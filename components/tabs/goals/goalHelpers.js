@@ -8,10 +8,12 @@ export const GOAL_TYPES = {
   },
   home: {
     icon: '🏠', label: 'Buy a Home', color: 'var(--blue)', dimColor: 'var(--blue-dim)',
+    inflationRate: 0.035, // Home price appreciation ~3.5%
     defaults: { targetYear: 2031, homePrice: 400000, downPct: 20, currentSavings: 20000 },
   },
   college: {
     icon: '🎓', label: 'College Fund', color: 'var(--purple)', dimColor: 'var(--purple-dim)',
+    inflationRate: 0.05, // College tuition inflation ~5%
     defaults: { childAge: 5, annualCost: 35000, years: 4, balance529: 10000 },
   },
   travel: {
@@ -20,7 +22,7 @@ export const GOAL_TYPES = {
   },
 };
 
-export const CURRENT_YEAR = 2026;
+export const CURRENT_YEAR = new Date().getFullYear();
 export const SAFE_WITHDRAWAL = 0.04;
 
 /* ── Helper: future value with monthly contributions ───── */
@@ -42,8 +44,9 @@ export function pmtNeeded(pv, fv, rateAnnual, years) {
 }
 
 /* ── Compute goal metrics ──────────────────────────────── */
-export function computeGoal(goal, currentAge) {
-  const inflRate = DEFAULT_INFLATION / 100;
+// totalSavings is the household total passed from GoalPlanner
+export function computeGoal(goal, currentAge, totalSavings = 0, goalCount = 1) {
+  const generalInflRate = DEFAULT_INFLATION / 100;
   const retRate = DEFAULT_RETURN;
 
   let targetYear, yearsOut, futureNeed, currentFunding, monthlyNeeded;
@@ -51,35 +54,38 @@ export function computeGoal(goal, currentAge) {
   switch (goal.type) {
     case 'retirement': {
       targetYear = CURRENT_YEAR + (goal.params.targetAge - currentAge);
-      yearsOut = goal.params.targetAge - currentAge;
-      const annualSpend = (goal.params.monthlySpending - goal.params.ssIncome) * 12;
-      futureNeed = (annualSpend / SAFE_WITHDRAWAL) * Math.pow(1 + inflRate, yearsOut);
-      currentFunding = 0;
-      monthlyNeeded = pmtNeeded(0, futureNeed, retRate, yearsOut);
+      yearsOut = Math.max(0, goal.params.targetAge - currentAge);
+      const annualGap = Math.max(0, goal.params.monthlySpending - goal.params.ssIncome) * 12;
+      futureNeed = (annualGap / SAFE_WITHDRAWAL) * Math.pow(1 + generalInflRate, yearsOut);
+      // Retirement uses household savings (proportional share if multiple goals)
+      currentFunding = goalCount > 0 ? totalSavings / goalCount : totalSavings;
+      monthlyNeeded = pmtNeeded(currentFunding, futureNeed, retRate, yearsOut);
       break;
     }
     case 'home': {
+      const homeInflRate = GOAL_TYPES.home.inflationRate; // 3.5%
       targetYear = goal.params.targetYear;
-      yearsOut = targetYear - CURRENT_YEAR;
-      const inflatedPrice = goal.params.homePrice * Math.pow(1 + inflRate, yearsOut);
+      yearsOut = Math.max(0, targetYear - CURRENT_YEAR);
+      const inflatedPrice = goal.params.homePrice * Math.pow(1 + homeInflRate, yearsOut);
       futureNeed = inflatedPrice * (goal.params.downPct / 100);
       currentFunding = goal.params.currentSavings;
       monthlyNeeded = pmtNeeded(currentFunding, futureNeed, retRate, yearsOut);
       break;
     }
     case 'college': {
-      const yearsToCollege = 18 - goal.params.childAge;
+      const collegeInflRate = GOAL_TYPES.college.inflationRate; // 5%
+      const yearsToCollege = Math.max(0, 18 - goal.params.childAge);
       targetYear = CURRENT_YEAR + yearsToCollege;
       yearsOut = yearsToCollege;
-      futureNeed = goal.params.annualCost * goal.params.years * Math.pow(1 + inflRate, yearsOut);
+      futureNeed = goal.params.annualCost * goal.params.years * Math.pow(1 + collegeInflRate, yearsOut);
       currentFunding = goal.params.balance529;
       monthlyNeeded = pmtNeeded(currentFunding, futureNeed, retRate, yearsOut);
       break;
     }
     case 'travel': {
       targetYear = goal.params.targetYear;
-      yearsOut = targetYear - CURRENT_YEAR;
-      futureNeed = goal.params.cost * Math.pow(1 + inflRate, yearsOut);
+      yearsOut = Math.max(0, targetYear - CURRENT_YEAR);
+      futureNeed = goal.params.cost * Math.pow(1 + generalInflRate, yearsOut);
       currentFunding = goal.params.currentSavings;
       monthlyNeeded = pmtNeeded(currentFunding, futureNeed, retRate, yearsOut);
       break;

@@ -41,10 +41,10 @@ export default function GoalPlanner() {
   const metricsMap = useMemo(() => {
     const map = {};
     for (const g of goals) {
-      map[g.id] = computeGoal(g, currentAge);
+      map[g.id] = computeGoal(g, currentAge, totalSavings, goals.length);
     }
     return map;
-  }, [goals, currentAge]);
+  }, [goals, currentAge, totalSavings]);
 
   const totalMonthlyNeeded = useMemo(() =>
     goals.reduce((s, g) => s + (metricsMap[g.id]?.monthlyNeeded || 0), 0),
