@@ -1,4 +1,23 @@
-const getConfig = () => ({
+import type { UserProfile } from './types';
+
+interface AuthConfig {
+  region: string;
+  apiUrl: string;
+  userPoolId: string;
+  userPoolClientId: string;
+  cognitoDomain: string;
+  redirectUri: string;
+}
+
+interface AuthTokens {
+  id_token: string;
+  access_token: string;
+  refresh_token?: string;
+  token_type?: string;
+  expires_in?: number;
+}
+
+const getConfig = (): AuthConfig => ({
   region: process.env.NEXT_PUBLIC_AWS_REGION || '',
   apiUrl: process.env.NEXT_PUBLIC_API_URL || '',
   userPoolId: process.env.NEXT_PUBLIC_USER_POOL_ID || '',
@@ -7,22 +26,22 @@ const getConfig = () => ({
   redirectUri: typeof window !== 'undefined' ? window.location.origin + window.location.pathname : '',
 });
 
-export const isConfigured = () => {
+export const isConfigured = (): boolean => {
   const c = getConfig();
   return !!(c.region && c.apiUrl && c.userPoolClientId);
 };
 
 const Auth = {
-  getTokens() {
-    try { return JSON.parse(sessionStorage.getItem('rs_tokens')); } catch { return null; }
+  getTokens(): AuthTokens | null {
+    try { return JSON.parse(sessionStorage.getItem('rs_tokens') || 'null'); } catch { return null; }
   },
-  setTokens(tokens) {
+  setTokens(tokens: AuthTokens): void {
     sessionStorage.setItem('rs_tokens', JSON.stringify(tokens));
   },
-  clearTokens() {
+  clearTokens(): void {
     sessionStorage.removeItem('rs_tokens');
   },
-  getUser() {
+  getUser(): UserProfile | null {
     const tokens = this.getTokens();
     if (!tokens?.id_token) return null;
     try {
@@ -31,7 +50,7 @@ const Auth = {
       return { name: payload.name || payload.email, given_name: payload.given_name, email: payload.email, sub: payload.sub, picture: payload.picture };
     } catch { return null; }
   },
-  getAccessToken() {
+  getAccessToken(): string | null {
     const tokens = this.getTokens();
     if (!tokens?.access_token) return null;
     try {
@@ -40,11 +59,11 @@ const Auth = {
       return tokens.access_token;
     } catch { return null; }
   },
-  getIdToken() {
+  getIdToken(): string | null {
     const tokens = this.getTokens();
     return tokens?.id_token || null;
   },
-  signIn() {
+  signIn(): void {
     const config = getConfig();
     if (!isConfigured()) return;
     const params = new URLSearchParams({
@@ -56,7 +75,7 @@ const Auth = {
     });
     window.location.href = `${config.cognitoDomain}/oauth2/authorize?${params}`;
   },
-  signOut() {
+  signOut(): void {
     this.clearTokens();
     const config = getConfig();
     if (!isConfigured()) return;
@@ -66,7 +85,7 @@ const Auth = {
     });
     window.location.href = `${config.cognitoDomain}/logout?${params}`;
   },
-  async handleCallback() {
+  async handleCallback(): Promise<boolean> {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     const config = getConfig();
@@ -84,7 +103,7 @@ const Auth = {
         }),
       });
       if (!resp.ok) throw new Error('Token exchange failed');
-      const tokens = await resp.json();
+      const tokens: AuthTokens = await resp.json();
       this.setTokens(tokens);
       return true;
     } catch (e) {

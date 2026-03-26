@@ -1,4 +1,6 @@
-export function computeTarget(age, risk) {
+import type { Allocation } from './types';
+
+export function computeTarget(age: number, risk: number): Allocation {
   const base = Math.max(20, Math.min(95, 110 - age));
   const adj = (risk - 3) * 8;
   const stock = Math.max(15, Math.min(95, base + adj));
