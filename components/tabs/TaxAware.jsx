@@ -7,6 +7,7 @@ import Stat from '@/components/ui/Stat';
 import SectionLabel from '@/components/ui/SectionLabel';
 import InfoBox from '@/components/ui/InfoBox';
 import MiniChart from '@/components/ui/MiniChart';
+import BracketButtons from '@/components/ui/BracketButtons';
 import { fmt } from '@/lib/format';
 import { TAX_BRACKETS } from '@/lib/constants';
 
@@ -42,18 +43,6 @@ export default function TaxAware() {
   const rothWins = final.rothNet > final.tradNet;
   const diff = Math.abs(final.rothNet - final.tradNet);
 
-  const bracketBtnStyle = (rate, selected) => ({
-    padding: '6px 12px',
-    border: `1.5px solid ${selected ? 'var(--accent)' : 'var(--border)'}`,
-    borderRadius: 8,
-    background: selected ? 'var(--accent)' : 'transparent',
-    color: selected ? 'var(--bg)' : 'var(--text-muted)',
-    fontSize: 12,
-    fontWeight: 600,
-    cursor: 'pointer',
-    transition: 'all .15s',
-  });
-
   return (
     <div className="fade-up">
       <InfoBox icon="⚖️" title="Roth vs Traditional: Which Wins?" color="var(--info)" bgColor="var(--info-dim)">
@@ -79,24 +68,12 @@ export default function TaxAware() {
 
             <div style={{ marginBottom: 18 }}>
               <div className="f11 dim upcase mb-8" style={{ letterSpacing: '.08em' }}>Current Bracket (working years)</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {TAX_BRACKETS.map(b => (
-                  <button key={b.rate} onClick={() => setCurrentBracket(b.rate)} style={bracketBtnStyle(b.rate, currentBracket === b.rate)}>
-                    {b.label}
-                  </button>
-                ))}
-              </div>
+              <BracketButtons brackets={TAX_BRACKETS} selected={currentBracket} onSelect={setCurrentBracket} />
             </div>
 
             <div>
               <div className="f11 dim upcase mb-8" style={{ letterSpacing: '.08em' }}>Retirement Bracket (withdrawals)</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {TAX_BRACKETS.map(b => (
-                  <button key={b.rate} onClick={() => setRetireBracket(b.rate)} style={bracketBtnStyle(b.rate, retireBracket === b.rate)}>
-                    {b.label}
-                  </button>
-                ))}
-              </div>
+              <BracketButtons brackets={TAX_BRACKETS} selected={retireBracket} onSelect={setRetireBracket} />
             </div>
           </Card>
         </div>

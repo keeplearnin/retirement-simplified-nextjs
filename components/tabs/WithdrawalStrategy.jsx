@@ -7,6 +7,7 @@ import Stat from '@/components/ui/Stat';
 import SectionLabel from '@/components/ui/SectionLabel';
 import InfoBox from '@/components/ui/InfoBox';
 import MiniChart from '@/components/ui/MiniChart';
+import BracketButtons from '@/components/ui/BracketButtons';
 import { fmt, fmtFull } from '@/lib/format';
 import { RMD_TABLE, TAX_BRACKETS } from '@/lib/constants';
 
@@ -149,18 +150,6 @@ export default function WithdrawalStrategy() {
     };
   }, [age, lifeExpectancy, annualSpend, returnRate, inflationRate, traditional, roth, taxable, socialSecurity, taxBracket, enableRothConversion, rothConversionAmt]);
 
-  const bracketBtnStyle = (rate, selected) => ({
-    padding: '6px 12px',
-    border: `1.5px solid ${selected ? 'var(--accent)' : 'var(--border)'}`,
-    borderRadius: 8,
-    background: selected ? 'var(--accent)' : 'transparent',
-    color: selected ? 'var(--bg)' : 'var(--text-muted)',
-    fontSize: 12,
-    fontWeight: 600,
-    cursor: 'pointer',
-    transition: 'all .15s',
-  });
-
   const withdrawalColor = results.withdrawalRate < 4 ? 'var(--accent)' : results.withdrawalRate <= 5 ? 'var(--warn)' : 'var(--danger)';
   const yearsColor = results.moneyRunsOutAge ? 'var(--danger)' : 'var(--accent)';
   const totalAccount = traditional + roth + taxable;
@@ -204,13 +193,7 @@ export default function WithdrawalStrategy() {
 
             <div style={{ marginTop: 14 }}>
               <div className="f11 dim upcase mb-8" style={{ letterSpacing: '.08em' }}>Tax Bracket</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {TAX_BRACKETS.map(b => (
-                  <button key={b.rate} onClick={() => setTaxBracket(b.rate)} style={bracketBtnStyle(b.rate, taxBracket === b.rate)}>
-                    {b.label}
-                  </button>
-                ))}
-              </div>
+              <BracketButtons brackets={TAX_BRACKETS} selected={taxBracket} onSelect={setTaxBracket} />
             </div>
           </Card>
 

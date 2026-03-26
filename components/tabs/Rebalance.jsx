@@ -7,6 +7,9 @@ import Stat from '@/components/ui/Stat';
 import SectionLabel from '@/components/ui/SectionLabel';
 import InfoBox from '@/components/ui/InfoBox';
 import Donut from '@/components/ui/Donut';
+import FormInput from '@/components/ui/FormInput';
+import FormSelect from '@/components/ui/FormSelect';
+import DonutLegend from '@/components/ui/DonutLegend';
 import { fmt, fmtFull } from '@/lib/format';
 import { RISK_LABELS, ASSET_CLASSES } from '@/lib/constants';
 import { computeTarget } from '@/lib/allocation';
@@ -154,27 +157,26 @@ export default function Rebalance() {
               </div>
             )}
             <div style={{ display: 'flex', gap: 6 }}>
-              <input
+              <FormInput
                 value={newHolding.name}
-                onChange={e => setNewHolding(h => ({ ...h, name: e.target.value }))}
+                onChange={v => setNewHolding(h => ({ ...h, name: v }))}
                 placeholder="Fund name (e.g. VTI)"
-                style={{ flex: 1, padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 12, outline: 'none' }}
+                style={{ flex: 1, padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: 12 }}
               />
-              <input
+              <FormInput
                 type="number"
                 value={newHolding.value}
-                onChange={e => setNewHolding(h => ({ ...h, value: e.target.value }))}
+                onChange={v => setNewHolding(h => ({ ...h, value: v }))}
                 placeholder="Value ($)"
-                style={{ width: 100, padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 12, outline: 'none' }}
+                style={{ width: 100, padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: 12 }}
                 onKeyDown={e => e.key === 'Enter' && addHolding()}
               />
-              <select
+              <FormSelect
                 value={newHolding.assetClass}
-                onChange={e => setNewHolding(h => ({ ...h, assetClass: e.target.value }))}
-                style={{ padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 12 }}
-              >
-                {ASSET_CLASSES.map(ac => <option key={ac.id} value={ac.id}>{ac.label}</option>)}
-              </select>
+                onChange={v => setNewHolding(h => ({ ...h, assetClass: v }))}
+                options={ASSET_CLASSES.map(ac => ({ value: ac.id, label: ac.label }))}
+                style={{ padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: 12 }}
+              />
               <button
                 onClick={addHolding}
                 style={{ padding: '8px 14px', borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer', background: 'var(--accent)', color: 'var(--bg)', fontWeight: 700, fontSize: 12 }}
@@ -226,13 +228,7 @@ export default function Rebalance() {
                   <Donut segs={currentSegs} label="Current" />
                   <Donut segs={targetSegs} label="Target" />
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap', marginTop: 12 }}>
-                  {ASSET_CLASSES.map(ac => (
-                    <div key={ac.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>
-                      <div style={{ width: 8, height: 8, borderRadius: 2, background: ac.color }} />{ac.label}
-                    </div>
-                  ))}
-                </div>
+                <DonutLegend items={ASSET_CLASSES} style={{ marginTop: 12, gap: 16 }} />
               </Card>
 
               {/* Drift Table */}

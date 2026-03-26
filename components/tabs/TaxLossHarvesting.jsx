@@ -6,6 +6,9 @@ import Card from '@/components/ui/Card';
 import Stat from '@/components/ui/Stat';
 import SectionLabel from '@/components/ui/SectionLabel';
 import InfoBox from '@/components/ui/InfoBox';
+import FormInput from '@/components/ui/FormInput';
+import FormSelect from '@/components/ui/FormSelect';
+import BracketButtons from '@/components/ui/BracketButtons';
 import { fmt, fmtFull } from '@/lib/format';
 import { TAX_BRACKETS, ASSET_CLASSES, REPLACEMENT_FUNDS } from '@/lib/constants';
 
@@ -53,18 +56,6 @@ export default function TaxLossHarvesting() {
     return { analyzed, totalGains, totalLosses, totalTaxSavings, netGainLoss };
   }, [holdings, taxRate, stateRate]);
 
-  const bracketBtnStyle = (rate, selected) => ({
-    padding: '6px 12px',
-    border: `1.5px solid ${selected ? 'var(--accent)' : 'var(--border)'}`,
-    borderRadius: 8,
-    background: selected ? 'var(--accent-dim)' : 'transparent',
-    color: selected ? 'var(--accent)' : 'var(--text-muted)',
-    fontSize: 12,
-    fontWeight: 600,
-    cursor: 'pointer',
-    transition: 'all .15s',
-  });
-
   const lossPositions = analysis.analyzed.filter(h => h.isLoss);
 
   return (
@@ -81,13 +72,7 @@ export default function TaxLossHarvesting() {
 
             <div style={{ marginBottom: 18 }}>
               <div className="f11 dim upcase mb-8" style={{ letterSpacing: '.08em' }}>Federal Tax Bracket</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {TAX_BRACKETS.map(b => (
-                  <button key={b.rate} onClick={() => setTaxRate(b.rate)} style={bracketBtnStyle(b.rate, taxRate === b.rate)}>
-                    {b.label}
-                  </button>
-                ))}
-              </div>
+              <BracketButtons brackets={TAX_BRACKETS} selected={taxRate} onSelect={setTaxRate} variant="dim" />
             </div>
 
             <Slider label="State Tax Rate" value={stateRate} onChange={setStateRate} min={0} max={13} step={0.5} suffix="%" />
@@ -122,42 +107,41 @@ export default function TaxLossHarvesting() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ display: 'flex', gap: 6 }}>
-                <input
+                <FormInput
                   value={newHolding.name}
-                  onChange={e => setNewHolding(h => ({ ...h, name: e.target.value }))}
+                  onChange={v => setNewHolding(h => ({ ...h, name: v }))}
                   placeholder="Fund name (e.g. VTI)"
-                  style={{ flex: 1, padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 12, outline: 'none' }}
+                  style={{ flex: 1, padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: 12 }}
                 />
-                <select
+                <FormSelect
                   value={newHolding.assetClass}
-                  onChange={e => setNewHolding(h => ({ ...h, assetClass: e.target.value }))}
-                  style={{ padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 12 }}
-                >
-                  {ASSET_CLASSES.map(ac => <option key={ac.id} value={ac.id}>{ac.label}</option>)}
-                </select>
+                  onChange={v => setNewHolding(h => ({ ...h, assetClass: v }))}
+                  options={ASSET_CLASSES.map(ac => ({ value: ac.id, label: ac.label }))}
+                  style={{ padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: 12 }}
+                />
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
-                <input
+                <FormInput
                   type="number"
                   value={newHolding.costBasis}
-                  onChange={e => setNewHolding(h => ({ ...h, costBasis: e.target.value }))}
+                  onChange={v => setNewHolding(h => ({ ...h, costBasis: v }))}
                   placeholder="Cost basis ($)"
-                  style={{ flex: 1, padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 12, outline: 'none' }}
+                  style={{ flex: 1, padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: 12 }}
                 />
-                <input
+                <FormInput
                   type="number"
                   value={newHolding.currentValue}
-                  onChange={e => setNewHolding(h => ({ ...h, currentValue: e.target.value }))}
+                  onChange={v => setNewHolding(h => ({ ...h, currentValue: v }))}
                   placeholder="Current value ($)"
-                  style={{ flex: 1, padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 12, outline: 'none' }}
+                  style={{ flex: 1, padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: 12 }}
                 />
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
-                <input
+                <FormInput
                   type="date"
                   value={newHolding.purchaseDate}
-                  onChange={e => setNewHolding(h => ({ ...h, purchaseDate: e.target.value }))}
-                  style={{ flex: 1, padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 12, outline: 'none' }}
+                  onChange={v => setNewHolding(h => ({ ...h, purchaseDate: v }))}
+                  style={{ flex: 1, padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: 12 }}
                 />
                 <button
                   onClick={addHolding}

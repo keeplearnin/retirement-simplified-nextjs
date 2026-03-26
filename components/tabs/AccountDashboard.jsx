@@ -7,6 +7,9 @@ import Stat from '@/components/ui/Stat';
 import SectionLabel from '@/components/ui/SectionLabel';
 import InfoBox from '@/components/ui/InfoBox';
 import Donut from '@/components/ui/Donut';
+import FormInput from '@/components/ui/FormInput';
+import FormSelect from '@/components/ui/FormSelect';
+import DonutLegend from '@/components/ui/DonutLegend';
 import { fmt, fmtFull } from '@/lib/format';
 import { ASSET_CLASSES, ACCOUNT_TYPES, RISK_LABELS } from '@/lib/constants';
 import { computeTarget } from '@/lib/allocation';
@@ -117,32 +120,30 @@ export default function AccountDashboard() {
           {/* Add Account Form in empty state */}
           <div style={{ maxWidth: 520, margin: '0 auto' }}>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
-              <input
+              <FormInput
                 value={newAccount.name}
-                onChange={e => setNewAccount(a => ({ ...a, name: e.target.value }))}
+                onChange={v => setNewAccount(a => ({ ...a, name: v }))}
                 placeholder="Account name"
-                style={{ flex: '1 1 140px', padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 12, outline: 'none' }}
+                style={{ flex: '1 1 140px', padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: 12, width: 'auto' }}
               />
-              <select
+              <FormSelect
                 value={newAccount.type}
-                onChange={e => setNewAccount(a => ({ ...a, type: e.target.value }))}
-                style={{ padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 12 }}
-              >
-                {ACCOUNT_TYPES.map(at => <option key={at.id} value={at.id}>{at.label}</option>)}
-              </select>
-              <select
+                onChange={v => setNewAccount(a => ({ ...a, type: v }))}
+                options={ACCOUNT_TYPES.map(at => ({ value: at.id, label: at.label }))}
+                style={{ padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: 12 }}
+              />
+              <FormSelect
                 value={newAccount.institution}
-                onChange={e => setNewAccount(a => ({ ...a, institution: e.target.value }))}
-                style={{ padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 12 }}
-              >
-                {INSTITUTIONS.map(inst => <option key={inst} value={inst}>{inst}</option>)}
-              </select>
-              <input
+                onChange={v => setNewAccount(a => ({ ...a, institution: v }))}
+                options={INSTITUTIONS}
+                style={{ padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: 12 }}
+              />
+              <FormInput
                 type="number"
                 value={newAccount.balance}
-                onChange={e => setNewAccount(a => ({ ...a, balance: e.target.value }))}
+                onChange={v => setNewAccount(a => ({ ...a, balance: v }))}
                 placeholder="Balance ($)"
-                style={{ width: 110, padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 12, outline: 'none' }}
+                style={{ width: 110, padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: 12 }}
                 onKeyDown={e => e.key === 'Enter' && addAccount()}
               />
               <button
@@ -224,32 +225,30 @@ export default function AccountDashboard() {
 
             {/* Add Account Form */}
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <input
+              <FormInput
                 value={newAccount.name}
-                onChange={e => setNewAccount(a => ({ ...a, name: e.target.value }))}
+                onChange={v => setNewAccount(a => ({ ...a, name: v }))}
                 placeholder="Account name"
-                style={{ flex: '1 1 140px', padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 12, outline: 'none' }}
+                style={{ flex: '1 1 140px', padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: 12, width: 'auto' }}
               />
-              <select
+              <FormSelect
                 value={newAccount.type}
-                onChange={e => setNewAccount(a => ({ ...a, type: e.target.value }))}
-                style={{ padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 12 }}
-              >
-                {ACCOUNT_TYPES.map(at => <option key={at.id} value={at.id}>{at.label}</option>)}
-              </select>
-              <select
+                onChange={v => setNewAccount(a => ({ ...a, type: v }))}
+                options={ACCOUNT_TYPES.map(at => ({ value: at.id, label: at.label }))}
+                style={{ padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: 12 }}
+              />
+              <FormSelect
                 value={newAccount.institution}
-                onChange={e => setNewAccount(a => ({ ...a, institution: e.target.value }))}
-                style={{ padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 12 }}
-              >
-                {INSTITUTIONS.map(inst => <option key={inst} value={inst}>{inst}</option>)}
-              </select>
-              <input
+                onChange={v => setNewAccount(a => ({ ...a, institution: v }))}
+                options={INSTITUTIONS}
+                style={{ padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: 12 }}
+              />
+              <FormInput
                 type="number"
                 value={newAccount.balance}
-                onChange={e => setNewAccount(a => ({ ...a, balance: e.target.value }))}
+                onChange={v => setNewAccount(a => ({ ...a, balance: v }))}
                 placeholder="Balance ($)"
-                style={{ width: 110, padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 12, outline: 'none' }}
+                style={{ width: 110, padding: '8px 10px', borderRadius: 'var(--radius-sm)', fontSize: 12 }}
                 onKeyDown={e => e.key === 'Enter' && addAccount()}
               />
               <button
@@ -328,14 +327,7 @@ export default function AccountDashboard() {
               {accountTypeSegs.length > 0 ? (
                 <>
                   <Donut segs={accountTypeSegs} label={fmt(totalNetWorth)} />
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap', marginTop: 12 }}>
-                    {accountTypeSegs.map(seg => (
-                      <div key={seg.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>
-                        <div style={{ width: 8, height: 8, borderRadius: 2, background: seg.color }} />
-                        {seg.label} ({seg.pct.toFixed(0)}%)
-                      </div>
-                    ))}
-                  </div>
+                  <DonutLegend items={accountTypeSegs} style={{ marginTop: 12 }} />
                   <div style={{ textAlign: 'center', marginTop: 14, padding: '8px 12px', background: 'var(--bg2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
                     <span className="f11 dim">For detailed asset allocation, use the <strong style={{ color: 'var(--accent)' }}>Rebalance</strong> tab</span>
                   </div>
