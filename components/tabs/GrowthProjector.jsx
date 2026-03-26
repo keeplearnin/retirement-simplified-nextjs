@@ -438,6 +438,33 @@ export default function GrowthProjector() {
               You may be leaving free money on the table. Consider increasing your 401(k) contribution to at least capture the full employer match.
             </InfoBox>
           )}
+
+          {/* Bridge to Monte Carlo */}
+          <button
+            onClick={() => {
+              localStorage.setItem('growthToMonteCarlo', JSON.stringify({
+                age, retireAge, savings: totalSavings, monthly: totalMonthlyNow,
+                salaryGrowth, annualSpend: Math.round(monthlyIncome * 12),
+              }));
+              window.dispatchEvent(new CustomEvent('navigate-tab', { detail: 'montecarlo' }));
+            }}
+            style={{
+              width: '100%', marginTop: 14, padding: '14px 24px', borderRadius: 10,
+              background: 'linear-gradient(135deg, rgba(139,92,246,0.15) 0%, rgba(52,211,153,0.10) 100%)',
+              border: '1.5px solid rgba(139,92,246,0.3)', cursor: 'pointer', transition: 'all .2s',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            }}
+          >
+            <span style={{ fontSize: 20 }}>🎲</span>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--sans)' }}>
+                Stress-Test with Monte Carlo →
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                Run 1,000 market simulations with these numbers
+              </div>
+            </div>
+          </button>
         </div>
       </div>
     </div>

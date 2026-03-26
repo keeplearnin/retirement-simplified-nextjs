@@ -31,6 +31,9 @@ function AppContent() {
 
   useEffect(() => {
     setTimeout(() => setLoaded(true), 100);
+    const handler = (e) => setTab(e.detail);
+    window.addEventListener('navigate-tab', handler);
+    return () => window.removeEventListener('navigate-tab', handler);
   }, []);
 
   const categories = [

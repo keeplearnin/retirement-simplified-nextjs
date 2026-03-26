@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Slider from '@/components/ui/Slider';
 import Card from '@/components/ui/Card';
 import Stat from '@/components/ui/Stat';
@@ -81,6 +81,23 @@ export default function MonteCarlo() {
   const [simData, setSimData] = useState(null);
   const [running, setRunning] = useState(false);
   const [sensitivity, setSensitivity] = useState(null);
+
+  // Auto-populate from Growth Projector if navigated via bridge button
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('growthToMonteCarlo');
+      if (stored) {
+        const d = JSON.parse(stored);
+        if (d.age) setAge(d.age);
+        if (d.retireAge) setRetireAge(d.retireAge);
+        if (d.savings) setSavings(d.savings);
+        if (d.monthly) setMonthly(Math.round(d.monthly));
+        if (d.salaryGrowth !== undefined) setSalaryGrowth(d.salaryGrowth);
+        if (d.annualSpend) setAnnualSpend(d.annualSpend);
+        localStorage.removeItem('growthToMonteCarlo'); // consume once
+      }
+    } catch {}
+  }, []);
 
   const activeProfile = PORTFOLIO_PROFILES.find(p => p.id === portfolioProfile);
   const avgReturn = portfolioProfile === 'custom' ? customReturn / 100 : activeProfile.avgReturn;
