@@ -94,6 +94,14 @@ export default function WithdrawalStrategy() {
         totalRMDs += rmd;
         totalConversions += conversion;
 
+        // Tax impact: Traditional withdrawals taxed at ordinary rate, Roth tax-free, Taxable at LTCG
+        const ltcgRate = taxBracket <= 12 ? 0 : taxBracket >= 37 ? 0.20 : 0.15;
+        const taxOnTraditional = fromTraditional * (taxBracket / 100);
+        const taxOnTaxable = fromTaxable * ltcgRate * 0.5; // ~50% of taxable withdrawal is gains
+        const taxOnConversion = conversion * (taxBracket / 100);
+        const totalTax = taxOnTraditional + taxOnTaxable + taxOnConversion;
+        const afterTaxIncome = (fromTaxable + fromTraditional + fromRoth + ssIncome) - totalTax;
+
         projection.push({
           year: y,
           age: currentAge,
@@ -108,6 +116,8 @@ export default function WithdrawalStrategy() {
           fromTraditional,
           fromRoth,
           conversion,
+          totalTax,
+          afterTaxIncome,
         });
 
         if (total <= 0 && !moneyRunsOutAge) {
@@ -243,6 +253,33 @@ export default function WithdrawalStrategy() {
             <Stat icon="📅" label="Years Funded" value={results.yearsOfRetirement} sub={results.moneyRunsOutAge ? 'Money runs out early' : 'Fully funded'} color={yearsColor} />
             <Stat icon="🎯" label="Money Lasts Until" value={`Age ${age + results.yearsOfRetirement}`} sub={results.moneyRunsOutAge ? 'Consider reducing spend' : 'On track'} color={yearsColor} />
           </div>
+
+          {/* Tax Impact Summary */}
+          {results.projectionData.length > 1 && (() => {
+            const firstYear = results.projectionData[0] || {};
+            const avgTax = results.projectionData.reduce((s, d) => s + (d.totalTax || 0), 0) / results.projectionData.length;
+            const totalLifetimeTax = results.projectionData.reduce((s, d) => s + (d.totalTax || 0), 0);
+            return (
+              <Card style={{ marginBottom: 14, background: 'var(--bg2)', border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div className="f11 dim upcase" style={{ letterSpacing: '.08em', marginBottom: 4 }}>Estimated Tax Impact</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                      Year 1 tax: <strong style={{ color: 'var(--danger)' }}>{fmtFull(Math.round(firstYear.totalTax || 0))}</strong>
+                      {' · '}Avg annual: <strong style={{ color: 'var(--warn)' }}>{fmtFull(Math.round(avgTax))}</strong>
+                      {' · '}Lifetime est: <strong style={{ color: 'var(--danger)' }}>{fmt(Math.round(totalLifetimeTax))}</strong>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div className="f11 dim upcase" style={{ letterSpacing: '.08em', marginBottom: 4 }}>Year 1 After-Tax</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--accent)', fontFamily: 'var(--serif)' }}>
+                      {fmtFull(Math.round(firstYear.afterTaxIncome || 0))}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            );
+          })()}
 
           {/* Account Drawdown Chart */}
           <Card>

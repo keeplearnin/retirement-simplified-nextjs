@@ -7,6 +7,7 @@ import Stat from '@/components/ui/Stat';
 import SectionLabel from '@/components/ui/SectionLabel';
 import InfoBox from '@/components/ui/InfoBox';
 import { fmt } from '@/lib/format';
+import ValidationWarning from '@/components/ui/ValidationWarning';
 import { GRID_FRACS, DEFAULT_RETURN, DEFAULT_STD_DEV } from '@/lib/constants';
 
 const avgReturn = DEFAULT_RETURN;
@@ -103,6 +104,16 @@ export default function MonteCarlo() {
     return { makePath, makeBand, gridLines, retireX, xScale, yScale, maxVal, percentiles, totalYears, years };
   }, [simData, w, h]);
 
+  const warnings = useMemo(() => {
+    const w = [];
+    if (savings === 0 && monthly === 0) w.push('Both savings and contributions are $0 — simulation will show 0% success.');
+    if (annualSpend === 0) w.push('Annual spending is $0 — all simulations will succeed (unrealistic).');
+    if (endAge - retireAge < 10) w.push('Short retirement period — consider planning to at least age 90.');
+    if (retireAge - age < 5) w.push('Very short accumulation period — you may not have enough time to build savings.');
+    if (simData && simData.successRate < 50) w.push('Success rate is below 50% — consider saving more, spending less, or retiring later.');
+    return w;
+  }, [savings, monthly, annualSpend, endAge, retireAge, age, simData]);
+
   return (
     <div className="fade-up">
       <InfoBox icon="🎲" title="Monte Carlo Simulation" color="var(--purple)" bgColor="var(--purple-dim, rgba(139,92,246,0.08))">
@@ -110,6 +121,8 @@ export default function MonteCarlo() {
         Instead of assuming a fixed return, each simulation uses randomized annual returns based on historical market behavior (7% average, 15% standard deviation).
         This gives you a realistic range of outcomes rather than a single optimistic number.
       </InfoBox>
+
+      <ValidationWarning warnings={warnings} />
 
       <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 32, marginTop: 20 }}>
         <div>

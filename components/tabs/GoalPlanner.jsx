@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { useLocalState } from '@/lib/useLocalState';
+import ValidationWarning from '@/components/ui/ValidationWarning';
 import Card from '@/components/ui/Card';
 import Slider from '@/components/ui/Slider';
 import Stat from '@/components/ui/Stat';
@@ -63,8 +64,17 @@ export default function GoalPlanner() {
 
   const feasibilityScore = Math.max(0, Math.min(100, Math.round((1 / Math.max(feasibilityRatio, 0.01)) * 100)));
 
+  const warnings = useMemo(() => {
+    const w = [];
+    if (monthlyAvailable === 0) w.push('Monthly available is $0 — set a savings amount to see if your goals are achievable.');
+    if (feasibilityRatio > 2) w.push('Your goals require more than 2x your available savings — consider prioritizing or adjusting timelines.');
+    if (goals.some(g => metricsMap[g.id]?.yearsOut <= 0)) w.push('One or more goals have a target date in the past — check your ages.');
+    return w;
+  }, [monthlyAvailable, feasibilityRatio, goals, metricsMap]);
+
   return (
     <div className="fade-up">
+      <ValidationWarning warnings={warnings} />
       {/* Shared inputs */}
       <Card style={{ marginBottom: 20 }}>
         <SectionLabel>Your Household</SectionLabel>

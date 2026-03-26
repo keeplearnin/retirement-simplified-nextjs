@@ -72,8 +72,12 @@ export default function SocialSecurity() {
   return (
     <div className="fade-up">
       <InfoBox icon="⚠️" title="Social Security Is a Starting Point, Not a Plan" color="var(--warn)" bgColor="var(--warn-dim)">
-        Social Security replaces roughly 40% of pre-retirement income for average earners. When you claim matters — waiting until 70 can increase your benefit by over 75% compared to claiming at 62. This estimator uses the actual PIA formula with 2024 bend points.
+        Social Security replaces roughly 40% of pre-retirement income for average earners. When you claim matters — waiting until 70 can increase your benefit by over 75% compared to claiming at 62. This estimator uses the actual PIA formula with 2025 bend points.
       </InfoBox>
+
+      <div style={{ background: 'var(--blue-dim)', border: '1px solid var(--blue)', borderRadius: 'var(--radius-sm)', padding: '8px 14px', marginTop: 12, fontSize: 11, color: 'var(--blue)', fontFamily: 'var(--sans)', display: 'flex', gap: 6, alignItems: 'center' }}>
+        <span>ℹ️</span> Bend points and wage cap reflect 2025 SSA figures (${SS_WAGE_CAP.toLocaleString()} cap, ${SS_BEND_POINTS[0]}/${SS_BEND_POINTS[1]} AIME). These change annually — verify at <a href="https://www.ssa.gov/OACT/COLA/bendpoints.html" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue)', textDecoration: 'underline' }}>ssa.gov</a> for the latest.
+      </div>
 
       <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 32, marginTop: 16 }}>
         <div>
