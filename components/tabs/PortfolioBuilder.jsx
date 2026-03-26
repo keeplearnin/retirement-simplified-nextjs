@@ -8,6 +8,7 @@ import InfoBox from '@/components/ui/InfoBox';
 import Donut from '@/components/ui/Donut';
 import { fmt, fmtFull } from '@/lib/format';
 import { RISK_LABELS } from '@/lib/constants';
+import PortfolioAnalytics from '@/components/tabs/portfolio/PortfolioAnalytics';
 
 // ── ETF universe with real data (10yr + 20yr returns) ──────────────────
 const ETF_DATA = {
@@ -108,6 +109,7 @@ export default function PortfolioBuilder() {
   const [includeGold, setIncludeGold] = useState(true);
   const [intlBias, setIntlBias] = useState(35);
   const [broker, setBroker] = useState('vanguard');
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   useEffect(() => {
     try {
@@ -449,6 +451,30 @@ export default function PortfolioBuilder() {
           ))}
         </div>
       </Card>
+
+      {/* Deep Analytics Toggle */}
+      <button
+        onClick={() => setShowAnalytics(!showAnalytics)}
+        style={{
+          width: '100%', marginTop: 20, padding: '16px 24px', borderRadius: 10,
+          background: showAnalytics ? 'rgba(99,102,241,0.12)' : 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(52,211,153,0.06) 100%)',
+          border: showAnalytics ? '1.5px solid rgba(99,102,241,0.4)' : '1.5px solid var(--border)',
+          cursor: 'pointer', transition: 'all .25s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+        }}
+      >
+        <span style={{ fontSize: 22 }}>📊</span>
+        <div style={{ textAlign: 'left' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--sans)' }}>
+            {showAnalytics ? 'Hide' : 'Show'} Deep Portfolio Analytics
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+            Correlation matrix · Stress tests · Sharpe ratios · Tax efficiency · Sector/geo exposure · Rate sensitivity
+          </div>
+        </div>
+        <span style={{ fontSize: 18, color: 'var(--text-dim)', transition: 'transform .2s', transform: showAnalytics ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
+      </button>
+
+      {showAnalytics && <PortfolioAnalytics alloc={alloc} portfolioSize={portfolioSize} funds={funds} />}
     </div>
   );
 }
