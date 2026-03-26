@@ -21,6 +21,7 @@ export default function MonteCarlo() {
   const [annualSpend, setAnnualSpend] = useState(50000);
   const [endAge, setEndAge] = useState(95);
   const [inflationPct, setInflationPct] = useState(2.5);
+  const [salaryGrowth, setSalaryGrowth] = useState(3);
   const [runs, setRuns] = useState(1000);
   const [simData, setSimData] = useState(null);
   const [running, setRunning] = useState(false);
@@ -34,16 +35,20 @@ export default function MonteCarlo() {
       const paths = [];
       let successes = 0;
       const percentiles = { p10: [], p25: [], p50: [], p75: [], p90: [] };
+      const salGrowthRate = salaryGrowth / 100;
       for (let i = 0; i < runs; i++) {
         let bal = savings;
         const path = [bal];
         let failed = false;
         for (let y = 1; y <= totalYears; y++) {
-          const u1 = Math.random(), u2 = Math.random();
+          // Box-Muller: guard against log(0) which produces -Infinity
+          const u1 = Math.max(1e-10, Math.random()), u2 = Math.random();
           const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
           const r = avgReturn + stdDev * z;
           if (y <= years) {
-            bal = bal * (1 + r) + monthly * 12;
+            // Contributions grow with salary (e.g., 3%/yr raises)
+            const yearlyContrib = monthly * 12 * Math.pow(1 + salGrowthRate, y - 1);
+            bal = bal * (1 + r) + yearlyContrib;
           } else {
             bal = bal * (1 + r) - annualSpend * Math.pow(1 + inflationPct / 100, y - years);
           }
@@ -132,7 +137,8 @@ export default function MonteCarlo() {
             <Slider label="Retirement Age" value={retireAge} onChange={v => { setRetireAge(v); if (endAge <= v + 5) setEndAge(v + 5); }} min={Math.max(age + 5, 50)} max={80} suffix=" yrs" />
             <Slider label="Plan Until Age" value={endAge} onChange={setEndAge} min={Math.max(retireAge + 5, 75)} max={100} suffix=" yrs" tooltip="How long to model retirement spending" />
             <Slider label="Current Savings" value={savings} onChange={setSavings} min={0} max={2000000} step={5000} format={fmt} />
-            <Slider label="Monthly Contribution" value={monthly} onChange={setMonthly} min={0} max={10000} step={50} format={fmt} tooltip="How much you invest each month before retirement" />
+            <Slider label="Monthly Contribution" value={monthly} onChange={setMonthly} min={0} max={10000} step={50} format={fmt} tooltip="How much you invest each month before retirement (grows with salary)" />
+            <Slider label="Salary Growth Rate" value={salaryGrowth} onChange={setSalaryGrowth} min={0} max={6} step={0.5} suffix="%" tooltip="Annual raise — contributions grow at this rate" />
             <Slider label="Annual Spending in Retirement" value={annualSpend} onChange={setAnnualSpend} min={20000} max={200000} step={1000} format={fmt} tooltip="Yearly spending adjusted for inflation each year" />
             <Slider label="Inflation Rate" value={inflationPct} onChange={setInflationPct} min={1} max={5} step={0.5} suffix="%" tooltip="Annual inflation applied to spending" />
             <Slider label="Simulations" value={runs} onChange={setRuns} min={100} max={5000} step={100} tooltip="More runs = smoother results but slower" />

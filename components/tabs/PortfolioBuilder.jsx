@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Slider from '@/components/ui/Slider';
 import Card from '@/components/ui/Card';
 import SectionLabel from '@/components/ui/SectionLabel';
@@ -11,6 +11,17 @@ import { RISK_LABELS, ASSET_CLASSES } from '@/lib/constants';
 export default function PortfolioBuilder() {
   const [age, setAge] = useState(35);
   const [risk, setRisk] = useState(3);
+
+  // Auto-set risk from Risk Quiz result if available
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('riskProfile');
+      if (stored) {
+        const profile = JSON.parse(stored);
+        if (profile.level >= 1 && profile.level <= 5) setRisk(profile.level);
+      }
+    } catch {}
+  }, []);
 
   const alloc = useMemo(() => {
     const base = Math.max(20, Math.min(95, 110 - age));

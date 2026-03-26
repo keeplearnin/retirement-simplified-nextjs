@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useLocalState } from '@/lib/useLocalState';
 import Slider from '@/components/ui/Slider';
 import Card from '@/components/ui/Card';
@@ -18,6 +18,17 @@ import { computeTarget } from '@/lib/allocation';
 export default function Rebalance() {
   const [age, setAge] = useState(35);
   const [risk, setRisk] = useState(3);
+
+  // Auto-set risk from Risk Quiz result if available
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('riskProfile');
+      if (stored) {
+        const profile = JSON.parse(stored);
+        if (profile.level >= 1 && profile.level <= 5) setRisk(profile.level);
+      }
+    } catch {}
+  }, []);
   const [threshold, setThreshold] = useState(5);
   const [holdings, setHoldings] = useLocalState('rebalance_holdings', []);
   const [newHolding, setNewHolding] = useState({ name: '', value: '', assetClass: 'us_stock' });

@@ -66,11 +66,18 @@ const RISK_COLORS = [
   'var(--danger)',
 ];
 
-function scoreToLevel(total) {
-  if (total <= 16) return 0;
-  if (total <= 22) return 1;
-  if (total <= 28) return 2;
-  if (total <= 34) return 3;
+function scoreToLevel(total, answers) {
+  // Weight time horizon (Q2) and age (Q1) — young investors with long horizons get a boost
+  const ageScore = answers[0] || 0; // 1=Under 30, 2=30-45, 3=46-55, 4=Over 55
+  const horizonScore = answers[1] || 0; // 1=20+yrs, 2=10-20, 3=5-10, 4=<5
+  // Young + long horizon = natural fit for growth — add bonus points
+  const timeBonus = (ageScore <= 2 && horizonScore <= 2) ? 4 : (ageScore <= 2 && horizonScore <= 3) ? 2 : 0;
+  const adjusted = total + timeBonus;
+
+  if (adjusted <= 16) return 0;
+  if (adjusted <= 22) return 1;
+  if (adjusted <= 28) return 2;
+  if (adjusted <= 34) return 3;
   return 4;
 }
 
@@ -123,7 +130,7 @@ export default function RiskQuiz() {
   }, []);
 
   const total = useMemo(() => answers.reduce((s, v) => s + (v || 0), 0), [answers]);
-  const level = useMemo(() => scoreToLevel(total), [total]);
+  const level = useMemo(() => scoreToLevel(total, answers), [total, answers]);
   const alloc = ALLOCATIONS[level];
   const label = RISK_LABELS[level];
   const color = RISK_COLORS[level];
@@ -229,11 +236,23 @@ export default function RiskQuiz() {
         </Card>
 
         <InfoBox icon="🎯" title="What this means" color={color} bgColor={`${color}11`}>
-          {level === 0 && 'Your profile suggests a very conservative approach. Focus on capital preservation with mostly bonds and a small stock allocation. Ideal if you are near or in retirement.'}
-          {level === 1 && 'You lean conservative. A balanced portfolio weighted toward bonds provides steady income with moderate growth. Good for those within 10 years of retirement.'}
-          {level === 2 && 'A moderate risk tolerance balances growth and stability. A classic 60/40 split gives you market participation with downside cushioning.'}
-          {level === 3 && 'You are comfortable with volatility for higher long-term returns. An 80/20 stock-to-bond ratio is aggressive but historically rewarding over 10+ year horizons.'}
-          {level === 4 && 'Maximum growth tolerance. A nearly all-stock portfolio targets the highest long-term returns, but expect significant short-term swings.'}
+          {level === 0 && (answers[0] <= 2
+            ? 'Your answers suggest a very conservative approach despite your young age. While capital preservation is safe, consider that with 20+ years to retirement, you have time to ride out market dips. Even a small increase in stock allocation could significantly boost long-term growth.'
+            : 'Your profile suggests a very conservative approach. Focus on capital preservation with mostly bonds and a small stock allocation. Ideal if you are near or in retirement.'
+          )}
+          {level === 1 && (answers[0] <= 2
+            ? 'You lean conservative, which is understandable as a newer investor. With decades ahead, you have the most powerful advantage: time. A slightly higher stock allocation (50-60%) could add significant wealth over your career.'
+            : 'You lean conservative. A balanced portfolio weighted toward bonds provides steady income with moderate growth. Good for those within 10 years of retirement.'
+          )}
+          {level === 2 && 'A moderate risk tolerance balances growth and stability. A classic 60/40 split gives you market participation with downside cushioning. A solid choice for most investors.'}
+          {level === 3 && (answers[0] <= 2
+            ? 'Great fit for your age. An 80/20 stock-to-bond ratio is aggressive but historically rewarding — and with 20+ years of compounding, you can weather short-term volatility for higher long-term returns.'
+            : 'You are comfortable with volatility for higher long-term returns. An 80/20 stock-to-bond ratio is aggressive but historically rewarding over 10+ year horizons.'
+          )}
+          {level === 4 && (answers[0] <= 2
+            ? 'Maximum growth — and with your long time horizon, this makes sense. A nearly all-stock portfolio targets the highest long-term returns. Start here and gradually shift toward bonds as you approach retirement.'
+            : 'Maximum growth tolerance. A nearly all-stock portfolio targets the highest long-term returns, but expect significant short-term swings.'
+          )}
         </InfoBox>
 
         <div style={{ textAlign: 'center', marginTop: 24 }}>
