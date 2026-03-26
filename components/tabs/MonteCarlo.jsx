@@ -7,10 +7,10 @@ import Stat from '@/components/ui/Stat';
 import SectionLabel from '@/components/ui/SectionLabel';
 import InfoBox from '@/components/ui/InfoBox';
 import { fmt } from '@/lib/format';
-import { GRID_FRACS } from '@/lib/constants';
+import { GRID_FRACS, DEFAULT_RETURN, DEFAULT_STD_DEV } from '@/lib/constants';
 
-const avgReturn = 0.07;
-const stdDev = 0.15;
+const avgReturn = DEFAULT_RETURN;
+const stdDev = DEFAULT_STD_DEV;
 const inflationRate = 0.025;
 
 export default function MonteCarlo() {

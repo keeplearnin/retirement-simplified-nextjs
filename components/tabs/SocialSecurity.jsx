@@ -8,20 +8,21 @@ import SectionLabel from '@/components/ui/SectionLabel';
 import InfoBox from '@/components/ui/InfoBox';
 import MiniChart from '@/components/ui/MiniChart';
 import { fmt } from '@/lib/format';
+import { SS_WAGE_CAP, SS_BEND_POINTS, SS_FACTORS, SS_FRA } from '@/lib/constants';
 
 function estimateBenefit(currentIncome, startAge, workYears) {
-  const aime = Math.min(currentIncome, 168600) / 12;
+  const aime = Math.min(currentIncome, SS_WAGE_CAP) / 12;
 
   let pia;
-  if (aime <= 1174) {
-    pia = aime * 0.9;
-  } else if (aime <= 7078) {
-    pia = 1174 * 0.9 + (aime - 1174) * 0.32;
+  if (aime <= SS_BEND_POINTS[0]) {
+    pia = aime * SS_FACTORS[0];
+  } else if (aime <= SS_BEND_POINTS[1]) {
+    pia = SS_BEND_POINTS[0] * SS_FACTORS[0] + (aime - SS_BEND_POINTS[0]) * SS_FACTORS[1];
   } else {
-    pia = 1174 * 0.9 + (7078 - 1174) * 0.32 + (aime - 7078) * 0.15;
+    pia = SS_BEND_POINTS[0] * SS_FACTORS[0] + (SS_BEND_POINTS[1] - SS_BEND_POINTS[0]) * SS_FACTORS[1] + (aime - SS_BEND_POINTS[1]) * SS_FACTORS[2];
   }
 
-  const fra = 67;
+  const fra = SS_FRA;
   let ageAdj;
   if (startAge < fra) {
     ageAdj = 1 - ((fra - startAge) * 12 * 0.00556);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import Slider from '@/components/ui/Slider';
 import Card from '@/components/ui/Card';
 import Stat from '@/components/ui/Stat';
@@ -9,9 +9,8 @@ import InfoBox from '@/components/ui/InfoBox';
 import { fmt, fmtFull } from '@/lib/format';
 import { TAX_BRACKETS, ASSET_CLASSES, REPLACEMENT_FUNDS } from '@/lib/constants';
 
-let holdingIdCounter = 0;
-
 export default function TaxLossHarvesting() {
+  const idCounter = useRef(0);
   const [holdings, setHoldings] = useState([]);
   const [taxRate, setTaxRate] = useState(24);
   const [stateRate, setStateRate] = useState(5);
@@ -21,7 +20,7 @@ export default function TaxLossHarvesting() {
     const cv = parseFloat(newHolding.currentValue);
     const cb = parseFloat(newHolding.costBasis);
     if (!newHolding.name || !cv || cv <= 0 || !cb || cb <= 0 || !newHolding.purchaseDate) return;
-    setHoldings(h => [...h, { id: ++holdingIdCounter, name: newHolding.name, currentValue: cv, costBasis: cb, assetClass: newHolding.assetClass, purchaseDate: newHolding.purchaseDate }]);
+    setHoldings(h => [...h, { id: ++idCounter.current, name: newHolding.name, currentValue: cv, costBasis: cb, assetClass: newHolding.assetClass, purchaseDate: newHolding.purchaseDate }]);
     setNewHolding({ name: '', currentValue: '', costBasis: '', assetClass: 'us_stock', purchaseDate: '' });
   }
 

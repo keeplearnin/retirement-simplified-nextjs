@@ -1,22 +1,20 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import Slider from '@/components/ui/Slider';
 import Card from '@/components/ui/Card';
 import Stat from '@/components/ui/Stat';
 import SectionLabel from '@/components/ui/SectionLabel';
 import InfoBox from '@/components/ui/InfoBox';
-import { fmt, fmtFull, descArc } from '@/lib/format';
-import { ASSET_CLASSES, ACCOUNT_TYPES } from '@/lib/constants';
+import Donut from '@/components/ui/Donut';
+import { fmt, fmtFull } from '@/lib/format';
+import { ASSET_CLASSES, ACCOUNT_TYPES, RISK_LABELS } from '@/lib/constants';
 import { computeTarget } from '@/lib/allocation';
-
-let acctIdCounter = 0;
 
 const INSTITUTIONS = ['Vanguard', 'Fidelity', 'Schwab', 'Other'];
 
-const RISK_LABELS = ['Very Conservative', 'Conservative', 'Moderate', 'Growth', 'Aggressive'];
-
 export default function AccountDashboard() {
+  const idCounter = useRef(0);
   const [accounts, setAccounts] = useState([]);
   const [newAccount, setNewAccount] = useState({ name: '', type: '401k', institution: 'Vanguard', balance: '' });
   const [age, setAge] = useState(35);
@@ -30,7 +28,7 @@ export default function AccountDashboard() {
     const bal = parseFloat(newAccount.balance);
     if (!newAccount.name || !bal || bal <= 0) return;
     setAccounts(a => [...a, {
-      id: ++acctIdCounter,
+      id: ++idCounter.current,
       name: newAccount.name,
       type: newAccount.type,
       institution: newAccount.institution,
@@ -97,20 +95,6 @@ export default function AccountDashboard() {
     }).filter(s => s.pct > 0);
   }, [accounts, totalNetWorth]);
 
-  function Donut({ segs, label }) {
-    return (
-      <div style={{ textAlign: 'center' }}>
-        <svg viewBox="0 0 200 200" style={{ width: '100%', maxWidth: 160, display: 'block', margin: '0 auto' }}>
-          {segs.map((seg, i) => {
-            const gap = 2, sA = (seg.start / 100) * 360 + gap, eA = (seg.end / 100) * 360 - gap;
-            if (eA <= sA) return null;
-            return <path key={i} d={descArc(100, 100, 70, sA, eA)} fill="none" stroke={seg.color} strokeWidth="28" strokeLinecap="round" />;
-          })}
-          <text x="100" y="105" textAnchor="middle" fill="var(--text-muted)" fontSize="12" fontFamily="Outfit" fontWeight="600">{label}</text>
-        </svg>
-      </div>
-    );
-  }
 
   const savingsColor = savingsRate < 10 ? 'var(--danger)' : savingsRate < 20 ? 'var(--warn)' : 'var(--accent)';
   const progressColor = retirementProgress < 25 ? 'var(--danger)' : retirementProgress < 50 ? 'var(--warn)' : 'var(--accent)';

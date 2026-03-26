@@ -32,7 +32,7 @@ export default function PortfolioBuilder() {
   }, [alloc]);
 
   const blended = ((alloc.dom * 0.03 + alloc.intl * 0.07 + alloc.bond * 0.03) / 100).toFixed(3);
-  const targetYr = Math.round((2026 + (65 - age)) / 5) * 5;
+  const targetYr = Math.round((new Date().getFullYear() + (65 - age)) / 5) * 5;
   const segs = useMemo(() => { let cum = 0; return funds.map(f => { const s = cum; cum += f.pct; return { ...f, start: s, end: cum }; }); }, [funds]);
 
   return (

@@ -1,18 +1,18 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import Slider from '@/components/ui/Slider';
 import Card from '@/components/ui/Card';
 import Stat from '@/components/ui/Stat';
 import SectionLabel from '@/components/ui/SectionLabel';
 import InfoBox from '@/components/ui/InfoBox';
-import { fmt, fmtFull, descArc } from '@/lib/format';
+import Donut from '@/components/ui/Donut';
+import { fmt, fmtFull } from '@/lib/format';
 import { RISK_LABELS, ASSET_CLASSES } from '@/lib/constants';
 import { computeTarget } from '@/lib/allocation';
 
-let holdingIdCounter = 0;
-
 export default function Rebalance() {
+  const idCounter = useRef(0);
   const [age, setAge] = useState(35);
   const [risk, setRisk] = useState(3);
   const [threshold, setThreshold] = useState(5);
@@ -22,7 +22,7 @@ export default function Rebalance() {
   function addHolding() {
     const val = parseFloat(newHolding.value);
     if (!newHolding.name || !val || val <= 0) return;
-    setHoldings(h => [...h, { id: ++holdingIdCounter, name: newHolding.name, value: val, assetClass: newHolding.assetClass }]);
+    setHoldings(h => [...h, { id: ++idCounter.current, name: newHolding.name, value: val, assetClass: newHolding.assetClass }]);
     setNewHolding({ name: '', value: '', assetClass: 'us_stock' });
   }
 
@@ -91,20 +91,6 @@ export default function Rebalance() {
   const targetSegs = useMemo(() => makeDonutSegs(target), [target]);
   const currentSegs = useMemo(() => makeDonutSegs(currentPct), [currentPct]);
 
-  function Donut({ segs, label }) {
-    return (
-      <div style={{ textAlign: 'center' }}>
-        <svg viewBox="0 0 200 200" style={{ width: '100%', maxWidth: 160, display: 'block', margin: '0 auto' }}>
-          {segs.map((seg, i) => {
-            const gap = 2, sA = (seg.start / 100) * 360 + gap, eA = (seg.end / 100) * 360 - gap;
-            if (eA <= sA) return null;
-            return <path key={i} d={descArc(100, 100, 70, sA, eA)} fill="none" stroke={seg.color} strokeWidth="28" strokeLinecap="round" />;
-          })}
-          <text x="100" y="105" textAnchor="middle" fill="var(--text-muted)" fontSize="12" fontFamily="Outfit" fontWeight="600">{label}</text>
-        </svg>
-      </div>
-    );
-  }
 
   return (
     <div className="fade-up">
