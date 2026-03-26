@@ -20,6 +20,9 @@ import InvestingGuide from '@/components/tabs/InvestingGuide';
 import AIAdvisor from '@/components/tabs/AIAdvisor';
 import MyPlans from '@/components/tabs/MyPlans';
 import Journal from '@/components/tabs/Journal';
+import RiskQuiz from '@/components/tabs/RiskQuiz';
+import GoalPlanner from '@/components/tabs/GoalPlanner';
+import LinkedAccounts from '@/components/tabs/LinkedAccounts';
 
 function AppContent() {
   const [tab, setTab] = useState('growth');
@@ -34,6 +37,7 @@ function AppContent() {
     { id: 'overview', label: 'Overview', icon: '📊', tabs: [
       { id: 'dashboard', label: 'Dashboard' },
       { id: 'growth', label: 'Growth Projector' },
+      { id: 'goals', label: 'Goal Planner' },
       { id: 'scenarios', label: 'Scenarios' },
     ]},
     { id: 'invest', label: 'Invest', icon: '🎯', tabs: [
@@ -51,11 +55,13 @@ function AppContent() {
       { id: 'ssa', label: 'Social Security' },
     ]},
     { id: 'learn', label: 'Learn', icon: '💡', tabs: [
+      { id: 'riskquiz', label: 'Risk Profile' },
       { id: 'investing', label: 'Investing 101' },
       { id: 'guide', label: 'Getting Started' },
       { id: 'advisor', label: 'AI Advisor' },
     ]},
     ...(user ? [{ id: 'me', label: 'My Data', icon: '👤', tabs: [
+      { id: 'linked', label: 'Linked Accounts' },
       { id: 'myplans', label: 'My Plans' },
       { id: 'journal', label: 'Journal' },
     ]}] : []),
@@ -156,6 +162,9 @@ function AppContent() {
         {tab === 'myplans' && <MyPlans />}
         {tab === 'journal' && <Journal />}
         {tab === 'guide' && <GettingStarted />}
+        {tab === 'riskquiz' && <RiskQuiz />}
+        {tab === 'goals' && <GoalPlanner />}
+        {tab === 'linked' && <LinkedAccounts />}
       </main>
 
       <footer style={{ maxWidth: 700, margin: '0 auto', textAlign: 'center', padding: '28px 24px 40px', borderTop: '1px solid var(--border)' }}>
