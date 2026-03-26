@@ -10,8 +10,9 @@ import InfoBox from '@/components/ui/InfoBox';
 import FormInput from '@/components/ui/FormInput';
 import FormSelect from '@/components/ui/FormSelect';
 import BracketButtons from '@/components/ui/BracketButtons';
+import ValidationWarning from '@/components/ui/ValidationWarning';
 import { fmt, fmtFull } from '@/lib/format';
-import { TAX_BRACKETS, ASSET_CLASSES, REPLACEMENT_FUNDS } from '@/lib/constants';
+import { TAX_BRACKETS, ASSET_CLASSES, REPLACEMENT_FUNDS, LOSS_DEDUCTION_LIMIT } from '@/lib/constants';
 
 export default function TaxLossHarvesting() {
   const [holdings, setHoldings] = useLocalState('tlh_holdings', []);
@@ -33,38 +34,66 @@ export default function TaxLossHarvesting() {
 
   const analysis = useMemo(() => {
     const today = new Date();
+    const ltcgFederal = taxRate <= 12 ? 0 : taxRate >= 37 ? 0.20 : 0.15;
+    const shortTermRate = (taxRate + stateRate) / 100;
+    const longTermRate = ltcgFederal + stateRate / 100;
+
     const analyzed = holdings.map(h => {
       const unrealizedGain = h.currentValue - h.costBasis;
       const isLoss = unrealizedGain < 0;
       const purchaseDate = new Date(h.purchaseDate);
       const diffMs = today - purchaseDate;
       const diffDays = diffMs / (1000 * 60 * 60 * 24);
-      const holdingPeriod = diffDays > 365 ? 'long-term' : 'short-term';
-      const shortTermRate = (taxRate + stateRate) / 100;
-      // LTCG federal rate: 0% for 10/12% brackets, 20% for 37%+, 15% otherwise
-      const ltcgFederal = taxRate <= 12 ? 0 : taxRate >= 37 ? 0.20 : 0.15;
-      const longTermRate = ltcgFederal + stateRate / 100;
+      const isFutureDate = diffDays < 0;
+      const holdingPeriod = isFutureDate ? 'invalid' : diffDays > 365 ? 'long-term' : 'short-term';
       const applicableRate = holdingPeriod === 'long-term' ? longTermRate : shortTermRate;
-      const taxSavings = isLoss ? Math.abs(unrealizedGain) * applicableRate : 0;
+      const taxSavings = (isLoss && !isFutureDate) ? Math.abs(unrealizedGain) * applicableRate : 0;
       const replacement = REPLACEMENT_FUNDS[h.name.toUpperCase()] || null;
-      return { ...h, unrealizedGain, isLoss, holdingPeriod, applicableRate, taxSavings, replacement };
+      return { ...h, unrealizedGain, isLoss, isFutureDate, holdingPeriod, applicableRate, taxSavings, replacement };
     });
 
     const totalGains = analyzed.reduce((s, h) => s + (h.unrealizedGain > 0 ? h.unrealizedGain : 0), 0);
-    const totalLosses = analyzed.reduce((s, h) => s + (h.unrealizedGain < 0 ? Math.abs(h.unrealizedGain) : 0), 0);
-    const totalTaxSavings = analyzed.reduce((s, h) => s + h.taxSavings, 0);
+    const totalLosses = analyzed.reduce((s, h) => s + (h.unrealizedGain < 0 && !h.isFutureDate ? Math.abs(h.unrealizedGain) : 0), 0);
     const netGainLoss = totalGains - totalLosses;
 
-    return { analyzed, totalGains, totalLosses, totalTaxSavings, netGainLoss };
+    // Tax savings: losses first offset gains, then up to $3K deducts at ordinary rate
+    let adjustedSavings;
+    if (totalLosses <= totalGains) {
+      // All losses offset gains at applicable rates
+      adjustedSavings = analyzed.reduce((s, h) => s + h.taxSavings, 0);
+    } else {
+      // Losses offset all gains + up to $3K of ordinary income
+      const gainsOffset = totalGains * longTermRate; // Simplified: assume gains are long-term
+      const excessLoss = totalLosses - totalGains;
+      const ordinaryDeduction = Math.min(excessLoss, LOSS_DEDUCTION_LIMIT);
+      const ordinaryDeductionSavings = ordinaryDeduction * shortTermRate;
+      const carryforward = Math.max(0, excessLoss - LOSS_DEDUCTION_LIMIT);
+      adjustedSavings = gainsOffset + ordinaryDeductionSavings;
+      // Attach carryforward for display
+      analyzed._carryforward = carryforward;
+    }
+
+    return { analyzed, totalGains, totalLosses, totalTaxSavings: adjustedSavings, netGainLoss, carryforward: analyzed._carryforward || 0 };
   }, [holdings, taxRate, stateRate]);
 
-  const lossPositions = analysis.analyzed.filter(h => h.isLoss);
+  const lossPositions = analysis.analyzed.filter(h => h.isLoss && !h.isFutureDate);
+  const ltcgFedDisplay = taxRate <= 12 ? 0 : taxRate >= 37 ? 20 : 15;
+
+  const warnings = useMemo(() => {
+    const w = [];
+    if (analysis.analyzed.some(h => h.isFutureDate)) w.push('One or more holdings have a purchase date in the future — check your dates.');
+    if (analysis.carryforward > 0) w.push(`${fmt(analysis.carryforward)} in losses will carry forward to future years (exceeds $${LOSS_DEDUCTION_LIMIT.toLocaleString()} annual limit after offsetting gains).`);
+    if (analysis.totalLosses > 0 && analysis.totalGains === 0) w.push('No gains to offset — losses will deduct up to $3,000/yr against ordinary income, rest carries forward.');
+    return w;
+  }, [analysis]);
 
   return (
     <div className="fade-up">
       <InfoBox icon="🌾" title="Tax-Loss Harvesting" color="var(--accent)">
         Sell investments at a loss to offset capital gains taxes. Losses can offset gains dollar-for-dollar, plus up to <strong style={{ color: 'var(--text)' }}>$3,000/year</strong> of ordinary income. Unused losses carry forward indefinitely.
       </InfoBox>
+
+      <ValidationWarning warnings={warnings} />
 
       <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: 32, marginTop: 16 }}>
         {/* LEFT COLUMN */}
@@ -177,7 +206,7 @@ export default function TaxLossHarvesting() {
               <div className="stats-row" style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
                 <Stat icon="📈" label="Unrealized Gains" value={fmt(analysis.totalGains)} color="var(--accent)" />
                 <Stat icon="📉" label="Unrealized Losses" value={fmt(analysis.totalLosses)} color="var(--danger)" />
-                <Stat icon="💰" label="Potential Tax Savings" value={fmt(analysis.totalTaxSavings)} color="var(--accent)" />
+                <Stat icon="💰" label="Year 1 Tax Savings" value={fmt(analysis.totalTaxSavings)} sub={analysis.carryforward > 0 ? `${fmt(analysis.carryforward)} carries forward` : 'After gain offset + $3K limit'} color="var(--accent)" />
               </div>
 
               {/* Holdings Analysis Table */}
@@ -276,7 +305,7 @@ export default function TaxLossHarvesting() {
                     { i: '💵', t: '$3,000 Annual Deduction Limit', d: 'You can deduct up to $3,000 of net capital losses against ordinary income per year ($1,500 if married filing separately)' },
                     { i: '🚫', t: 'Wash Sale Rule', d: 'You cannot buy a substantially identical security within 30 days before or after selling at a loss, or the loss is disallowed' },
                     { i: '📅', t: 'Losses Carry Forward', d: 'Unused capital losses carry forward to future tax years indefinitely — they don&apos;t expire' },
-                    { i: '⏱️', t: 'Long-Term vs Short-Term', d: `Short-term losses (held ≤1 year) offset at ordinary income rates (${taxRate + stateRate}%). Long-term losses offset at lower capital gains rates (${(15 + stateRate).toFixed(1)}%)` },
+                    { i: '⏱️', t: 'Long-Term vs Short-Term', d: `Short-term losses (held ≤1 year) offset at ordinary income rates (${taxRate + stateRate}%). Long-term losses offset at capital gains rates (${(ltcgFedDisplay + stateRate).toFixed(1)}%)` },
                   ].map((x, i) => (
                     <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 6 }}>
                       <span style={{ fontSize: 16 }}>{x.i}</span>
