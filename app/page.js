@@ -60,11 +60,11 @@ function AppContent() {
       { id: 'guide', label: 'Getting Started' },
       { id: 'advisor', label: 'AI Advisor' },
     ]},
-    ...(user ? [{ id: 'me', label: 'My Data', icon: '👤', tabs: [
+    { id: 'me', label: 'My Data', icon: '👤', tabs: [
       { id: 'linked', label: 'Linked Accounts' },
       { id: 'myplans', label: 'My Plans' },
       { id: 'journal', label: 'Journal' },
-    ]}] : []),
+    ]},
   ];
 
   const activeCategory = categories.find(c => c.tabs.some(t => t.id === tab)) || categories[0];

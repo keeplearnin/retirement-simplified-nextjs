@@ -33,11 +33,15 @@ export default function Journal() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!user) { setLoading(false); return; }
     (async () => {
       try {
-        const data = await API.listJournal();
-        setEntries(data || []);
+        if (user) {
+          const data = await API.listJournal();
+          setEntries(data || []);
+        } else {
+          const saved = localStorage.getItem('rs_journal');
+          setEntries(saved ? JSON.parse(saved) : []);
+        }
       } catch (e) {
         console.error('Failed to load journal:', e);
       } finally {
@@ -49,9 +53,15 @@ export default function Journal() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await API.saveJournal(form);
-      const data = await API.listJournal();
-      setEntries(data || []);
+      if (user) {
+        await API.saveJournal(form);
+        const data = await API.listJournal();
+        setEntries(data || []);
+      } else {
+        const updated = [...entries, { ...form, id: Date.now().toString() }].sort((a, b) => b.date.localeCompare(a.date));
+        setEntries(updated);
+        localStorage.setItem('rs_journal', JSON.stringify(updated));
+      }
       setForm(emptyForm());
       setShowForm(false);
     } catch (e) {
@@ -71,37 +81,8 @@ export default function Journal() {
     setForm(prev => ({ ...prev, accounts: prev.accounts.filter((_, i) => i !== idx) }));
   };
 
-  if (!user) {
-    return (
-      <Card>
-        <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>📓</div>
-          <div style={{ fontSize: 20, fontFamily: 'var(--serif)', color: 'var(--text)', marginBottom: 8 }}>
-            Sign In to Track Your Progress
-          </div>
-          <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 24, maxWidth: 400, margin: '0 auto 24px' }}>
-            Keep a journal of your financial progress. Track net worth, savings, and investments over time.
-          </p>
-          {isConfigured() && (
-            <button
-              onClick={() => signIn()}
-              style={{
-                padding: '10px 28px',
-                background: 'var(--accent)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 8,
-                fontSize: 14,
-                cursor: 'pointer',
-                fontFamily: 'var(--serif)',
-              }}
-            >
-              Sign In
-            </button>
-          )}
-        </div>
-      </Card>
-    );
+  if (loading) {
+    return <Card><div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Loading...</div></Card>;
   }
 
   if (loading) {

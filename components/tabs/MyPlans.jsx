@@ -33,12 +33,18 @@ export default function MyPlans() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) { setLoading(false); return; }
     (async () => {
       try {
-        const [p, mc] = await Promise.all([API.listPlans(), API.listMonteCarlo()]);
-        setPlans(p || []);
-        setMcHistory(mc || []);
+        if (user) {
+          const [p, mc] = await Promise.all([API.listPlans(), API.listMonteCarlo()]);
+          setPlans(p || []);
+          setMcHistory(mc || []);
+        } else {
+          const savedPlans = localStorage.getItem('rs_plans');
+          const savedMC = localStorage.getItem('rs_montecarlo');
+          setPlans(savedPlans ? JSON.parse(savedPlans) : []);
+          setMcHistory(savedMC ? JSON.parse(savedMC) : []);
+        }
       } catch (e) {
         console.error('Failed to load data:', e);
       } finally {
@@ -49,42 +55,14 @@ export default function MyPlans() {
 
   const handleDelete = async (planId) => {
     if (!confirm('Are you sure you want to delete this plan?')) return;
-    await API.deletePlan(planId);
+    if (user) {
+      await API.deletePlan(planId);
+    } else {
+      const updated = plans.filter(p => p.planId !== planId);
+      localStorage.setItem('rs_plans', JSON.stringify(updated));
+    }
     setPlans(prev => prev.filter(p => p.planId !== planId));
   };
-
-  if (!user) {
-    return (
-      <Card>
-        <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
-          <div style={{ fontSize: 20, fontFamily: 'var(--serif)', color: 'var(--text)', marginBottom: 8 }}>
-            Sign In to Save Your Plans
-          </div>
-          <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 24, maxWidth: 400, margin: '0 auto 24px' }}>
-            Create an account to save your retirement plans, track Monte Carlo simulations, and access your data from any device.
-          </p>
-          {isConfigured() && (
-            <button
-              onClick={() => signIn()}
-              style={{
-                padding: '10px 28px',
-                background: 'var(--accent)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 8,
-                fontSize: 14,
-                cursor: 'pointer',
-                fontFamily: 'var(--serif)',
-              }}
-            >
-              Sign In
-            </button>
-          )}
-        </div>
-      </Card>
-    );
-  }
 
   if (loading) {
     return (
@@ -96,7 +74,7 @@ export default function MyPlans() {
     );
   }
 
-  const firstName = user.given_name || user.name?.split(' ')[0] || 'there';
+  const firstName = user?.given_name || user?.name?.split(' ')[0] || 'there';
 
   return (
     <div>
