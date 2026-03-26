@@ -1,0 +1,298 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Retirement.Simplified — Backend infrastructure (Cognito + DynamoDB + API Gateway + Lambda)
+
+Parameters:
+  GoogleClientId:
+    Type: String
+    Description: Google OAuth 2.0 Client ID
+  GoogleClientSecret:
+    Type: String
+    Description: Google OAuth 2.0 Client Secret
+    NoEcho: true
+  AppDomainPrefix:
+    Type: String
+    Default: retirement-simplified
+    Description: Cognito hosted UI domain prefix (must be globally unique)
+  FrontendUrl:
+    Type: String
+    Default: https://keeplearnin.github.io/retirement-simplified
+    Description: Frontend URL for OAuth redirect (no trailing slash)
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 15
+    MemorySize: 256
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref DataTable
+
+Resources:
+
+  # ═══════════════════════════════════
+  # COGNITO USER POOL
+  # ═══════════════════════════════════
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: RetirementSimplifiedUsers
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Schema:
+        - Name: email
+          Required: true
+          Mutable: false
+        - Name: name
+          Required: false
+          Mutable: true
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: false
+          RequireLowercase: false
+          RequireNumbers: false
+          RequireSymbols: false
+
+  # Google Identity Provider
+  GoogleIdP:
+    Type: AWS::Cognito::UserPoolIdentityProvider
+    Properties:
+      UserPoolId: !Ref UserPool
+      ProviderName: Google
+      ProviderType: Google
+      ProviderDetails:
+        client_id: !Ref GoogleClientId
+        client_secret: !Ref GoogleClientSecret
+        authorize_scopes: "openid email profile"
+      AttributeMapping:
+        email: email
+        name: name
+        username: sub
+
+  # App Client
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: GoogleIdP
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: RetirementSimplifiedApp
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_REFRESH_TOKEN_AUTH
+      SupportedIdentityProviders:
+        - Google
+      CallbackURLs:
+        - !Sub "${FrontendUrl}/index.html"
+        - !Sub "${FrontendUrl}/"
+        - !Ref FrontendUrl
+        - http://localhost:3000
+        - http://localhost:3000/index.html
+      LogoutURLs:
+        - !Sub "${FrontendUrl}/index.html"
+        - !Sub "${FrontendUrl}/"
+        - !Ref FrontendUrl
+        - http://localhost:3000
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - profile
+      AllowedOAuthFlowsUserPoolClient: true
+
+  # Hosted UI Domain
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref UserPool
+      Domain: !Ref AppDomainPrefix
+
+  # ═══════════════════════════════════
+  # DYNAMODB TABLE (Single Table Design)
+  # ═══════════════════════════════════
+  DataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: RetirementSimplified
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+        - AttributeName: gsi1pk
+          AttributeType: S
+        - AttributeName: gsi1sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: gsi1pk
+              KeyType: HASH
+            - AttributeName: gsi1sk
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: RetirementSimplified
+
+  # ═══════════════════════════════════
+  # API GATEWAY
+  # ═══════════════════════════════════
+  Api:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowOrigin: "'*'"
+      Auth:
+        DefaultAuthorizer: CognitoAuth
+        Authorizers:
+          CognitoAuth:
+            UserPoolArn: !GetAtt UserPool.Arn
+
+  # ═══════════════════════════════════
+  # LAMBDA FUNCTIONS
+  # ═══════════════════════════════════
+
+  # Plans CRUD
+  PlansFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: RetSimp-Plans
+      CodeUri: api/
+      Handler: handler.plans_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DataTable
+      Events:
+        ListPlans:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /plans
+            Method: GET
+        SavePlan:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /plans
+            Method: POST
+        UpdatePlan:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /plans/{planId}
+            Method: PUT
+        DeletePlan:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /plans/{planId}
+            Method: DELETE
+
+  # Journal / Progress Tracking
+  JournalFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: RetSimp-Journal
+      CodeUri: api/
+      Handler: handler.journal_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DataTable
+      Events:
+        ListJournal:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /journal
+            Method: GET
+        SaveJournal:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /journal
+            Method: POST
+        DeleteJournal:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /journal/{entryDate}
+            Method: DELETE
+
+  # Monte Carlo History
+  MonteCarloFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: RetSimp-MonteCarlo
+      CodeUri: api/
+      Handler: handler.montecarlo_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DataTable
+      Events:
+        ListMC:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /montecarlo
+            Method: GET
+        SaveMC:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /montecarlo
+            Method: POST
+
+  # User Profile / Settings
+  ProfileFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: RetSimp-Profile
+      CodeUri: api/
+      Handler: handler.profile_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DataTable
+      Events:
+        GetProfile:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /profile
+            Method: GET
+        SaveProfile:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /profile
+            Method: POST
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/prod"
+  UserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Description: Cognito App Client ID
+    Value: !Ref UserPoolClient
+  CognitoDomain:
+    Description: Cognito hosted UI domain
+    Value: !Sub "https://${AppDomainPrefix}.auth.${AWS::Region}.amazoncognito.com"
+  TableName:
+    Description: DynamoDB table name
+    Value: !Ref DataTable
