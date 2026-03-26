@@ -8,17 +8,7 @@ import SectionLabel from '@/components/ui/SectionLabel';
 import InfoBox from '@/components/ui/InfoBox';
 import { fmt, fmtFull, descArc } from '@/lib/format';
 import { RISK_LABELS, ASSET_CLASSES } from '@/lib/constants';
-
-function computeTarget(age, risk) {
-  const base = Math.max(20, Math.min(95, 110 - age));
-  const adj = (risk - 3) * 8;
-  const stock = Math.max(15, Math.min(95, base + adj));
-  const intl = Math.round(stock * 0.3);
-  const dom = stock - intl;
-  const bond = Math.max(5, 100 - stock - 5);
-  const cash = 100 - dom - intl - bond;
-  return { us_stock: dom, intl_stock: intl, bond, cash };
-}
+import { computeTarget } from '@/lib/allocation';
 
 let holdingIdCounter = 0;
 

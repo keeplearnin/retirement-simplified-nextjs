@@ -4,10 +4,13 @@ import { useState, useEffect } from 'react';
 import AuthProvider, { useAuth } from '@/components/AuthProvider';
 import Auth, { isConfigured } from '@/lib/auth';
 
+import AccountDashboard from '@/components/tabs/AccountDashboard';
 import GrowthProjector from '@/components/tabs/GrowthProjector';
 import FeeImpact from '@/components/tabs/FeeImpact';
 import PortfolioBuilder from '@/components/tabs/PortfolioBuilder';
 import Rebalance from '@/components/tabs/Rebalance';
+import TaxLossHarvesting from '@/components/tabs/TaxLossHarvesting';
+import WithdrawalStrategy from '@/components/tabs/WithdrawalStrategy';
 import MonteCarlo from '@/components/tabs/MonteCarlo';
 import TaxAware from '@/components/tabs/TaxAware';
 import ScenarioComparison from '@/components/tabs/ScenarioComparison';
@@ -28,12 +31,15 @@ function AppContent() {
   }, []);
 
   const tabs = [
+    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'growth', label: 'Growth', icon: '📈' },
     { id: 'fees', label: 'Fees', icon: '⚠️' },
     { id: 'portfolio', label: 'Portfolio', icon: '🎯' },
     { id: 'rebalance', label: 'Rebalance', icon: '⚖️' },
+    { id: 'taxloss', label: 'Tax Harvesting', icon: '🌾' },
+    { id: 'withdrawal', label: 'Withdrawal', icon: '🏦' },
     { id: 'montecarlo', label: 'Monte Carlo', icon: '🎲' },
-    { id: 'tax', label: 'Tax-Aware', icon: '⚖️' },
+    { id: 'tax', label: 'Roth vs Trad', icon: '⚖️' },
     { id: 'scenarios', label: 'Scenarios', icon: '🔀' },
     { id: 'ssa', label: 'Social Security', icon: '🏛️' },
     { id: 'investing', label: 'Investing 101', icon: '💡' },
@@ -93,10 +99,13 @@ function AppContent() {
       </nav>
 
       <main className="section-pad" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 40px' }} key={tab}>
+        {tab === 'dashboard' && <AccountDashboard />}
         {tab === 'growth' && <GrowthProjector />}
         {tab === 'fees' && <FeeImpact />}
         {tab === 'portfolio' && <PortfolioBuilder />}
         {tab === 'rebalance' && <Rebalance />}
+        {tab === 'taxloss' && <TaxLossHarvesting />}
+        {tab === 'withdrawal' && <WithdrawalStrategy />}
         {tab === 'montecarlo' && <MonteCarlo />}
         {tab === 'tax' && <TaxAware />}
         {tab === 'scenarios' && <ScenarioComparison />}
