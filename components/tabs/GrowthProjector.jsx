@@ -18,6 +18,19 @@ const MATCH_TYPES = [
   { id: 'custom', label: 'Custom' },
 ];
 
+const PROFILES = [
+  { id: 'fresh_grad', label: '🎓 Fresh Graduate', desc: 'Age 22, starting career, entry-level salary', age: 22, retireAge: 65, savings401k: 0, savingsOther: 5000, salary: 55000, contribution401k: 6, matchType: '50_6', monthlyOther: 100, returnRate: 7 },
+  { id: 'late_start', label: '⏰ Late Starter (35)', desc: 'Playing catch-up, moderate savings', age: 35, retireAge: 67, savings401k: 15000, savingsOther: 10000, salary: 75000, contribution401k: 10, matchType: '50_6', monthlyOther: 300, returnRate: 7 },
+  { id: 'mid_career', label: '💼 Mid-Career Pro', desc: 'Age 40, solid income, steady saver', age: 40, retireAge: 65, savings401k: 150000, savingsOther: 50000, salary: 120000, contribution401k: 15, matchType: '100_4', monthlyOther: 500, returnRate: 7 },
+  { id: 'high_earner', label: '🚀 High Earner', desc: 'Age 35, tech/finance salary, maxing out', age: 35, retireAge: 60, savings401k: 250000, savingsOther: 150000, salary: 250000, contribution401k: 25, matchType: '100_6', monthlyOther: 2000, returnRate: 7 },
+  { id: 'couple_dual', label: '👫 Dual-Income Couple', desc: 'Combined household, age 32', age: 32, retireAge: 62, savings401k: 80000, savingsOther: 60000, salary: 180000, contribution401k: 12, matchType: '100_3', monthlyOther: 1000, returnRate: 7 },
+  { id: 'pre_retire', label: '🏖️ Pre-Retiree (55)', desc: 'Final stretch, maximizing contributions', age: 55, retireAge: 67, savings401k: 600000, savingsOther: 200000, salary: 140000, contribution401k: 25, matchType: '100_4', monthlyOther: 1500, returnRate: 6 },
+  { id: 'conservative', label: '🛡️ Conservative Saver', desc: 'Low risk tolerance, bonds-heavy', age: 45, retireAge: 67, savings401k: 200000, savingsOther: 100000, salary: 90000, contribution401k: 10, matchType: '50_6', monthlyOther: 400, returnRate: 5 },
+  { id: 'aggressive', label: '🔥 Aggressive FIRE', desc: 'Financial Independence, Retire Early', age: 28, retireAge: 45, savings401k: 60000, savingsOther: 80000, salary: 130000, contribution401k: 25, matchType: '100_6', monthlyOther: 3000, returnRate: 8 },
+  { id: 'teacher', label: '📚 Teacher / Public Sector', desc: 'Pension supplement, modest salary', age: 30, retireAge: 62, savings401k: 20000, savingsOther: 8000, salary: 55000, contribution401k: 8, matchType: '100_3', monthlyOther: 150, returnRate: 7 },
+  { id: 'small_biz', label: '🏪 Small Business Owner', desc: 'Self-employed, SEP-IRA, variable income', age: 38, retireAge: 65, savings401k: 100000, savingsOther: 75000, salary: 110000, contribution401k: 20, matchType: 'none', monthlyOther: 800, returnRate: 7 },
+];
+
 function calcMatch(matchType, salary, customPct, customCap) {
   if (matchType === 'none') return 0;
   if (matchType === 'custom') return Math.min(salary * (customPct / 100), salary * (customCap / 100));
@@ -40,7 +53,17 @@ export default function GrowthProjector() {
   const [monthlyOther, setMonthlyOther] = useState(200);
   const [returnRate, setReturnRate] = useState(7);
   const [showInflation, setShowInflation] = useState(false);
+  const [activeProfile, setActiveProfile] = useState(null);
   const inflation = 2.5;
+
+  function applyProfile(p) {
+    setActiveProfile(p.id);
+    setAge(p.age); setRetireAge(p.retireAge);
+    setSavings401k(p.savings401k); setSavingsOther(p.savingsOther);
+    setSalary(p.salary); setContribution401k(p.contribution401k);
+    setMatchType(p.matchType); setMonthlyOther(p.monthlyOther);
+    setReturnRate(p.returnRate);
+  }
 
   const totalSavings = savings401k + savingsOther;
   const annual401k = Math.min(salary * (contribution401k / 100), 23500); // 2025 limit
@@ -84,6 +107,23 @@ export default function GrowthProjector() {
 
   return (
     <div className="fade-up">
+      <Card style={{ marginBottom: 20 }}>
+        <SectionLabel icon="👤">Quick Profiles — Pick one to auto-fill, then customize</SectionLabel>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8, marginTop: 8 }}>
+          {PROFILES.map(p => (
+            <button key={p.id} onClick={() => applyProfile(p)} style={{
+              padding: '10px 12px', borderRadius: 8, textAlign: 'left',
+              border: activeProfile === p.id ? '2px solid var(--accent)' : '1px solid var(--border)',
+              background: activeProfile === p.id ? 'rgba(45,212,191,0.08)' : 'var(--card)',
+              cursor: 'pointer', transition: 'all .2s',
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--heading)', fontFamily: 'var(--sans)' }}>{p.label}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, fontFamily: 'var(--sans)' }}>{p.desc}</div>
+            </button>
+          ))}
+        </div>
+      </Card>
+
       <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: 32 }}>
         <div>
           <Card>
