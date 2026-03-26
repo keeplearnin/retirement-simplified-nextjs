@@ -38,6 +38,8 @@ export const DEFAULT_INFLATION: number = 2.5;     // 2.5% annual inflation
 export const LONG_TERM_CAP_GAINS_RATE: number = 0.15; // 15% for most brackets
 export const RMD_START_AGE: number = 73;          // SECURE Act 2.0
 export const LOSS_DEDUCTION_LIMIT: number = 3000; // Annual loss deduction vs ordinary income
+export const MAX_401K_CONTRIBUTION: number = 23500; // 2025 elective deferral limit
+export const CATCHUP_401K_CONTRIBUTION: number = 7500; // Age 50+ catch-up
 
 // Social Security bend points (2025)
 export const SS_WAGE_CAP: number = 168600;

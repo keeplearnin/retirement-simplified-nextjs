@@ -9,6 +9,7 @@ import InfoBox from '@/components/ui/InfoBox';
 import MiniChart from '@/components/ui/MiniChart';
 import ValidationWarning from '@/components/ui/ValidationWarning';
 import { fmt } from '@/lib/format';
+import { MAX_401K_CONTRIBUTION, CATCHUP_401K_CONTRIBUTION } from '@/lib/constants';
 
 const MATCH_TYPES = [
   { id: 'none', label: 'No Match' },
@@ -32,13 +33,18 @@ const PROFILES = [
   { id: 'small_biz', label: '🏪 Small Business Owner', desc: 'Self-employed, SEP-IRA, variable income', age: 38, retireAge: 65, savings401k: 100000, savingsOther: 75000, salary: 110000, contribution401k: 20, matchType: 'none', monthlyOther: 800, returnRate: 7 },
 ];
 
-function calcMatch(matchType, salary, customPct, customCap) {
+function calcMatch(matchType, salary, employeeContribPct, customPct, customCap) {
   if (matchType === 'none') return 0;
-  if (matchType === 'custom') return Math.min(salary * (customPct / 100), salary * (customCap / 100));
+  const employeeContrib = salary * (employeeContribPct / 100);
+  if (matchType === 'custom') {
+    // Match rate% of employee contribution, up to cap% of salary
+    const matchableContrib = Math.min(employeeContrib, salary * (customCap / 100));
+    return matchableContrib * (customPct / 100);
+  }
   const [rate, cap] = matchType.split('_').map(Number);
-  const matchRate = rate / 100;
-  const capPct = cap / 100;
-  return salary * capPct * matchRate;
+  // Employer matches rate% of your contribution, up to cap% of salary
+  const matchableContrib = Math.min(employeeContrib, salary * (cap / 100));
+  return matchableContrib * (rate / 100);
 }
 
 export default function GrowthProjector() {
@@ -67,26 +73,32 @@ export default function GrowthProjector() {
   }
 
   const totalSavings = savings401k + savingsOther;
-  const annual401k = Math.min(salary * (contribution401k / 100), 23500); // 2025 limit
-  const annualMatch = calcMatch(matchType, salary, customMatchPct, customMatchCap);
+  const limit401k = age >= 50 ? MAX_401K_CONTRIBUTION + CATCHUP_401K_CONTRIBUTION : MAX_401K_CONTRIBUTION;
+  const annual401k = Math.min(salary * (contribution401k / 100), limit401k);
+  const annualMatch = calcMatch(matchType, salary, contribution401k, customMatchPct, customMatchCap);
   const monthly401kTotal = (annual401k + annualMatch) / 12;
+  const employeeMonthly = (annual401k / 12) + monthlyOther; // Excludes match for savings rate
   const totalMonthly = monthly401kTotal + monthlyOther;
 
   const data = useMemo(() => {
     const years = retireAge - age;
-    const r = returnRate / 100;
-    const ri = (returnRate - inflation) / 100;
-    const annualContrib = totalMonthly * 12;
+    const monthlyRate = returnRate / 100 / 12; // Monthly compounding
+    const monthlyRateReal = (returnRate - inflation) / 100 / 12;
+    const monthly401kContrib = (annual401k + annualMatch) / 12;
     const pts = [];
     let bal = totalSavings, balR = totalSavings;
     let bal401k = savings401k, balOther = savingsOther;
+    let totalContrib = totalSavings;
     for (let y = 0; y <= years; y++) {
-      const c = totalSavings + annualContrib * y;
-      pts.push({ year: y, age: age + y, balance: bal, real: balR, contributed: c, bal401k, balOther });
-      bal = bal * (1 + r) + annualContrib;
-      balR = balR * (1 + ri) + annualContrib;
-      bal401k = bal401k * (1 + r) + (annual401k + annualMatch);
-      balOther = balOther * (1 + r) + monthlyOther * 12;
+      pts.push({ year: y, age: age + y, balance: bal, real: balR, contributed: totalContrib, bal401k, balOther });
+      // Compound monthly for this year (12 months)
+      for (let m = 0; m < 12; m++) {
+        bal = bal * (1 + monthlyRate) + totalMonthly;
+        balR = balR * (1 + monthlyRateReal) + totalMonthly;
+        bal401k = bal401k * (1 + monthlyRate) + monthly401kContrib;
+        balOther = balOther * (1 + monthlyRate) + monthlyOther;
+      }
+      totalContrib += totalMonthly * 12;
     }
     return pts;
   }, [age, retireAge, totalSavings, savings401k, savingsOther, totalMonthly, annual401k, annualMatch, monthlyOther, returnRate, inflation]);
@@ -103,10 +115,10 @@ export default function GrowthProjector() {
     if (retireAge - age < 10) w.push('Very short time horizon — consider working longer for more compounding.');
     if (salary > 0 && contribution401k === 0 && monthlyOther === 0) w.push('You have no contributions — your savings will only grow from existing balance.');
     if (salary === 0 && annualMatch > 0) w.push('Salary is $0 but match is calculated — check your inputs.');
-    if (totalMonthly > salary / 12 * 0.5) w.push('You are saving over 50% of gross income — make sure this is realistic.');
+    if (employeeMonthly > salary / 12 * 0.5) w.push('You are saving over 50% of gross income — make sure this is realistic.');
     if (monthlyIncome < 2000) w.push('Projected retirement income is under $2K/mo — you may need to save more.');
     return w;
-  }, [age, retireAge, salary, contribution401k, monthlyOther, annualMatch, totalMonthly, monthlyIncome]);
+  }, [age, retireAge, salary, contribution401k, monthlyOther, annualMatch, employeeMonthly, monthlyIncome]);
 
   const btnStyle = (active) => ({
     padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border)',
@@ -151,7 +163,7 @@ export default function GrowthProjector() {
             <Slider label="Current 401(k) Balance" value={savings401k} onChange={setSavings401k} min={0} max={3000000} step={5000} format={fmt} />
             <Slider label="Your Contribution" value={contribution401k} onChange={setContribution401k} min={0} max={25} step={1} suffix="% of salary" />
             <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: -4, marginBottom: 10 }}>
-              = {fmt(annual401k / 12)}/mo ({fmt(annual401k)}/yr) · 2025 limit: $23,500
+              = {fmt(annual401k / 12)}/mo ({fmt(annual401k)}/yr) · 2025 limit: ${limit401k.toLocaleString()}{age >= 50 ? ' (incl. catch-up)' : ''}
             </div>
 
             <div style={{ marginBottom: 8 }}>
@@ -262,7 +274,7 @@ export default function GrowthProjector() {
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)' }}>
               <span>Total: <strong style={{ color: 'var(--text)' }}>{fmt(totalMonthly)}/mo</strong></span>
               <span>{fmt(totalMonthly * 12)}/yr</span>
-              <span>Savings rate: <strong style={{ color: salary > 0 ? (totalMonthly * 12 / salary >= 0.2 ? 'var(--accent)' : 'var(--warn)') : 'var(--text-dim)' }}>{salary > 0 ? ((totalMonthly * 12 / salary) * 100).toFixed(0) : 0}%</strong></span>
+              <span>Savings rate: <strong style={{ color: salary > 0 ? (employeeMonthly * 12 / salary >= 0.2 ? 'var(--accent)' : 'var(--warn)') : 'var(--text-dim)' }}>{salary > 0 ? ((employeeMonthly * 12 / salary) * 100).toFixed(0) : 0}%</strong></span>
             </div>
           </Card>
 
