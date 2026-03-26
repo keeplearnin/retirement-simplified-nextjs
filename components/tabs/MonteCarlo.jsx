@@ -11,7 +11,6 @@ import { GRID_FRACS, DEFAULT_RETURN, DEFAULT_STD_DEV } from '@/lib/constants';
 
 const avgReturn = DEFAULT_RETURN;
 const stdDev = DEFAULT_STD_DEV;
-const inflationRate = 0.025;
 
 export default function MonteCarlo() {
   const [age, setAge] = useState(35);
@@ -20,6 +19,7 @@ export default function MonteCarlo() {
   const [monthly, setMonthly] = useState(800);
   const [annualSpend, setAnnualSpend] = useState(50000);
   const [endAge, setEndAge] = useState(95);
+  const [inflationPct, setInflationPct] = useState(2.5);
   const [runs, setRuns] = useState(1000);
   const [simData, setSimData] = useState(null);
   const [running, setRunning] = useState(false);
@@ -44,7 +44,7 @@ export default function MonteCarlo() {
           if (y <= years) {
             bal = bal * (1 + r) + monthly * 12;
           } else {
-            bal = bal * (1 + r) - annualSpend * Math.pow(1 + inflationRate, y - years);
+            bal = bal * (1 + r) - annualSpend * Math.pow(1 + inflationPct / 100, y - years);
           }
           if (bal < 0) { bal = 0; failed = true; }
           path.push(bal);
@@ -121,6 +121,7 @@ export default function MonteCarlo() {
             <Slider label="Current Savings" value={savings} onChange={setSavings} min={0} max={2000000} step={5000} format={fmt} />
             <Slider label="Monthly Contribution" value={monthly} onChange={setMonthly} min={0} max={10000} step={50} format={fmt} tooltip="How much you invest each month before retirement" />
             <Slider label="Annual Spending in Retirement" value={annualSpend} onChange={setAnnualSpend} min={20000} max={200000} step={1000} format={fmt} tooltip="Yearly spending adjusted for inflation each year" />
+            <Slider label="Inflation Rate" value={inflationPct} onChange={setInflationPct} min={1} max={5} step={0.5} suffix="%" tooltip="Annual inflation applied to spending" />
             <Slider label="Simulations" value={runs} onChange={setRuns} min={100} max={5000} step={100} tooltip="More runs = smoother results but slower" />
             <button
               onClick={runSim}

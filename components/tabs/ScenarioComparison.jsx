@@ -11,15 +11,16 @@ import { fmt } from '@/lib/format';
 
 function project(s) {
   const yrsWork = s.retireAge - s.age;
-  const yrsRetire = 30;
-  const total = yrsWork + yrsRetire;
+  const yrsRetire = (s.planUntilAge || 95) - s.retireAge;
+  const total = yrsWork + Math.max(0, yrsRetire);
   const r = s.returnRate / 100;
+  const inflRate = (s.inflation || 2.5) / 100;
   const pts = [];
   let bal = s.savings;
   for (let y = 0; y <= total; y++) {
     pts.push({ year: y, age: s.age + y, balance: bal, phase: y <= yrsWork ? 'accumulate' : 'spend' });
     if (y < yrsWork) bal = bal * (1 + r) + s.monthly * 12;
-    else bal = bal * (1 + r) - s.annualSpend * Math.pow(1.025, y - yrsWork);
+    else bal = bal * (1 + r) - s.annualSpend * Math.pow(1 + inflRate, y - yrsWork);
     if (bal < 0) bal = 0;
   }
   return pts;
@@ -52,11 +53,13 @@ function ScenPanel({ scen, onChange, color, label }) {
       </div>
       <SectionLabel>{label}</SectionLabel>
       <Slider label="Current Age" value={scen.age} onChange={v => update('age', v)} min={18} max={60} suffix=" yrs" />
-      <Slider label="Retirement Age" value={scen.retireAge} onChange={v => update('retireAge', v)} min={50} max={75} suffix=" yrs" />
+      <Slider label="Retirement Age" value={scen.retireAge} onChange={v => update('retireAge', v)} min={Math.max(scen.age + 5, 50)} max={75} suffix=" yrs" />
+      <Slider label="Plan Until Age" value={scen.planUntilAge} onChange={v => update('planUntilAge', v)} min={Math.max(scen.retireAge + 5, 80)} max={100} suffix=" yrs" />
       <Slider label="Current Savings" value={scen.savings} onChange={v => update('savings', v)} min={0} max={1000000} step={5000} format={fmt} />
       <Slider label="Monthly Contribution" value={scen.monthly} onChange={v => update('monthly', v)} min={0} max={5000} step={50} format={fmt} />
       <Slider label="Expected Return" value={scen.returnRate} onChange={v => update('returnRate', v)} min={4} max={12} step={0.5} suffix="%" />
       <Slider label="Annual Spending (Retirement)" value={scen.annualSpend} onChange={v => update('annualSpend', v)} min={20000} max={150000} step={5000} format={fmt} />
+      <Slider label="Inflation Rate" value={scen.inflation} onChange={v => update('inflation', v)} min={1} max={5} step={0.5} suffix="%" />
     </Card>
   );
 }
@@ -66,20 +69,24 @@ export default function ScenarioComparison() {
     name: 'Conservative',
     age: 35,
     retireAge: 65,
+    planUntilAge: 95,
     savings: 100000,
     monthly: 500,
     returnRate: 7,
     annualSpend: 50000,
+    inflation: 2.5,
   });
 
   const [scenB, setScenB] = useState({
     name: 'Aggressive',
     age: 35,
     retireAge: 60,
+    planUntilAge: 95,
     savings: 100000,
     monthly: 1000,
     returnRate: 9,
     annualSpend: 50000,
+    inflation: 2.5,
   });
 
   const ptsA = useMemo(() => project(scenA), [scenA]);

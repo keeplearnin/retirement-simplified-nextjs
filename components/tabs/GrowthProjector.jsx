@@ -7,6 +7,7 @@ import Stat from '@/components/ui/Stat';
 import SectionLabel from '@/components/ui/SectionLabel';
 import InfoBox from '@/components/ui/InfoBox';
 import MiniChart from '@/components/ui/MiniChart';
+import ValidationWarning from '@/components/ui/ValidationWarning';
 import { fmt } from '@/lib/format';
 
 const MATCH_TYPES = [
@@ -97,6 +98,16 @@ export default function GrowthProjector() {
   const maxBal = Math.max(...data.map(d => d.balance));
   const totalMatchLifetime = annualMatch * (retireAge - age);
 
+  const warnings = useMemo(() => {
+    const w = [];
+    if (retireAge - age < 10) w.push('Very short time horizon — consider working longer for more compounding.');
+    if (salary > 0 && contribution401k === 0 && monthlyOther === 0) w.push('You have no contributions — your savings will only grow from existing balance.');
+    if (salary === 0 && annualMatch > 0) w.push('Salary is $0 but match is calculated — check your inputs.');
+    if (totalMonthly > salary / 12 * 0.5) w.push('You are saving over 50% of gross income — make sure this is realistic.');
+    if (monthlyIncome < 2000) w.push('Projected retirement income is under $2K/mo — you may need to save more.');
+    return w;
+  }, [age, retireAge, salary, contribution401k, monthlyOther, annualMatch, totalMonthly, monthlyIncome]);
+
   const btnStyle = (active) => ({
     padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border)',
     background: active ? 'var(--accent)' : 'transparent',
@@ -123,6 +134,8 @@ export default function GrowthProjector() {
           ))}
         </div>
       </Card>
+
+      <ValidationWarning warnings={warnings} />
 
       <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: 32 }}>
         <div>

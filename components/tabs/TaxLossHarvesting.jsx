@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
+import { useLocalState } from '@/lib/useLocalState';
 import Slider from '@/components/ui/Slider';
 import Card from '@/components/ui/Card';
 import Stat from '@/components/ui/Stat';
@@ -13,8 +14,7 @@ import { fmt, fmtFull } from '@/lib/format';
 import { TAX_BRACKETS, ASSET_CLASSES, REPLACEMENT_FUNDS } from '@/lib/constants';
 
 export default function TaxLossHarvesting() {
-  const idCounter = useRef(0);
-  const [holdings, setHoldings] = useState([]);
+  const [holdings, setHoldings] = useLocalState('tlh_holdings', []);
   const [taxRate, setTaxRate] = useState(24);
   const [stateRate, setStateRate] = useState(5);
   const [newHolding, setNewHolding] = useState({ name: '', currentValue: '', costBasis: '', assetClass: 'us_stock', purchaseDate: '' });
@@ -23,7 +23,7 @@ export default function TaxLossHarvesting() {
     const cv = parseFloat(newHolding.currentValue);
     const cb = parseFloat(newHolding.costBasis);
     if (!newHolding.name || !cv || cv <= 0 || !cb || cb <= 0 || !newHolding.purchaseDate) return;
-    setHoldings(h => [...h, { id: ++idCounter.current, name: newHolding.name, currentValue: cv, costBasis: cb, assetClass: newHolding.assetClass, purchaseDate: newHolding.purchaseDate }]);
+    setHoldings(h => [...h, { id: crypto.randomUUID(), name: newHolding.name, currentValue: cv, costBasis: cb, assetClass: newHolding.assetClass, purchaseDate: newHolding.purchaseDate }]);
     setNewHolding({ name: '', currentValue: '', costBasis: '', assetClass: 'us_stock', purchaseDate: '' });
   }
 

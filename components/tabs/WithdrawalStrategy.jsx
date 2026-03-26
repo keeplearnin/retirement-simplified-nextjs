@@ -8,6 +8,7 @@ import SectionLabel from '@/components/ui/SectionLabel';
 import InfoBox from '@/components/ui/InfoBox';
 import MiniChart from '@/components/ui/MiniChart';
 import BracketButtons from '@/components/ui/BracketButtons';
+import ValidationWarning from '@/components/ui/ValidationWarning';
 import { fmt, fmtFull } from '@/lib/format';
 import { RMD_TABLE, TAX_BRACKETS } from '@/lib/constants';
 
@@ -155,6 +156,16 @@ export default function WithdrawalStrategy() {
   const yearsColor = results.moneyRunsOutAge ? 'var(--danger)' : 'var(--accent)';
   const totalAccount = traditional + roth + taxable;
 
+  const warnings = useMemo(() => {
+    const w = [];
+    if (totalAccount === 0) w.push('Total nest egg is $0 — enter your account balances.');
+    if (results.withdrawalRate > 5) w.push(`Withdrawal rate of ${results.withdrawalRate.toFixed(1)}% exceeds safe limits — consider reducing spending or saving more.`);
+    if (age < 59.5 && traditional > 0) w.push('Withdrawals from Traditional IRA/401(k) before age 59½ incur a 10% early withdrawal penalty (not shown).');
+    if (results.moneyRunsOutAge) w.push(`Money runs out at age ${results.moneyRunsOutAge} — ${lifeExpectancy - results.moneyRunsOutAge} years short of your plan.`);
+    if (enableRothConversion && rothConversionAmt > traditional * 0.1) w.push('Large Roth conversions may push you into a higher tax bracket or trigger Medicare IRMAA surcharges.');
+    return w;
+  }, [totalAccount, results, age, traditional, lifeExpectancy, enableRothConversion, rothConversionAmt]);
+
   // RMD rows for the table
   const rmdRows = results.projectionData.filter(d => d.age >= 73 && d.rmd > 0).slice(0, 15);
   let cumulativeRmd = 0;
@@ -168,6 +179,8 @@ export default function WithdrawalStrategy() {
       <InfoBox icon="🏦" title="Retirement Withdrawal Strategy" color="var(--blue)" bgColor="var(--blue-dim)">
         The accumulation phase gets all the attention, but how you draw down is just as important. The right withdrawal order and Roth conversion strategy can save you tens of thousands in taxes.
       </InfoBox>
+
+      <ValidationWarning warnings={warnings} />
 
       <div style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: 32, marginTop: 16 }}>
         {/* Left Column */}

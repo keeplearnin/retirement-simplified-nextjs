@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
+import { useLocalState } from '@/lib/useLocalState';
 import Slider from '@/components/ui/Slider';
 import Card from '@/components/ui/Card';
 import Stat from '@/components/ui/Stat';
@@ -15,17 +16,16 @@ import { RISK_LABELS, ASSET_CLASSES } from '@/lib/constants';
 import { computeTarget } from '@/lib/allocation';
 
 export default function Rebalance() {
-  const idCounter = useRef(0);
   const [age, setAge] = useState(35);
   const [risk, setRisk] = useState(3);
   const [threshold, setThreshold] = useState(5);
-  const [holdings, setHoldings] = useState([]);
+  const [holdings, setHoldings] = useLocalState('rebalance_holdings', []);
   const [newHolding, setNewHolding] = useState({ name: '', value: '', assetClass: 'us_stock' });
 
   function addHolding() {
     const val = parseFloat(newHolding.value);
     if (!newHolding.name || !val || val <= 0) return;
-    setHoldings(h => [...h, { id: ++idCounter.current, name: newHolding.name, value: val, assetClass: newHolding.assetClass }]);
+    setHoldings(h => [...h, { id: crypto.randomUUID(), name: newHolding.name, value: val, assetClass: newHolding.assetClass }]);
     setNewHolding({ name: '', value: '', assetClass: 'us_stock' });
   }
 

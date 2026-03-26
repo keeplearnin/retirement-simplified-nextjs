@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
+import { useLocalState } from '@/lib/useLocalState';
 import Slider from '@/components/ui/Slider';
 import Card from '@/components/ui/Card';
 import Stat from '@/components/ui/Stat';
@@ -17,8 +18,7 @@ import { computeTarget } from '@/lib/allocation';
 const INSTITUTIONS = ['Vanguard', 'Fidelity', 'Schwab', 'Other'];
 
 export default function AccountDashboard() {
-  const idCounter = useRef(0);
-  const [accounts, setAccounts] = useState([]);
+  const [accounts, setAccounts] = useLocalState('dashboard_accounts', []);
   const [newAccount, setNewAccount] = useState({ name: '', type: '401k', institution: 'Vanguard', balance: '' });
   const [age, setAge] = useState(35);
   const [risk, setRisk] = useState(3);
@@ -31,7 +31,7 @@ export default function AccountDashboard() {
     const bal = parseFloat(newAccount.balance);
     if (!newAccount.name || !bal || bal <= 0) return;
     setAccounts(a => [...a, {
-      id: ++idCounter.current,
+      id: crypto.randomUUID(),
       name: newAccount.name,
       type: newAccount.type,
       institution: newAccount.institution,

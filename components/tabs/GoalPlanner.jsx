@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
+import { useLocalState } from '@/lib/useLocalState';
 import Card from '@/components/ui/Card';
 import Slider from '@/components/ui/Slider';
 import Stat from '@/components/ui/Stat';
@@ -12,21 +13,19 @@ import GoalCard from './goals/GoalCard';
 import GoalChart from './goals/GoalChart';
 import AddGoalForm from './goals/AddGoalForm';
 
-let nextGoalId = 1;
-
 export default function GoalPlanner() {
   const [currentAge, setCurrentAge] = useState(30);
   const [income, setIncome] = useState(100000);
   const [totalSavings, setTotalSavings] = useState(50000);
   const [monthlyAvailable, setMonthlyAvailable] = useState(1500);
 
-  const [goals, setGoals] = useState([
-    { id: nextGoalId++, type: 'retirement', params: { ...GOAL_TYPES.retirement.defaults } },
+  const [goals, setGoals] = useLocalState('planner_goals', [
+    { id: crypto.randomUUID(), type: 'retirement', params: { ...GOAL_TYPES.retirement.defaults } },
   ]);
   const [showPicker, setShowPicker] = useState(false);
 
   const addGoal = useCallback((type) => {
-    setGoals(prev => [...prev, { id: nextGoalId++, type, params: { ...GOAL_TYPES[type].defaults } }]);
+    setGoals(prev => [...prev, { id: crypto.randomUUID(), type, params: { ...GOAL_TYPES[type].defaults } }]);
     setShowPicker(false);
   }, []);
 
