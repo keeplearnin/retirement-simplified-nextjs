@@ -36,12 +36,15 @@ export default function WithdrawalStrategy() {
       let totalRMDs = 0;
       let totalConversions = 0;
 
+      const ssCola = Math.max(inflationRate - 0.5, 1) / 100; // SS COLA typically trails personal inflation by ~0.5%
+
       for (let y = 0; y <= lifeExpectancy - age; y++) {
         const currentAge = age + y;
-        const inflationMult = Math.pow(1 + inflationRate / 100, y);
-        const ssIncome = socialSecurity * 12 * inflationMult;
-        const spending = annualSpend * inflationMult;
-        const gap = spending - ssIncome;
+        const spendInflation = Math.pow(1 + inflationRate / 100, y);
+        const ssInflation = Math.pow(1 + ssCola, y);
+        const ssIncome = socialSecurity * 12 * ssInflation;
+        const spending = annualSpend * spendInflation;
+        const gap = Math.max(0, spending - ssIncome);
 
         // Roth conversion FIRST (before RMD age, reduces future RMDs)
         let conversion = 0;
@@ -94,12 +97,28 @@ export default function WithdrawalStrategy() {
         totalRMDs += rmd;
         totalConversions += conversion;
 
-        // Tax impact: Traditional withdrawals taxed at ordinary rate, Roth tax-free, Taxable at LTCG
-        const ltcgRate = taxBracket <= 12 ? 0 : taxBracket >= 37 ? 0.20 : 0.15;
-        const taxOnTraditional = fromTraditional * (taxBracket / 100);
-        const taxOnTaxable = fromTaxable * ltcgRate * 0.5; // ~50% of taxable withdrawal is gains
-        const taxOnConversion = conversion * (taxBracket / 100);
-        const totalTax = taxOnTraditional + taxOnTaxable + taxOnConversion;
+        // Tax impact — estimate effective bracket based on total taxable income this year
+        const ordinaryIncome = fromTraditional + conversion;
+        // SS taxation: up to 85% of SS is taxable if combined income > $34K (single)
+        const combinedIncome = ordinaryIncome + ssIncome * 0.5;
+        const ssTaxable = combinedIncome > 34000 ? Math.min(ssIncome * 0.85, (combinedIncome - 34000) * 0.85) : 0;
+        const totalTaxableIncome = ordinaryIncome + ssTaxable;
+        // Progressive bracket estimate (simplified 2025 single filer)
+        const effectiveBracket = totalTaxableIncome <= 11600 ? 10
+          : totalTaxableIncome <= 47150 ? 12
+          : totalTaxableIncome <= 100525 ? 22
+          : totalTaxableIncome <= 191950 ? 24
+          : totalTaxableIncome <= 243725 ? 32
+          : totalTaxableIncome <= 609350 ? 35
+          : 37;
+        const ltcgRate = effectiveBracket <= 12 ? 0 : effectiveBracket >= 37 ? 0.20 : 0.15;
+        // Gains ratio: early years ~70% gains, evolves as portfolio ages
+        const gainsRatio = Math.min(0.8, 0.3 + y * 0.02); // Starts ~30%, grows ~2%/yr to max 80%
+        const taxOnTraditional = fromTraditional * (effectiveBracket / 100);
+        const taxOnTaxable = fromTaxable * ltcgRate * gainsRatio;
+        const taxOnConversion = conversion * (effectiveBracket / 100);
+        const taxOnSS = ssTaxable * (effectiveBracket / 100);
+        const totalTax = taxOnTraditional + taxOnTaxable + taxOnConversion + taxOnSS;
         const afterTaxIncome = (fromTaxable + fromTraditional + fromRoth + ssIncome) - totalTax;
 
         projection.push({
@@ -137,7 +156,8 @@ export default function WithdrawalStrategy() {
     const yearsOfRetirement = withConversion.moneyRunsOutAge
       ? withConversion.moneyRunsOutAge - age
       : lifeExpectancy - age;
-    const conversionTaxCost = withConversion.totalConversions * (taxBracket / 100);
+    // Sum actual tax from projection rather than flat-rate estimate
+    const conversionTaxCost = withConversion.projection.reduce((s, d) => s + (d.conversion || 0) * (taxBracket / 100), 0);
 
     const noConvYears = withoutConversion.moneyRunsOutAge
       ? withoutConversion.moneyRunsOutAge - age
