@@ -19,6 +19,7 @@ export default function MonteCarlo() {
   const [savings, setSavings] = useState(100000);
   const [monthly, setMonthly] = useState(800);
   const [annualSpend, setAnnualSpend] = useState(50000);
+  const [endAge, setEndAge] = useState(95);
   const [runs, setRuns] = useState(1000);
   const [simData, setSimData] = useState(null);
   const [running, setRunning] = useState(false);
@@ -27,7 +28,7 @@ export default function MonteCarlo() {
     setRunning(true);
     setTimeout(() => {
       const years = retireAge - age;
-      const retirementYears = 30;
+      const retirementYears = endAge - retireAge;
       const totalYears = years + retirementYears;
       const paths = [];
       let successes = 0;
@@ -115,7 +116,8 @@ export default function MonteCarlo() {
           <Card>
             <SectionLabel>Simulation Parameters</SectionLabel>
             <Slider label="Current Age" value={age} onChange={v => { setAge(v); if (retireAge <= v + 5) setRetireAge(v + 5); }} min={18} max={60} suffix=" yrs" />
-            <Slider label="Retirement Age" value={retireAge} onChange={setRetireAge} min={Math.max(age + 5, 50)} max={80} suffix=" yrs" />
+            <Slider label="Retirement Age" value={retireAge} onChange={v => { setRetireAge(v); if (endAge <= v + 5) setEndAge(v + 5); }} min={Math.max(age + 5, 50)} max={80} suffix=" yrs" />
+            <Slider label="Plan Until Age" value={endAge} onChange={setEndAge} min={Math.max(retireAge + 5, 75)} max={100} suffix=" yrs" tooltip="How long to model retirement spending" />
             <Slider label="Current Savings" value={savings} onChange={setSavings} min={0} max={2000000} step={5000} format={fmt} />
             <Slider label="Monthly Contribution" value={monthly} onChange={setMonthly} min={0} max={10000} step={50} format={fmt} tooltip="How much you invest each month before retirement" />
             <Slider label="Annual Spending in Retirement" value={annualSpend} onChange={setAnnualSpend} min={20000} max={200000} step={1000} format={fmt} tooltip="Yearly spending adjusted for inflation each year" />
