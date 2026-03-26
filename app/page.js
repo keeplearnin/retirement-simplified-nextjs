@@ -7,6 +7,7 @@ import Auth, { isConfigured } from '@/lib/auth';
 import GrowthProjector from '@/components/tabs/GrowthProjector';
 import FeeImpact from '@/components/tabs/FeeImpact';
 import PortfolioBuilder from '@/components/tabs/PortfolioBuilder';
+import Rebalance from '@/components/tabs/Rebalance';
 import MonteCarlo from '@/components/tabs/MonteCarlo';
 import TaxAware from '@/components/tabs/TaxAware';
 import ScenarioComparison from '@/components/tabs/ScenarioComparison';
@@ -30,6 +31,7 @@ function AppContent() {
     { id: 'growth', label: 'Growth', icon: '📈' },
     { id: 'fees', label: 'Fees', icon: '⚠️' },
     { id: 'portfolio', label: 'Portfolio', icon: '🎯' },
+    { id: 'rebalance', label: 'Rebalance', icon: '⚖️' },
     { id: 'montecarlo', label: 'Monte Carlo', icon: '🎲' },
     { id: 'tax', label: 'Tax-Aware', icon: '⚖️' },
     { id: 'scenarios', label: 'Scenarios', icon: '🔀' },
@@ -94,6 +96,7 @@ function AppContent() {
         {tab === 'growth' && <GrowthProjector />}
         {tab === 'fees' && <FeeImpact />}
         {tab === 'portfolio' && <PortfolioBuilder />}
+        {tab === 'rebalance' && <Rebalance />}
         {tab === 'montecarlo' && <MonteCarlo />}
         {tab === 'tax' && <TaxAware />}
         {tab === 'scenarios' && <ScenarioComparison />}
