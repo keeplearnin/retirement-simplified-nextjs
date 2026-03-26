@@ -25,12 +25,17 @@ export default function TaxAware() {
     const rothContrib = annualContrib;
     const tradContrib = annualContrib;
     const tradTaxSaved = annualContrib * (currentBracket / 100);
+    // Tax savings are invested in a taxable account — gains taxed at LTCG rate (~15%)
+    const ltcgRate = retireBracket <= 12 ? 0 : retireBracket >= 37 ? 0.20 : 0.15;
     const pts = [];
     let roth = 0, trad = 0, taxSavingsInvested = 0;
     for (let y = 0; y <= years; y++) {
-      const rothAfterTax = roth;
-      const tradAfterTax = trad * (1 - retireBracket / 100);
-      const taxSavingsAfterTax = taxSavingsInvested * (1 - retireBracket / 100 * .5);
+      const rothAfterTax = roth; // Roth: already taxed, withdrawals are tax-free
+      const tradAfterTax = trad * (1 - retireBracket / 100); // Traditional: taxed at retirement bracket
+      // Tax savings account: only the GAINS are taxed at LTCG rate, not the principal
+      const taxSavingsBasis = tradTaxSaved * y; // total contributions (cost basis)
+      const taxSavingsGain = Math.max(0, taxSavingsInvested - taxSavingsBasis);
+      const taxSavingsAfterTax = taxSavingsInvested - (taxSavingsGain * ltcgRate);
       pts.push({ year: y, age: age + y, roth, trad, rothNet: rothAfterTax, tradNet: tradAfterTax + taxSavingsAfterTax, taxSavings: taxSavingsInvested });
       roth = roth * (1 + r) + rothContrib;
       trad = trad * (1 + r) + tradContrib;

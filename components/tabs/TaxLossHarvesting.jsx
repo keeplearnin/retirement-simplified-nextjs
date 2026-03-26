@@ -41,7 +41,9 @@ export default function TaxLossHarvesting() {
       const diffDays = diffMs / (1000 * 60 * 60 * 24);
       const holdingPeriod = diffDays > 365 ? 'long-term' : 'short-term';
       const shortTermRate = (taxRate + stateRate) / 100;
-      const longTermRate = 0.15 + stateRate / 100;
+      // LTCG federal rate: 0% for 10/12% brackets, 20% for 37%+, 15% otherwise
+      const ltcgFederal = taxRate <= 12 ? 0 : taxRate >= 37 ? 0.20 : 0.15;
+      const longTermRate = ltcgFederal + stateRate / 100;
       const applicableRate = holdingPeriod === 'long-term' ? longTermRate : shortTermRate;
       const taxSavings = isLoss ? Math.abs(unrealizedGain) * applicableRate : 0;
       const replacement = REPLACEMENT_FUNDS[h.name.toUpperCase()] || null;

@@ -42,20 +42,24 @@ export default function WithdrawalStrategy() {
         const spending = annualSpend * inflationMult;
         const gap = spending - ssIncome;
 
-        // RMD check (starts at 73)
-        let rmd = 0;
-        if (currentAge >= 73 && tradBal > 0) {
-          const divisor = RMD_TABLE[currentAge] || 3.5;
-          rmd = tradBal / divisor;
-        }
-
-        // Roth conversion (before RMD age, if enabled)
+        // Roth conversion FIRST (before RMD age, reduces future RMDs)
         let conversion = 0;
         if (conversionEnabled && currentAge < 73 && tradBal > 0) {
           conversion = Math.min(rothConversionAmt, tradBal);
+          tradBal -= conversion;
+          rothBal += conversion;
         }
 
-        // Withdrawal order: Taxable first, then Traditional (or RMD), then Roth
+        // RMD check (starts at 73 per SECURE Act 2.0)
+        let rmd = 0;
+        if (currentAge >= 73 && tradBal > 0) {
+          const divisor = RMD_TABLE[currentAge];
+          if (divisor && divisor > 0) {
+            rmd = tradBal / divisor;
+          }
+        }
+
+        // Withdrawal order: Taxable first, then Traditional (forced RMD + gap), then Roth
         let remaining = Math.max(0, gap);
 
         // 1. Take from taxable
@@ -63,15 +67,12 @@ export default function WithdrawalStrategy() {
         taxableBal -= fromTaxable;
         remaining -= fromTaxable;
 
-        // 2. Take from traditional (at least RMD)
-        let fromTraditional = Math.max(remaining, rmd);
-        fromTraditional = Math.min(fromTraditional, tradBal);
+        // 2. Take from traditional — must take at least RMD, plus any remaining gap
+        const tradNeeded = Math.max(remaining, rmd); // Must satisfy both gap AND RMD
+        let fromTraditional = Math.min(tradNeeded, tradBal);
         tradBal -= fromTraditional;
-        remaining -= fromTraditional;
-
-        // Apply Roth conversion
-        tradBal -= conversion;
-        rothBal += conversion;
+        // Only reduce remaining by the gap portion (RMD excess doesn't count toward spending gap)
+        remaining = Math.max(0, remaining - fromTraditional);
 
         // 3. Take from Roth (last resort, tax-free)
         const fromRoth = Math.min(remaining, rothBal);
