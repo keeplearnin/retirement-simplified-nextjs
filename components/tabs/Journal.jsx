@@ -107,7 +107,7 @@ export default function Journal() {
           style={{
             padding: '8px 20px',
             background: showForm ? 'var(--border)' : 'var(--accent)',
-            color: showForm ? 'var(--text)' : '#fff',
+            color: showForm ? 'var(--text)' : 'var(--bg)',
             border: 'none',
             borderRadius: 8,
             fontSize: 13,
@@ -288,7 +288,7 @@ export default function Journal() {
               style={{
                 padding: '7px 14px',
                 background: 'var(--accent)',
-                color: '#fff',
+                color: 'var(--bg)',
                 border: 'none',
                 borderRadius: 6,
                 fontSize: 12,

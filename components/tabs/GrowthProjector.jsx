@@ -100,7 +100,7 @@ export default function GrowthProjector() {
   const btnStyle = (active) => ({
     padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border)',
     background: active ? 'var(--accent)' : 'transparent',
-    color: active ? '#fff' : 'var(--text-muted)',
+    color: active ? 'var(--bg)' : 'var(--text-muted)',
     cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: 'var(--sans)',
     transition: 'all .2s',
   });
@@ -117,7 +117,7 @@ export default function GrowthProjector() {
               background: activeProfile === p.id ? 'rgba(45,212,191,0.08)' : 'var(--card)',
               cursor: 'pointer', transition: 'all .2s',
             }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--heading)', fontFamily: 'var(--sans)' }}>{p.label}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--sans)' }}>{p.label}</div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, fontFamily: 'var(--sans)' }}>{p.desc}</div>
             </button>
           ))}

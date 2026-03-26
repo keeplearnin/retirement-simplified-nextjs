@@ -129,7 +129,7 @@ export default function MonteCarlo() {
                 width: '100%',
                 padding: '14px 24px',
                 background: running ? 'var(--border)' : 'var(--accent)',
-                color: running ? 'var(--text-muted)' : '#fff',
+                color: running ? 'var(--text-muted)' : 'var(--bg)',
                 border: 'none',
                 borderRadius: 10,
                 fontSize: 15,

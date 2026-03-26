@@ -47,7 +47,7 @@ export default function TaxAware() {
     border: `1.5px solid ${selected ? 'var(--accent)' : 'var(--border)'}`,
     borderRadius: 8,
     background: selected ? 'var(--accent)' : 'transparent',
-    color: selected ? '#fff' : 'var(--text-muted)',
+    color: selected ? 'var(--bg)' : 'var(--text-muted)',
     fontSize: 12,
     fontWeight: 600,
     cursor: 'pointer',

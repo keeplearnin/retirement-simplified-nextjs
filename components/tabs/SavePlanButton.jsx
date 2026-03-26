@@ -46,12 +46,13 @@ export default function SavePlanButton({ getCurrentSettings, tabName }) {
           onKeyDown={(e) => e.key === 'Enter' && handleSave()}
           placeholder={`Name your ${tabName || 'plan'}...`}
           style={{
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.12)',
+            background: 'var(--bg2)',
+            border: '1px solid var(--border)',
             borderRadius: 20,
             padding: '6px 14px',
-            color: '#fff',
+            color: 'var(--text)',
             fontSize: 13,
+            fontFamily: 'var(--sans)',
             outline: 'none',
             width: 180,
           }}
@@ -62,13 +63,14 @@ export default function SavePlanButton({ getCurrentSettings, tabName }) {
         onClick={handleSave}
         disabled={saving}
         style={{
-          background: saved ? '#22c55e' : 'rgba(255,255,255,0.08)',
-          border: '1px solid rgba(255,255,255,0.12)',
+          background: saved ? 'var(--accent)' : 'var(--bg2)',
+          border: '1px solid var(--border)',
           borderRadius: 20,
           padding: '6px 16px',
-          color: saved ? '#fff' : '#ccc',
+          color: saved ? 'var(--bg)' : 'var(--text-muted)',
           fontSize: 13,
           fontWeight: 600,
+          fontFamily: 'var(--sans)',
           cursor: saving ? 'not-allowed' : 'pointer',
           transition: 'all 0.2s',
           opacity: saving ? 0.6 : 1,
