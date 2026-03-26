@@ -30,26 +30,39 @@ function AppContent() {
     setTimeout(() => setLoaded(true), 100);
   }, []);
 
-  const tabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-    { id: 'growth', label: 'Growth', icon: '📈' },
-    { id: 'fees', label: 'Fees', icon: '⚠️' },
-    { id: 'portfolio', label: 'Portfolio', icon: '🎯' },
-    { id: 'rebalance', label: 'Rebalance', icon: '⚖️' },
-    { id: 'taxloss', label: 'Tax Harvesting', icon: '🌾' },
-    { id: 'withdrawal', label: 'Withdrawal', icon: '🏦' },
-    { id: 'montecarlo', label: 'Monte Carlo', icon: '🎲' },
-    { id: 'tax', label: 'Roth vs Trad', icon: '⚖️' },
-    { id: 'scenarios', label: 'Scenarios', icon: '🔀' },
-    { id: 'ssa', label: 'Social Security', icon: '🏛️' },
-    { id: 'investing', label: 'Investing 101', icon: '💡' },
-    { id: 'advisor', label: 'AI Advisor', icon: '🤖' },
-    ...(user ? [
-      { id: 'myplans', label: 'My Plans', icon: '📂' },
-      { id: 'journal', label: 'Journal', icon: '📓' },
-    ] : []),
-    { id: 'guide', label: 'Get Started', icon: '📚' },
+  const categories = [
+    { id: 'overview', label: 'Overview', icon: '📊', tabs: [
+      { id: 'dashboard', label: 'Dashboard' },
+      { id: 'growth', label: 'Growth Projector' },
+      { id: 'scenarios', label: 'Scenarios' },
+    ]},
+    { id: 'invest', label: 'Invest', icon: '🎯', tabs: [
+      { id: 'portfolio', label: 'Portfolio Builder' },
+      { id: 'rebalance', label: 'Rebalance' },
+      { id: 'fees', label: 'Fee Analyzer' },
+    ]},
+    { id: 'taxes', label: 'Taxes', icon: '🏦', tabs: [
+      { id: 'tax', label: 'Roth vs Traditional' },
+      { id: 'taxloss', label: 'Tax-Loss Harvesting' },
+      { id: 'withdrawal', label: 'Withdrawal Strategy' },
+    ]},
+    { id: 'analyze', label: 'Analyze', icon: '🔬', tabs: [
+      { id: 'montecarlo', label: 'Monte Carlo' },
+      { id: 'ssa', label: 'Social Security' },
+    ]},
+    { id: 'learn', label: 'Learn', icon: '💡', tabs: [
+      { id: 'investing', label: 'Investing 101' },
+      { id: 'guide', label: 'Getting Started' },
+      { id: 'advisor', label: 'AI Advisor' },
+    ]},
+    ...(user ? [{ id: 'me', label: 'My Data', icon: '👤', tabs: [
+      { id: 'myplans', label: 'My Plans' },
+      { id: 'journal', label: 'Journal' },
+    ]}] : []),
   ];
+
+  const activeCategory = categories.find(c => c.tabs.some(t => t.id === tab)) || categories[0];
+  const subTabs = activeCategory.tabs;
 
   return (
     <div style={{ opacity: loaded ? 1 : 0, transition: 'opacity .6s ease', position: 'relative', zIndex: 1 }}>
@@ -77,25 +90,53 @@ function AppContent() {
         </p>
       </header>
 
-      <nav className="fade-up-3 tab-bar" style={{ display: 'flex', justifyContent: 'center', gap: 6, padding: '12px 16px 28px', position: 'sticky', top: 0, zIndex: 10, background: 'linear-gradient(180deg,var(--bg) 60%,transparent)', backdropFilter: 'blur(12px)', flexWrap: 'wrap' }}>
-        {tabs.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            style={{
-              padding: '10px 16px', border: 'none', cursor: 'pointer', borderRadius: 32,
-              background: tab === t.id ? 'var(--accent)' : 'var(--card)',
-              color: tab === t.id ? 'var(--bg)' : 'var(--text-muted)',
-              fontWeight: tab === t.id ? 700 : 500, fontSize: 12,
-              transition: 'all .25s', display: 'flex', alignItems: 'center', gap: 6,
-              border: tab === t.id ? 'none' : '1px solid var(--border)',
-              boxShadow: tab === t.id ? '0 4px 20px var(--accent-glow)' : 'none',
-              fontFamily: 'var(--sans)',
-            }}
-          >
-            <span style={{ fontSize: 14 }}>{t.icon}</span>{t.label}
-          </button>
-        ))}
+      <nav className="fade-up-3" style={{ position: 'sticky', top: 0, zIndex: 10, background: 'linear-gradient(180deg,var(--bg) 80%,transparent)', backdropFilter: 'blur(12px)', padding: '12px 16px 0' }}>
+        {/* Category row */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
+          {categories.map(c => {
+            const isActive = c.id === activeCategory.id;
+            return (
+              <button
+                key={c.id}
+                onClick={() => setTab(c.tabs[0].id)}
+                style={{
+                  padding: '10px 18px', border: 'none', cursor: 'pointer', borderRadius: 32,
+                  background: isActive ? 'var(--accent)' : 'var(--card)',
+                  color: isActive ? 'var(--bg)' : 'var(--text-muted)',
+                  fontWeight: isActive ? 700 : 500, fontSize: 13,
+                  transition: 'all .25s', display: 'flex', alignItems: 'center', gap: 6,
+                  border: isActive ? 'none' : '1px solid var(--border)',
+                  boxShadow: isActive ? '0 4px 20px var(--accent-glow)' : 'none',
+                  fontFamily: 'var(--sans)',
+                }}
+              >
+                <span style={{ fontSize: 15 }}>{c.icon}</span>{c.label}
+              </button>
+            );
+          })}
+        </div>
+        {/* Sub-tab row */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 4, paddingBottom: 20, flexWrap: 'wrap' }}>
+          {subTabs.map(t => {
+            const isActive = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                style={{
+                  padding: '7px 14px', border: 'none', cursor: 'pointer', borderRadius: 20,
+                  background: isActive ? 'var(--accent-dim)' : 'transparent',
+                  color: isActive ? 'var(--accent)' : 'var(--text-dim)',
+                  fontWeight: isActive ? 700 : 500, fontSize: 12,
+                  transition: 'all .2s', fontFamily: 'var(--sans)',
+                  borderBottom: isActive ? '2px solid var(--accent)' : '2px solid transparent',
+                }}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
       </nav>
 
       <main className="section-pad" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 40px' }} key={tab}>
