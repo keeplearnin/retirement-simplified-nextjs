@@ -95,7 +95,7 @@ export default function GrowthProjector() {
 
           <Card style={{ marginTop: 14 }}>
             <SectionLabel icon="🏦">401(k) / Employer Plan</SectionLabel>
-            <Slider label="Current 401(k) Balance" value={savings401k} onChange={setSavings401k} min={0} max={1000000} step={1000} format={fmt} />
+            <Slider label="Current 401(k) Balance" value={savings401k} onChange={setSavings401k} min={0} max={3000000} step={5000} format={fmt} />
             <Slider label="Your Contribution" value={contribution401k} onChange={setContribution401k} min={0} max={25} step={1} suffix="% of salary" />
             <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: -4, marginBottom: 10 }}>
               = {fmt(annual401k / 12)}/mo ({fmt(annual401k)}/yr) · 2025 limit: $23,500
@@ -134,7 +134,7 @@ export default function GrowthProjector() {
 
           <Card style={{ marginTop: 14 }}>
             <SectionLabel icon="💼">Other Savings (IRA, Brokerage, etc.)</SectionLabel>
-            <Slider label="Current Other Savings" value={savingsOther} onChange={setSavingsOther} min={0} max={1000000} step={1000} format={fmt} />
+            <Slider label="Current Other Savings" value={savingsOther} onChange={setSavingsOther} min={0} max={3000000} step={5000} format={fmt} />
             <Slider label="Monthly Other Contribution" value={monthlyOther} onChange={setMonthlyOther} min={0} max={5000} step={50} format={fmt} />
           </Card>
 
