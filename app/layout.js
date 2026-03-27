@@ -15,11 +15,11 @@ const outfit = Outfit({
 });
 
 export const metadata = {
-  title: 'Retirement.Simplified — Free Retirement Planning',
-  description: 'Free retirement planning tools: growth projector, Monte Carlo simulation, fee impact, portfolio builder, tax-aware projections, Social Security estimator, and step-by-step guide. No advisor needed.',
+  title: 'Retirement.Simplified — From First Paycheck to Last Withdrawal',
+  description: 'Free investment & retirement planning tools: portfolio builder with ETF analytics, growth projector, Monte Carlo simulation, tax-loss harvesting, Roth vs Traditional, withdrawal strategy, and AI advisor. No advisor needed.',
   openGraph: {
-    title: 'Retirement.Simplified — Free Retirement Planning',
-    description: 'Everything a financial advisor charges 1% for — free and transparent.',
+    title: 'Retirement.Simplified — From First Paycheck to Last Withdrawal',
+    description: 'Everything a financial advisor charges 1% for — free and transparent. From first paycheck to last withdrawal.',
   },
 };
 

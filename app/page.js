@@ -93,7 +93,10 @@ function AppContent() {
         <h1 className="fade-up-1 hero-title" style={{ fontFamily: 'var(--serif)', fontSize: 48, fontWeight: 400, margin: 0, lineHeight: 1.05 }}>
           Retirement<span style={{ color: 'var(--accent)' }}>.</span>Simplified
         </h1>
-        <p className="fade-up-2" style={{ color: 'var(--text-muted)', fontSize: 15, maxWidth: 560, margin: '12px auto 0', lineHeight: 1.6, fontWeight: 300 }}>
+        <p className="fade-up-2" style={{ color: 'var(--text-muted)', fontSize: 14, maxWidth: 560, margin: '10px auto 0', lineHeight: 1.6, fontWeight: 300 }}>
+          From first paycheck to last withdrawal
+        </p>
+        <p className="fade-up-2" style={{ color: 'var(--text-muted)', fontSize: 13, maxWidth: 560, margin: '6px auto 0', lineHeight: 1.6, fontWeight: 300 }}>
           Everything a financial advisor charges 1% for — <strong style={{ color: 'var(--text)', fontWeight: 600 }}>free and transparent</strong>.
           {user && <span style={{ color: 'var(--accent)' }}> Your data is saved.</span>}
         </p>
