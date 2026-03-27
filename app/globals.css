@@ -112,6 +112,8 @@ input[type=range]::-moz-range-thumb {
 
 .card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);padding:24px;transition:all .25s ease}
 .card-glow{box-shadow:0 0 30px rgba(52,211,153,.08)}
+.card-input{border-left:3px solid var(--accent)}
+.card-output{background:linear-gradient(135deg,rgba(52,211,153,0.03) 0%,rgba(96,165,250,0.02) 100%);border:1px solid rgba(52,211,153,0.12);box-shadow:0 0 20px rgba(52,211,153,0.04)}
 .stat-card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);padding:20px 24px;flex:1;min-width:140px}
 .sec-label{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.12em;margin-bottom:14px;font-weight:600}
 .info-box{border-radius:var(--radius);padding:20px 24px;margin-bottom:16px}

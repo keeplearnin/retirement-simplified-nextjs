@@ -404,7 +404,7 @@ export default function GrowthProjector() {
 
       <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: 32 }}>
         <div>
-          <Card>
+          <Card variant="input">
             <SectionLabel>Your Details</SectionLabel>
             <Slider label="Current Age" value={age} onChange={v => { setAge(v); if (retireAge <= v + 5) setRetireAge(v + 5); }} min={18} max={60} suffix=" yrs" />
             <Slider label="Retirement Age" value={retireAge} onChange={setRetireAge} min={Math.max(age + 5, 50)} max={80} suffix=" yrs" />
@@ -415,7 +415,7 @@ export default function GrowthProjector() {
             </div>
           </Card>
 
-          <Card style={{ marginTop: 14 }}>
+          <Card variant="input" style={{ marginTop: 14 }}>
             <SectionLabel icon="🏦">401(k) / Employer Plan</SectionLabel>
             <Slider label="Current 401(k) Balance" value={savings401k} onChange={setSavings401k} min={0} max={3000000} step={5000} format={fmt} />
             <Slider label="Your Contribution" value={contribution401k} onChange={setContribution401k} min={0} max={25} step={1} suffix="% of salary" />
@@ -454,7 +454,7 @@ export default function GrowthProjector() {
             )}
           </Card>
 
-          <Card style={{ marginTop: 14 }}>
+          <Card variant="input" style={{ marginTop: 14 }}>
             <SectionLabel icon="💼">Roth IRA</SectionLabel>
             <Slider label="Current Roth Balance" value={rothBalance} onChange={setRothBalance} min={0} max={1000000} step={1000} format={fmt} />
             <Slider label="Monthly Roth Contribution" value={rothMonthly} onChange={setRothMonthly} min={0} max={2000} step={25} format={fmt} />
@@ -463,14 +463,14 @@ export default function GrowthProjector() {
             </div>
           </Card>
 
-          <Card style={{ marginTop: 14 }}>
+          <Card variant="input" style={{ marginTop: 14 }}>
             <SectionLabel icon="💹">Taxable Brokerage</SectionLabel>
             <Slider label="Current Taxable Balance" value={taxableBalance} onChange={setTaxableBalance} min={0} max={3000000} step={5000} format={fmt} />
             <Slider label="Monthly Taxable Contribution" value={taxableMonthly} onChange={setTaxableMonthly} min={0} max={5000} step={50} format={fmt} />
             {salaryGrowth > 0 && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -4 }}>Grows with salary: {fmt(taxableMonthly)}/mo now \u2192 {fmt(taxableMonthly * Math.pow(1 + salaryGrowth / 100, years))}/mo at retirement</div>}
           </Card>
 
-          <Card style={{ marginTop: 14 }}>
+          <Card variant="input" style={{ marginTop: 14 }}>
             <SectionLabel icon="🩺">HSA (Health Savings Account)</SectionLabel>
             <Slider label="Current HSA Balance" value={hsaBalance} onChange={setHsaBalance} min={0} max={200000} step={500} format={fmt} />
             <Slider label="Annual HSA Contribution" value={hsaAnnual} onChange={setHsaAnnual} min={0} max={8550} step={50} format={fmt} />
@@ -482,7 +482,7 @@ export default function GrowthProjector() {
             </div>
           </Card>
 
-          <Card style={{ marginTop: 14 }}>
+          <Card variant="input" style={{ marginTop: 14 }}>
             <SectionLabel icon="📈">Assumptions</SectionLabel>
             <Slider label="Expected Annual Return" value={returnRate} onChange={setReturnRate} min={3} max={12} step={0.5} suffix="%" />
             <Slider label="Retirement Tax Bracket" value={taxBracket} onChange={setTaxBracket} min={10} max={37} step={1} suffix="%" />
@@ -519,7 +519,7 @@ export default function GrowthProjector() {
           {/* Combined income with SS */}
           {includeSSIncome && (
             <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
-              <Card style={{ flex: 1, padding: '12px 14px' }}>
+              <Card variant="output" style={{ flex: 1, padding: '12px 14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>Portfolio Withdrawal</div>
@@ -561,7 +561,7 @@ export default function GrowthProjector() {
 
           {/* Account breakdown — 4 buckets */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-            <Card>
+            <Card variant="output">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{ fontSize: 20 }}>{'🏦'}</span>
                 <div>
@@ -576,7 +576,7 @@ export default function GrowthProjector() {
                 </div>
               </div>
             </Card>
-            <Card>
+            <Card variant="output">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{ fontSize: 20 }}>{'💜'}</span>
                 <div>
@@ -591,7 +591,7 @@ export default function GrowthProjector() {
                 </div>
               </div>
             </Card>
-            <Card>
+            <Card variant="output">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{ fontSize: 20 }}>{'💹'}</span>
                 <div>
@@ -606,7 +606,7 @@ export default function GrowthProjector() {
                 </div>
               </div>
             </Card>
-            <Card>
+            <Card variant="output">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{ fontSize: 20 }}>{'🩺'}</span>
                 <div>
@@ -636,7 +636,7 @@ export default function GrowthProjector() {
           </div>
 
           {/* Monthly contribution breakdown */}
-          <Card style={{ marginBottom: 14 }}>
+          <Card variant="output" style={{ marginBottom: 14 }}>
             <SectionLabel>Monthly Contribution Breakdown</SectionLabel>
             <div style={{ display: 'flex', gap: 4, height: 28, borderRadius: 8, overflow: 'hidden', marginBottom: 10 }}>
               {annual401kNow > 0 && (
@@ -674,7 +674,7 @@ export default function GrowthProjector() {
           <Stat icon="📈" label="Market Growth" value={fmt(growth)} sub={`${totalC > 0 ? ((growth / totalC) * 100).toFixed(0) : 0}% return on contributions`} color="var(--blue)" />
 
           {/* Chart with confidence band */}
-          <Card style={{ marginTop: 14 }}>
+          <Card variant="output" style={{ marginTop: 14 }}>
             <SectionLabel>Portfolio Growth Over Time</SectionLabel>
             <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>
               Shaded area = \u00B11 standard deviation (68% probability range)
@@ -704,7 +704,7 @@ export default function GrowthProjector() {
           )}
 
           {/* What-If Comparison */}
-          <Card style={{ marginTop: 14 }}>
+          <Card variant="output" style={{ marginTop: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showWhatIf ? 12 : 0 }}>
               <SectionLabel icon="🤔">What-If Comparison</SectionLabel>
               <button onClick={() => setShowWhatIf(!showWhatIf)} style={{

@@ -203,7 +203,7 @@ export default function PortfolioBuilder() {
       </Card>
 
       {/* Controls */}
-      <Card style={{ marginBottom: 20 }}>
+      <Card variant="input" style={{ marginBottom: 20 }}>
         <SectionLabel>Your Profile</SectionLabel>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }} className="grid-2">
           <div>
@@ -244,7 +244,7 @@ export default function PortfolioBuilder() {
       </Card>
 
       {/* Glide Path Chart */}
-      <Card style={{ marginBottom: 20 }}>
+      <Card variant="input" style={{ marginBottom: 20 }}>
         <SectionLabel>Research-Backed Glide Path</SectionLabel>
         <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12, lineHeight: 1.5 }}>
           Based on Vanguard Target Retirement Fund methodology. Equity allocation decreases as you approach retirement. Your current position is marked below.
@@ -305,7 +305,7 @@ export default function PortfolioBuilder() {
       <SectionLabel>Your {funds.length}-ETF Portfolio</SectionLabel>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
         {funds.map((f, i) => (
-          <Card key={i} style={{ position: 'relative', overflow: 'hidden' }}>
+          <Card key={i} variant="output" style={{ position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: f.color }} />
             <div style={{ textAlign: 'center', paddingTop: 8 }}>
               <div style={{ fontFamily: 'var(--serif)', color: f.color, fontSize: 32, fontWeight: 700, lineHeight: 1 }}>{f.pct}%</div>
@@ -343,7 +343,7 @@ export default function PortfolioBuilder() {
       </div>
 
       {/* Dollar breakdown table with returns */}
-      <Card style={{ marginBottom: 20 }}>
+      <Card variant="output" style={{ marginBottom: 20 }}>
         <SectionLabel>Exact Purchase Amounts</SectionLabel>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 600 }}>
@@ -382,7 +382,7 @@ export default function PortfolioBuilder() {
       </Card>
 
       {/* ── ASSET LOCATION GUIDE ── */}
-      <Card style={{ marginBottom: 20 }}>
+      <Card variant="output" style={{ marginBottom: 20 }}>
         <SectionLabel icon="🧭">Where to Hold Each ETF (Tax-Efficient Placement)</SectionLabel>
         <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 14, lineHeight: 1.5 }}>
           Asset location can add 0.1-0.5% annually to after-tax returns. Place tax-inefficient assets (bonds, gold) in tax-sheltered accounts, and tax-efficient assets (US/intl stocks) in taxable.
@@ -439,7 +439,7 @@ export default function PortfolioBuilder() {
       </InfoBox>
 
       {/* Why this works */}
-      <Card>
+      <Card variant="output">
         <SectionLabel>Why This Works</SectionLabel>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
           {[
