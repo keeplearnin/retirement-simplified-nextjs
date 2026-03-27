@@ -27,14 +27,28 @@ import LinkedAccounts from '@/components/tabs/LinkedAccounts';
 function AppContent() {
   const [tab, setTab] = useState('growth');
   const [loaded, setLoaded] = useState(false);
+  const [theme, setTheme] = useState('dark');
   const { user, isConfigured: configured, authLoading, signIn, signOut } = useAuth();
 
   useEffect(() => {
     setTimeout(() => setLoaded(true), 100);
     const handler = (e) => setTab(e.detail);
     window.addEventListener('navigate-tab', handler);
+    // Restore saved theme
+    const saved = localStorage.getItem('theme');
+    if (saved === 'light' || saved === 'dark') {
+      setTheme(saved);
+      document.documentElement.setAttribute('data-theme', saved);
+    }
     return () => window.removeEventListener('navigate-tab', handler);
   }, []);
+
+  function toggleTheme() {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+  }
 
   const categories = [
     { id: 'overview', label: 'Overview', icon: '📊', tabs: [
@@ -76,17 +90,29 @@ function AppContent() {
   return (
     <div style={{ opacity: loaded ? 1 : 0, transition: 'opacity .6s ease', position: 'relative', zIndex: 1 }}>
       <header style={{ textAlign: 'center', padding: '40px 24px 16px', background: 'linear-gradient(180deg,rgba(52,211,153,.06) 0%,transparent 100%)', position: 'relative' }}>
-        {/* Auth button */}
-        <div style={{ position: 'absolute', top: 16, right: 24 }}>
+        {/* Theme toggle + Auth */}
+        <div style={{ position: 'absolute', top: 16, right: 24, display: 'flex', alignItems: 'center', gap: 10 }}>
           {authLoading ? null : user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <>
               {user.picture && <img src={user.picture} alt="" style={{ width: 32, height: 32, borderRadius: '50%', border: '2px solid var(--accent)' }} referrerPolicy="no-referrer" />}
               <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{user.name?.split(' ')[0]}</span>
               <button onClick={signOut} style={{ padding: '6px 14px', borderRadius: 20, border: '1px solid var(--border)', cursor: 'pointer', background: 'transparent', color: 'var(--text-dim)', fontSize: 11, fontWeight: 600 }}>Sign Out</button>
-            </div>
+            </>
           ) : configured ? (
             <button onClick={signIn} style={{ padding: '8px 18px', borderRadius: 20, border: '1px solid var(--accent)', cursor: 'pointer', background: 'var(--accent-dim)', color: 'var(--accent)', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>🔑 Sign in</button>
           ) : null}
+          <button
+            onClick={toggleTheme}
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            style={{
+              width: 36, height: 36, borderRadius: '50%', border: '1px solid var(--border)',
+              background: 'var(--bg2)', cursor: 'pointer', fontSize: 16,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all .25s',
+            }}
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
         </div>
 
         <div className="fade-up" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 6, color: 'var(--accent)', fontWeight: 700, marginBottom: 10 }}>Free · No Advisor Needed · Open to All</div>
