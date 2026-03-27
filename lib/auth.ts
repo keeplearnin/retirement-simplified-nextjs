@@ -61,7 +61,12 @@ const Auth = {
   },
   getIdToken(): string | null {
     const tokens = this.getTokens();
-    return tokens?.id_token || null;
+    if (!tokens?.id_token) return null;
+    try {
+      const payload = JSON.parse(atob(tokens.id_token.split('.')[1]));
+      if (payload.exp * 1000 < Date.now()) { this.clearTokens(); return null; }
+      return tokens.id_token;
+    } catch { return null; }
   },
   signIn(): void {
     const config = getConfig();

@@ -6,7 +6,9 @@ import Card from '@/components/ui/Card';
 import SectionLabel from '@/components/ui/SectionLabel';
 import InfoBox from '@/components/ui/InfoBox';
 import Donut from '@/components/ui/Donut';
+import SavePlanButton from '@/components/tabs/SavePlanButton';
 import { fmt, fmtFull } from '@/lib/format';
+import { useLocalState } from '@/lib/useLocalState';
 import { RISK_LABELS } from '@/lib/constants';
 import PortfolioAnalytics from '@/components/tabs/portfolio/PortfolioAnalytics';
 
@@ -103,12 +105,17 @@ function computeAllocation(age, risk, includeGold, intlBias) {
 }
 
 export default function PortfolioBuilder() {
-  const [age, setAge] = useState(35);
-  const [risk, setRisk] = useState(3);
-  const [portfolioSize, setPortfolioSize] = useState(50000);
-  const [includeGold, setIncludeGold] = useState(true);
-  const [intlBias, setIntlBias] = useState(35);
-  const [broker, setBroker] = useState('vanguard');
+  const [inputs, setInputs] = useLocalState('portfolio_builder', {
+    age: 35, risk: 3, portfolioSize: 50000, includeGold: true, intlBias: 35, broker: 'vanguard',
+  });
+  const { age, risk, portfolioSize, includeGold, intlBias, broker } = inputs;
+  const setField = (field, value) => setInputs(prev => ({ ...prev, [field]: value }));
+  const setAge = v => setField('age', v);
+  const setRisk = v => setField('risk', v);
+  const setPortfolioSize = v => setField('portfolioSize', v);
+  const setIncludeGold = v => setField('includeGold', v);
+  const setIntlBias = v => setField('intlBias', v);
+  const setBroker = v => setField('broker', v);
   const [showAnalytics, setShowAnalytics] = useState(false);
 
   useEffect(() => {
@@ -475,6 +482,18 @@ export default function PortfolioBuilder() {
       </button>
 
       {showAnalytics && <PortfolioAnalytics alloc={alloc} portfolioSize={portfolioSize} funds={funds} />}
+
+      {/* Save Plan */}
+      <SavePlanButton
+        tabName="Portfolio"
+        getCurrentSettings={() => ({
+          type: 'portfolio_builder',
+          ...inputs,
+          allocation: alloc,
+          totalStock, totalBond, totalGold,
+          blendedExpense,
+        })}
+      />
     </div>
   );
 }

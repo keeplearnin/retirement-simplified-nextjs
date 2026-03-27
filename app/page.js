@@ -148,7 +148,7 @@ function AppContent() {
         </div>
       </nav>
 
-      <main className="section-pad" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 40px' }} key={tab}>
+      <main className="section-pad" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 40px' }}>
         {tab === 'dashboard' && <AccountDashboard />}
         {tab === 'growth' && <GrowthProjector />}
         {tab === 'fees' && <FeeImpact />}

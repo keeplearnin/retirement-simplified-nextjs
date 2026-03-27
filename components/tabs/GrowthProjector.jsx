@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import Slider from '@/components/ui/Slider';
 import Card from '@/components/ui/Card';
 import Stat from '@/components/ui/Stat';
@@ -8,7 +8,9 @@ import SectionLabel from '@/components/ui/SectionLabel';
 import InfoBox from '@/components/ui/InfoBox';
 import MiniChart from '@/components/ui/MiniChart';
 import ValidationWarning from '@/components/ui/ValidationWarning';
+import SavePlanButton from '@/components/tabs/SavePlanButton';
 import { fmt, fmtFull } from '@/lib/format';
+import { useLocalState } from '@/lib/useLocalState';
 import { MAX_401K_CONTRIBUTION, CATCHUP_401K_CONTRIBUTION, SS_WAGE_CAP, SS_BEND_POINTS, SS_FACTORS, SS_FRA } from '@/lib/constants';
 
 const MATCH_TYPES = [
@@ -89,30 +91,49 @@ function estimateSS(annualSalary, claimAge) {
 // Milestone thresholds to track
 const MILESTONE_THRESHOLDS = [100000, 250000, 500000, 1000000, 2000000, 5000000];
 
+const GP_DEFAULTS = {
+  age: 35, retireAge: 65, savings401k: 30000, taxableBalance: 15000,
+  rothBalance: 0, rothMonthly: 200, hsaBalance: 0, hsaAnnual: 3850,
+  taxableMonthly: 200, salary: 85000, salaryGrowth: 3, contribution401k: 10,
+  matchType: '50_6', customMatchPct: 50, customMatchCap: 6,
+  returnRate: 7, showInflation: false, taxBracket: 22,
+  ssClaimAge: 67, includeSSIncome: true,
+};
+
 export default function GrowthProjector() {
-  const [age, setAge] = useState(35);
-  const [retireAge, setRetireAge] = useState(65);
-  const [savings401k, setSavings401k] = useState(30000);
-  const [taxableBalance, setTaxableBalance] = useState(15000);
-  const [rothBalance, setRothBalance] = useState(0);
-  const [rothMonthly, setRothMonthly] = useState(200);
-  const [hsaBalance, setHsaBalance] = useState(0);
-  const [hsaAnnual, setHsaAnnual] = useState(3850);
-  const [taxableMonthly, setTaxableMonthly] = useState(200);
-  const [salary, setSalary] = useState(85000);
-  const [salaryGrowth, setSalaryGrowth] = useState(3);
-  const [contribution401k, setContribution401k] = useState(10);
-  const [matchType, setMatchType] = useState('50_6');
-  const [customMatchPct, setCustomMatchPct] = useState(50);
-  const [customMatchCap, setCustomMatchCap] = useState(6);
-  const [returnRate, setReturnRate] = useState(7);
-  const [showInflation, setShowInflation] = useState(false);
-  const [taxBracket, setTaxBracket] = useState(22);
+  const [inputs, setInputs] = useLocalState('growth_projector', GP_DEFAULTS);
+  const set = useCallback((field, value) => setInputs(prev => ({ ...prev, [field]: value })), [setInputs]);
+
+  // Destructure for readability
+  const { age, retireAge, savings401k, taxableBalance, rothBalance, rothMonthly,
+    hsaBalance, hsaAnnual, taxableMonthly, salary, salaryGrowth, contribution401k,
+    matchType, customMatchPct, customMatchCap, returnRate, showInflation, taxBracket,
+    ssClaimAge, includeSSIncome } = inputs;
+
+  // Convenience setters
+  const setAge = v => set('age', v);
+  const setRetireAge = v => set('retireAge', v);
+  const setSavings401k = v => set('savings401k', v);
+  const setTaxableBalance = v => set('taxableBalance', v);
+  const setRothBalance = v => set('rothBalance', v);
+  const setRothMonthly = v => set('rothMonthly', v);
+  const setHsaBalance = v => set('hsaBalance', v);
+  const setHsaAnnual = v => set('hsaAnnual', v);
+  const setTaxableMonthly = v => set('taxableMonthly', v);
+  const setSalary = v => set('salary', v);
+  const setSalaryGrowth = v => set('salaryGrowth', v);
+  const setContribution401k = v => set('contribution401k', v);
+  const setMatchType = v => set('matchType', v);
+  const setCustomMatchPct = v => set('customMatchPct', v);
+  const setCustomMatchCap = v => set('customMatchCap', v);
+  const setReturnRate = v => set('returnRate', v);
+  const setShowInflation = v => set('showInflation', v);
+  const setTaxBracket = v => set('taxBracket', v);
+  const setSsClaimAge = v => set('ssClaimAge', v);
+  const setIncludeSSIncome = v => set('includeSSIncome', v);
+
   const [activeProfile, setActiveProfile] = useState(null);
-  // Social Security
-  const [ssClaimAge, setSsClaimAge] = useState(67);
-  const [includeSSIncome, setIncludeSSIncome] = useState(true);
-  // What-If
+  // What-If (transient, no persistence needed)
   const [showWhatIf, setShowWhatIf] = useState(false);
   const [extraMonthly, setExtraMonthly] = useState(200);
   const [extraYears, setExtraYears] = useState(3);
@@ -123,17 +144,16 @@ export default function GrowthProjector() {
 
   function applyProfile(p) {
     setActiveProfile(p.id);
-    setAge(p.age); setRetireAge(p.retireAge);
-    setSavings401k(p.savings401k);
-    setTaxableBalance(p.taxableBalance);
-    setRothBalance(p.rothBalance || 0);
-    setHsaBalance(p.hsaBalance || 0);
-    setSalary(p.salary); setContribution401k(p.contribution401k);
-    setMatchType(p.matchType);
-    setTaxableMonthly(p.taxableMonthly);
-    setRothMonthly(p.rothMonthly || 200);
-    setHsaAnnual(p.hsaAnnual || 3850);
-    setReturnRate(p.returnRate); setSalaryGrowth(p.salaryGrowth || 3);
+    setInputs(prev => ({
+      ...prev,
+      age: p.age, retireAge: p.retireAge, savings401k: p.savings401k,
+      taxableBalance: p.taxableBalance, rothBalance: p.rothBalance || 0,
+      hsaBalance: p.hsaBalance || 0, salary: p.salary,
+      contribution401k: p.contribution401k, matchType: p.matchType,
+      taxableMonthly: p.taxableMonthly, rothMonthly: p.rothMonthly || 200,
+      hsaAnnual: p.hsaAnnual || 3850, returnRate: p.returnRate,
+      salaryGrowth: p.salaryGrowth || 3,
+    }));
   }
 
   const totalSavings = savings401k + taxableBalance + rothBalance + hsaBalance;
@@ -777,6 +797,18 @@ export default function GrowthProjector() {
               </div>
             </div>
           </button>
+
+          {/* Save Plan */}
+          <SavePlanButton
+            tabName="Growth Projection"
+            getCurrentSettings={() => ({
+              type: 'growth_projector',
+              ...inputs,
+              currentSavings: totalSavings,
+              monthlyContribution: totalMonthlyNow,
+              projectedTotal: Math.round(final.balance),
+            })}
+          />
         </div>
       </div>
     </div>
