@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import Card from '@/components/ui/Card';
 import Slider from '@/components/ui/Slider';
 import SectionLabel from '@/components/ui/SectionLabel';
@@ -44,7 +44,7 @@ const DEFAULT_PLAN = {
   ],
 };
 
-let nextIncomeId = 100;
+// nextIncomeId moved to useRef inside component
 
 // ---------------------------------------------------------------------------
 // Collapsible Section
@@ -249,21 +249,26 @@ function IncomeExpenseChart({ projections, retireAge }) {
 // ---------------------------------------------------------------------------
 
 function SuccessScore({ projections }) {
-  if (!projections || projections.length === 0) return null;
+  if (!projections || projections.length < 2) return null;
+
+  const firstAge = projections[0].age;
+  const lastAge = projections[projections.length - 1].age;
+  const ageRange = lastAge - firstAge;
+  if (ageRange <= 0) return null; // guard against division by zero
 
   const firstGapAge = projections.find(p => p.gap < 0)?.age;
   let score, color, label;
 
-  if (!firstGapAge) {
+  if (firstGapAge === undefined) {
     score = 100;
     color = '#34d399';
     label = 'Fully Funded';
   } else if (firstGapAge >= 85) {
-    score = Math.round(((firstGapAge - projections[0].age) / (projections[projections.length - 1].age - projections[0].age)) * 100);
+    score = Math.max(0, Math.min(100, Math.round(((firstGapAge - firstAge) / ageRange) * 100)));
     color = '#f59e0b';
     label = 'Needs Attention';
   } else {
-    score = Math.round(((firstGapAge - projections[0].age) / (projections[projections.length - 1].age - projections[0].age)) * 100);
+    score = Math.max(0, Math.min(100, Math.round(((firstGapAge - firstAge) / ageRange) * 100)));
     color = '#ef4444';
     label = 'At Risk';
   }
@@ -357,6 +362,7 @@ function SummaryTable({ rows }) {
 // ---------------------------------------------------------------------------
 
 export default function MyPlan() {
+  const incomeIdRef = useRef(100);
   const [plan, setPlan] = useLocalState('myplan-v1', DEFAULT_PLAN);
 
   const updatePlan = useCallback((key, val) => {
@@ -380,10 +386,10 @@ export default function MyPlan() {
   const addIncome = useCallback((type) => {
     const template = INCOME_TEMPLATES[type];
     if (!template) return;
-    nextIncomeId += 1;
+    incomeIdRef.current += 1;
     setPlan(prev => ({
       ...prev,
-      incomeSources: [...prev.incomeSources, { ...template, id: nextIncomeId }],
+      incomeSources: [...prev.incomeSources, { ...template, id: incomeIdRef.current }],
     }));
   }, [setPlan]);
 

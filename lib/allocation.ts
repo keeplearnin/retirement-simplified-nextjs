@@ -7,6 +7,9 @@ export function computeTarget(age: number, risk: number): Allocation {
   const intl = Math.round(stock * 0.3);
   const dom = stock - intl;
   const bond = Math.max(5, 100 - stock - 5);
-  const cash = 100 - dom - intl - bond;
-  return { us_stock: dom, intl_stock: intl, bond, cash };
+  const cash = Math.max(0, 100 - dom - intl - bond);
+  // Ensure total = 100 by adjusting bond if needed
+  const total = dom + intl + bond + cash;
+  const adjBond = total !== 100 ? bond + (100 - total) : bond;
+  return { us_stock: dom, intl_stock: intl, bond: adjBond, cash };
 }
