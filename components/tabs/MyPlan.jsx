@@ -49,11 +49,20 @@ const DEFAULT_PLAN = {
   longevityAge: 95,
   filingStatus: 'single',
   stateCode: 'CA',
+  // Savings / portfolio
+  savings401k: 150000,
+  savingsRoth: 50000,
+  savingsTaxable: 30000,
+  savingsHSA: 10000,
+  monthlyContribution: 1500,
+  expectedReturn: 7,
+  // Expenses
   annualSpending: 80000,
-  expenseMode: 'simple', // 'simple' or 'detailed'
-  expenseBreakdown: null, // null = auto from annualSpending, or { housing: 24000, ... }
+  expenseMode: 'simple',
+  expenseBreakdown: null,
   goGoEndAge: 75,
   slowGoEndAge: 85,
+  // Income
   incomeSources: [
     { id: 1, type: 'salary', label: 'Salary', amount: 100000, growthRate: 3 },
     { id: 2, type: 'socialSecurity', label: 'Social Security', monthlyBenefit: 2500, startAge: 67 },
@@ -269,22 +278,29 @@ function SuccessScore({ projections }) {
 
   const firstAge = projections[0].age;
   const lastAge = projections[projections.length - 1].age;
+  const retireAge = projections.find(p => p.isRetired)?.age || lastAge;
   const ageRange = lastAge - firstAge;
-  if (ageRange <= 0) return null; // guard against division by zero
+  if (ageRange <= 0) return null;
 
-  const firstGapAge = projections.find(p => p.gap < 0)?.age;
+  // Find when portfolio runs out AND there's a gap (income < expenses)
+  const brokeAge = projections.find(p => p.isRetired && p.portfolioBalance <= 0 && p.gap < 0)?.age;
   let score, color, label;
 
-  if (firstGapAge === undefined) {
+  if (brokeAge === undefined) {
+    // Portfolio + income covers everything through longevity
     score = 100;
     color = '#34d399';
     label = 'Fully Funded';
-  } else if (firstGapAge >= 85) {
-    score = Math.max(0, Math.min(100, Math.round(((firstGapAge - firstAge) / ageRange) * 100)));
+  } else if (brokeAge >= lastAge - 5) {
+    score = Math.max(70, Math.min(99, Math.round(((brokeAge - retireAge) / (lastAge - retireAge)) * 100)));
     color = '#f59e0b';
-    label = 'Needs Attention';
+    label = 'Nearly There';
+  } else if (brokeAge >= retireAge + 10) {
+    score = Math.max(30, Math.min(69, Math.round(((brokeAge - retireAge) / (lastAge - retireAge)) * 100)));
+    color = '#f59e0b';
+    label = 'Needs Work';
   } else {
-    score = Math.max(0, Math.min(100, Math.round(((firstGapAge - firstAge) / ageRange) * 100)));
+    score = Math.max(0, Math.min(29, Math.round(((brokeAge - retireAge) / (lastAge - retireAge)) * 100)));
     color = '#ef4444';
     label = 'At Risk';
   }
@@ -306,9 +322,9 @@ function SuccessScore({ projections }) {
         <text x={90} y={82} textAnchor="middle" fill={color} fontSize={36} fontWeight={700} fontFamily="var(--sans)">{score}%</text>
         <text x={90} y={106} textAnchor="middle" fill="var(--text-muted)" fontSize={12} fontFamily="var(--sans)">{label}</text>
       </svg>
-      {firstGapAge && (
-        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>
-          Income shortfall begins at age {firstGapAge}
+      {brokeAge && (
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+          Savings run out at age {brokeAge}
         </div>
       )}
     </div>
@@ -409,6 +425,8 @@ export default function MyPlan() {
   // ---- Heavy computation ----
   const results = useMemo(() => {
     const { currentAge, retireAge, longevityAge, filingStatus, stateCode, annualSpending, goGoEndAge, slowGoEndAge, incomeSources } = plan;
+    const returnRate = (plan.expectedReturn || 7) / 100;
+    const monthlyContrib = plan.monthlyContribution || 0;
 
     // Build income plan
     const salarySource = incomeSources.find(s => s.type === 'salary');
@@ -440,11 +458,15 @@ export default function MyPlan() {
     const essentialTotal = expensePlan.essentialExpenses.reduce((s, e) => s + e.annualAmount, 0);
     const discretionaryTotal = expensePlan.discretionaryExpenses.reduce((s, e) => s + e.annualAmount, 0);
 
-    // Combine with taxes
+    // Portfolio balance tracking — grows with returns + contributions, draws down in retirement
+    let portfolioBalance = (plan.savings401k || 0) + (plan.savingsRoth || 0) + (plan.savingsTaxable || 0) + (plan.savingsHSA || 0);
+    const startingBalance = portfolioBalance;
+
+    // Combine with taxes + portfolio tracking
     const combined = incomeProjections.map((inc, i) => {
       const exp = expenseProjections[i] || { totalExpense: 0, healthcare: 0 };
 
-      // Compute ordinary income for tax (salary + pension + rental; SS handled separately)
+      // Compute ordinary income for tax
       const ordinaryIncome = inc.salary + inc.pension + inc.rental + inc.annuity + inc.rmd + inc.partTime + inc.otherIncome;
 
       const taxResult = computeTax({
@@ -458,6 +480,17 @@ export default function MyPlan() {
 
       const netAfterTax = inc.totalIncome - taxResult.totalTax;
       const gap = netAfterTax - exp.totalExpense;
+
+      // Portfolio: grow by return, add contributions pre-retirement, withdraw gap post-retirement
+      const balanceStart = portfolioBalance;
+      portfolioBalance = portfolioBalance * (1 + returnRate);
+      if (!inc.isRetired) {
+        portfolioBalance += monthlyContrib * 12; // saving
+      }
+      if (gap < 0) {
+        portfolioBalance += gap; // withdraw from savings (gap is negative)
+      }
+      if (portfolioBalance < 0) portfolioBalance = 0;
 
       return {
         age: inc.age,
@@ -477,22 +510,36 @@ export default function MyPlan() {
         ssTaxablePercent: taxResult.ssTaxablePercent,
         netAfterTax: Math.round(netAfterTax),
         gap: Math.round(gap),
+        portfolioBalance: Math.round(balanceStart),
         isRetired: inc.isRetired,
         isRetireYear: inc.age === retireAge,
       };
     });
+
+    // Portfolio at retirement
+    const retireRow = combined.find(r => r.age === retireAge);
+    const portfolioAtRetire = retireRow ? retireRow.portfolioBalance : 0;
 
     // Summary metrics
     const totalLifetimeIncome = combined.reduce((s, r) => s + r.totalIncome, 0);
     const totalLifetimeTax = combined.reduce((s, r) => s + r.totalTax, 0);
     const totalLifetimeExpense = combined.reduce((s, r) => s + r.totalExpense, 0);
     const totalSurplusOrShortfall = combined.reduce((s, r) => s + r.gap, 0);
-    const yearsWithPositiveGap = combined.filter(r => r.gap >= 0).length;
+    const yearsWithPositiveGap = combined.filter(r => r.gap >= 0 || r.portfolioBalance > 0).length;
     const avgEffectiveRate = totalLifetimeIncome > 0 ? totalLifetimeTax / totalLifetimeIncome : 0;
+
+    // Find when portfolio runs out
+    let moneyLastsAge = longevityAge;
+    for (const r of combined) {
+      if (r.isRetired && r.portfolioBalance <= 0 && r.gap < 0) {
+        moneyLastsAge = r.age;
+        break;
+      }
+    }
 
     // Find when money runs out (cumulative gap)
     let cumulativeGap = 0;
-    let moneyLastsAge = longevityAge;
+    // moneyLastsAge already calculated above
     for (const r of combined) {
       cumulativeGap += r.gap;
       // This is simplified - just tracks first gap year
@@ -504,6 +551,9 @@ export default function MyPlan() {
       combined,
       essentialTotal,
       discretionaryTotal,
+      startingBalance,
+      portfolioAtRetire,
+      finalBalance: Math.round(portfolioBalance),
       totalLifetimeIncome,
       totalLifetimeTax,
       totalLifetimeExpense,
@@ -542,30 +592,58 @@ export default function MyPlan() {
 
   return (
     <div className="slide-in">
-      {/* ============ MONTHLY SNAPSHOT (the hero answer) ============ */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }} className="grid-2">
-        {/* Now */}
+      {/* ============ HERO: 3-column snapshot ============ */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 20 }} className="grid-2">
+        {/* Current Savings */}
+        <div className="glass-card" style={{ padding: '16px 20px' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 2, fontWeight: 600, marginBottom: 10 }}>
+            My Savings
+          </div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--accent)', fontFamily: 'var(--sans)', marginBottom: 6 }}>
+            {fmt(results.startingBalance)}
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 11 }}>
+            {plan.savings401k > 0 && <span style={{ color: 'var(--text-muted)' }}>401(k): {fmt(plan.savings401k)}</span>}
+            {plan.savingsRoth > 0 && <span style={{ color: 'var(--text-muted)' }}>Roth: {fmt(plan.savingsRoth)}</span>}
+            {plan.savingsTaxable > 0 && <span style={{ color: 'var(--text-muted)' }}>Taxable: {fmt(plan.savingsTaxable)}</span>}
+            {plan.savingsHSA > 0 && <span style={{ color: 'var(--text-muted)' }}>HSA: {fmt(plan.savingsHSA)}</span>}
+          </div>
+          <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 6, fontSize: 11 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-dim)' }}>At retirement</span>
+              <span style={{ fontWeight: 700, color: 'var(--blue)' }}>{fmt(results.portfolioAtRetire)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+              <span style={{ color: 'var(--text-dim)' }}>Money lasts to</span>
+              <span style={{ fontWeight: 700, color: results.moneyLastsAge >= plan.longevityAge ? 'var(--accent)' : 'var(--danger)' }}>
+                Age {results.moneyLastsAge}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Today */}
         <div className="glass-card" style={{ padding: '16px 20px' }}>
           <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 2, fontWeight: 600, marginBottom: 10 }}>
             Today (Age {plan.currentAge})
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Monthly Income</span>
-            <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)' }}>{fmtFull(nowMonthlyIncome)}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Income</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent)' }}>{fmtFull(nowMonthlyIncome)}/mo</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Monthly Expenses</span>
-            <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{fmtFull(nowMonthlyExpense)}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Expenses</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{fmtFull(nowMonthlyExpense)}/mo</span>
           </div>
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Left Over</span>
-            <span style={{ fontSize: 18, fontWeight: 700, color: nowMonthlyNet >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
-              {nowMonthlyNet >= 0 ? '+' : '-'}{fmtFull(Math.abs(nowMonthlyNet))}
+            <span style={{ fontSize: 17, fontWeight: 700, color: nowMonthlyNet >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
+              {nowMonthlyNet >= 0 ? '+' : '-'}{fmtFull(Math.abs(nowMonthlyNet))}/mo
             </span>
           </div>
-          {nowMonthlyNet > 0 && (
+          {nowMonthlyIncome > 0 && nowMonthlyNet > 0 && (
             <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'right', marginTop: 2 }}>
-              {Math.round(nowMonthlyNet / nowMonthlyIncome * 100)}% savings rate
+              {Math.round(nowMonthlyNet / nowMonthlyIncome * 100)}% savings rate · {fmt(plan.monthlyContribution || 0)}/mo investing
             </div>
           )}
         </div>
@@ -573,30 +651,25 @@ export default function MyPlan() {
         {/* At Retirement */}
         <div className="glass-card" style={{ padding: '16px 20px' }}>
           <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 2, fontWeight: 600, marginBottom: 10 }}>
-            At Retirement (Age {plan.retireAge})
+            Retirement (Age {plan.retireAge})
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Monthly Income</span>
-            <span style={{ fontSize: 16, fontWeight: 700, color: retireMonthlyIncome > 0 ? 'var(--blue)' : 'var(--text-dim)' }}>{fmtFull(retireMonthlyIncome)}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Income</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: retireMonthlyIncome > 0 ? 'var(--blue)' : 'var(--text-dim)' }}>{fmtFull(retireMonthlyIncome)}/mo</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Monthly Expenses</span>
-            <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{fmtFull(retireMonthlyExpense)}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Expenses</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{fmtFull(retireMonthlyExpense)}/mo</span>
           </div>
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Monthly Gap</span>
-            <span style={{ fontSize: 18, fontWeight: 700, color: retireMonthlyNet >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
-              {retireMonthlyNet >= 0 ? '+' : '-'}{fmtFull(Math.abs(retireMonthlyNet))}
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Gap</span>
+            <span style={{ fontSize: 17, fontWeight: 700, color: retireMonthlyNet >= 0 ? 'var(--accent)' : 'var(--warn)' }}>
+              {retireMonthlyNet >= 0 ? '+' : '-'}{fmtFull(Math.abs(retireMonthlyNet))}/mo
             </span>
           </div>
-          {retireMonthlyNet < 0 && (
-            <div style={{ fontSize: 10, color: 'var(--danger)', textAlign: 'right', marginTop: 2 }}>
-              Need {fmtFull(Math.abs(retireMonthlyNet))}/mo from savings
-            </div>
-          )}
-          {retireMonthlyIncome === 0 && (
-            <div style={{ fontSize: 10, color: 'var(--warn)', textAlign: 'right', marginTop: 2 }}>
-              Add Social Security or pension to see retirement income
+          {retireMonthlyNet < 0 && results.portfolioAtRetire > 0 && (
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'right', marginTop: 2 }}>
+              {fmt(results.portfolioAtRetire)} covers ~{Math.round(results.portfolioAtRetire / (Math.abs(retireMonthlyNet) * 12))} years of gap
             </div>
           )}
         </div>
@@ -616,22 +689,35 @@ export default function MyPlan() {
       </div>
 
       {/* Key Metrics — horizontal strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginBottom: 20 }}>
+        <MetricCard label="Portfolio at Retire" value={fmt(results.portfolioAtRetire)} color="var(--blue)" />
+        <MetricCard label="Money Lasts To" value={`Age ${results.moneyLastsAge}`} color={results.moneyLastsAge >= plan.longevityAge ? '#34d399' : '#ef4444'} />
         <MetricCard label="Lifetime Income" value={fmt(results.totalLifetimeIncome)} />
         <MetricCard label="Lifetime Taxes" value={fmt(results.totalLifetimeTax)} color="#f59e0b" />
         <MetricCard label="Lifetime Expenses" value={fmt(results.totalLifetimeExpense)} />
-        <MetricCard
-          label="Net Surplus"
-          value={(results.totalSurplusOrShortfall >= 0 ? '+' : '-') + fmt(Math.abs(results.totalSurplusOrShortfall))}
-          color={results.totalSurplusOrShortfall >= 0 ? '#34d399' : '#ef4444'}
-        />
-        <MetricCard label="Years Covered" value={`${results.yearsWithPositiveGap}/${combined.length}`} />
         <MetricCard label="Avg Tax Rate" value={`${(results.avgEffectiveRate * 100).toFixed(1)}%`} color="#a78bfa" />
       </div>
 
       {/* ============ INPUTS (collapsible, below results) ============ */}
 
       {/* Personal Info — compact inline */}
+      <Collapsible title="Savings & Portfolio" defaultOpen={false} badge={fmt(results.startingBalance)}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+          <div>
+            <Slider label="401(k) / 403(b)" value={plan.savings401k} onChange={v => updatePlan('savings401k', v)} min={0} max={3000000} step={5000} format={fmt} />
+            <Slider label="Roth IRA" value={plan.savingsRoth} onChange={v => updatePlan('savingsRoth', v)} min={0} max={1000000} step={5000} format={fmt} />
+          </div>
+          <div>
+            <Slider label="Taxable Brokerage" value={plan.savingsTaxable} onChange={v => updatePlan('savingsTaxable', v)} min={0} max={2000000} step={5000} format={fmt} />
+            <Slider label="HSA" value={plan.savingsHSA} onChange={v => updatePlan('savingsHSA', v)} min={0} max={200000} step={1000} format={fmt} />
+          </div>
+        </div>
+        <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
+          <Slider label="Monthly Investment" value={plan.monthlyContribution} onChange={v => updatePlan('monthlyContribution', v)} min={0} max={10000} step={100} format={fmt} />
+          <Slider label="Expected Return" value={plan.expectedReturn} onChange={v => updatePlan('expectedReturn', v)} min={3} max={12} step={0.5} suffix="%" />
+        </div>
+      </Collapsible>
+
       <Collapsible title="Personal Info" defaultOpen={false} badge={`Age ${plan.currentAge}, retire ${plan.retireAge}`}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
           <div>
