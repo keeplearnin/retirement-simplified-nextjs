@@ -57,7 +57,7 @@ const DEFAULT_PLAN = {
   monthlyContribution: 1500,
   expectedReturn: 7,
   // Expenses
-  annualSpending: 80000,
+  annualSpending: 75000, // 75% of default $100K salary
   expenseMode: 'simple',
   expenseBreakdown: null,
   goGoEndAge: 75,
@@ -462,10 +462,16 @@ export default function MyPlan() {
   }, [setPlan]);
 
   const updateIncome = useCallback((id, updated) => {
-    setPlan(prev => ({
-      ...prev,
-      incomeSources: prev.incomeSources.map(s => s.id === id ? updated : s),
-    }));
+    setPlan(prev => {
+      const newSources = prev.incomeSources.map(s => s.id === id ? updated : s);
+      const next = { ...prev, incomeSources: newSources };
+      // Auto-derive spending from salary if user hasn't manually set expenses
+      if (updated.type === 'salary' && !prev._expenseManuallySet) {
+        const salary = updated.amount || 0;
+        next.annualSpending = Math.round(salary * 0.75 / 1000) * 1000; // 75% of gross, rounded to $1K
+      }
+      return next;
+    });
   }, [setPlan]);
 
   const removeIncome = useCallback((id) => {
@@ -906,7 +912,7 @@ export default function MyPlan() {
       </Collapsible>
 
       {/* ---- Expenses with Simple/Detailed Toggle ---- */}
-      <Collapsible title="Expenses" defaultOpen={false} badge={expenseMode === 'simple' ? fmt(plan.annualSpending) + '/yr' : fmt(detailedTotal) + '/yr'}>
+      <Collapsible title="Expenses" defaultOpen={true} badge={expenseMode === 'simple' ? fmt(plan.annualSpending) + '/yr' : fmt(detailedTotal) + '/yr'}>
         {/* Mode toggle */}
         <div style={{ display: 'flex', gap: 2, background: 'var(--bg)', borderRadius: 20, padding: 2, marginBottom: 16, width: 'fit-content' }}>
           {['simple', 'detailed'].map(mode => (
@@ -922,7 +928,12 @@ export default function MyPlan() {
 
         {expenseMode === 'simple' ? (
           <>
-            <Slider label="Total Annual Spending" value={plan.annualSpending} onChange={v => updatePlan('annualSpending', v)} min={30000} max={300000} step={5000} format={fmt} />
+            <Slider label="Total Annual Spending" value={plan.annualSpending} onChange={v => { updatePlan('annualSpending', v); updatePlan('_expenseManuallySet', true); }} min={30000} max={300000} step={5000} format={fmt} />
+            {!plan._expenseManuallySet && (
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -16, marginBottom: 8 }}>
+                Auto-estimated at 75% of your salary. Adjust to match your actual spending.
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
               <div style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)' }}>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>Essential (~60%)</div>
