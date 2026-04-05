@@ -574,19 +574,20 @@ export default function MyPlan() {
       const gap = netAfterTax - exp.totalExpense;
 
       // Portfolio tracking:
-      // Pre-retirement: grows with returns + monthly contributions
-      // Retirement: grows with returns, but draws down to cover any income gap
       const balanceStart = portfolioBalance;
-      portfolioBalance = portfolioBalance * (1 + returnRate);
       if (!inc.isRetired) {
-        // Working: add contributions
-        portfolioBalance += monthlyContrib * 12;
+        // Working: grow at full return rate + add contributions
+        portfolioBalance = portfolioBalance * (1 + returnRate) + monthlyContrib * 12;
       } else {
-        // Retired: if income doesn't cover expenses, draw from portfolio
+        // Retired: conservative return (60% of working return — bonds-heavy allocation)
+        const retiredReturn = returnRate * 0.6;
+        portfolioBalance = portfolioBalance * (1 + retiredReturn);
+        // Withdraw to cover the gap between income and expenses
         if (gap < 0) {
           portfolioBalance += gap; // gap is negative, so this subtracts
         }
-        // Do NOT add positive gap to portfolio — surplus income is just cash, not invested
+        // Positive gap: income covers expenses, portfolio just earns conservative return
+        // We do NOT add surplus to portfolio — it's spent or kept as cash
       }
       if (portfolioBalance < 0) portfolioBalance = 0;
 
