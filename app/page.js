@@ -75,49 +75,19 @@ function AppContent() {
   const subTabs = activeCategory.tabs;
 
   return (
-    <div style={{ opacity: loaded ? 1 : 0, transition: 'opacity .6s ease', position: 'relative', zIndex: 1 }}>
-      <header style={{ textAlign: 'center', padding: '40px 24px 16px', background: 'linear-gradient(180deg,rgba(52,211,153,.06) 0%,transparent 100%)', position: 'relative' }}>
-        {/* Theme toggle + Auth */}
-        <div style={{ position: 'absolute', top: 16, right: 24, display: 'flex', alignItems: 'center', gap: 10 }}>
-          {authLoading ? null : user ? (
-            <>
-              {user.picture && <img src={user.picture} alt="" style={{ width: 32, height: 32, borderRadius: '50%', border: '2px solid var(--accent)' }} referrerPolicy="no-referrer" />}
-              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{user.name?.split(' ')[0]}</span>
-              <button onClick={signOut} style={{ padding: '6px 14px', borderRadius: 20, border: '1px solid var(--border)', cursor: 'pointer', background: 'transparent', color: 'var(--text-dim)', fontSize: 11, fontWeight: 600 }}>Sign Out</button>
-            </>
-          ) : configured ? (
-            <button onClick={signIn} style={{ padding: '8px 18px', borderRadius: 20, border: '1px solid var(--accent)', cursor: 'pointer', background: 'var(--accent-dim)', color: 'var(--accent)', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>🔑 Sign in</button>
-          ) : null}
-          <button
-            onClick={toggleTheme}
-            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            style={{
-              width: 36, height: 36, borderRadius: '50%', border: '1px solid var(--border)',
-              background: 'var(--bg2)', cursor: 'pointer', fontSize: 16,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all .25s',
-            }}
-          >
-            {theme === 'dark' ? '☀️' : '🌙'}
-          </button>
+    <div style={{ opacity: loaded ? 1 : 0, transition: 'opacity .5s ease', position: 'relative', zIndex: 1 }}>
+      {/* Compact header — logo + nav + actions in one row */}
+      <header className="app-header">
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flexShrink: 0 }} onClick={() => setTab('myplan')}>
+          <span style={{ fontSize: 20, fontWeight: 700, fontFamily: 'var(--sans)', color: 'var(--text)', letterSpacing: '-0.02em' }}>
+            Retire<span style={{ color: 'var(--accent)' }}>.</span>Simplified
+          </span>
+          <span style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 2, opacity: 0.7 }}>Free</span>
         </div>
 
-        <div className="fade-up" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 6, color: 'var(--accent)', fontWeight: 700, marginBottom: 10 }}>Free · No Advisor Needed · Open to All</div>
-        <h1 className="fade-up-1 hero-title" style={{ fontFamily: 'var(--serif)', fontSize: 48, fontWeight: 400, margin: 0, lineHeight: 1.05 }}>
-          Retirement<span style={{ color: 'var(--accent)' }}>.</span>Simplified
-        </h1>
-        <p className="fade-up-2" style={{ color: 'var(--text-muted)', fontSize: 14, maxWidth: 560, margin: '10px auto 0', lineHeight: 1.6, fontWeight: 300 }}>
-          From first paycheck to last withdrawal
-        </p>
-        <p className="fade-up-2" style={{ color: 'var(--text-muted)', fontSize: 13, maxWidth: 560, margin: '6px auto 0', lineHeight: 1.6, fontWeight: 300 }}>
-          Everything a financial advisor charges 1% for — <strong style={{ color: 'var(--text)', fontWeight: 600 }}>free and transparent</strong>.
-          {user && <span style={{ color: 'var(--accent)' }}> Your data is saved.</span>}
-        </p>
-      </header>
-
-      <nav className="fade-up-3" style={{ position: 'sticky', top: 0, zIndex: 10, background: 'linear-gradient(180deg,var(--bg) 80%,transparent)', backdropFilter: 'blur(12px)', padding: '12px 16px 0' }}>
-        {/* Category row */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
+        {/* Nav pills */}
+        <nav style={{ display: 'flex', gap: 2, background: 'var(--bg2)', borderRadius: 28, padding: 3 }}>
           {categories.map(c => {
             const isActive = c.id === activeCategory.id;
             return (
@@ -125,23 +95,48 @@ function AppContent() {
                 key={c.id}
                 onClick={() => setTab(c.tabs[0].id)}
                 style={{
-                  padding: '10px 18px', border: 'none', cursor: 'pointer', borderRadius: 32,
-                  background: isActive ? 'var(--accent)' : 'var(--card)',
-                  color: isActive ? 'var(--bg)' : 'var(--text-muted)',
-                  fontWeight: isActive ? 700 : 500, fontSize: 13,
-                  transition: 'all .25s', display: 'flex', alignItems: 'center', gap: 6,
-                  border: isActive ? 'none' : '1px solid var(--border)',
-                  boxShadow: isActive ? '0 4px 20px var(--accent-glow)' : 'none',
-                  fontFamily: 'var(--sans)',
+                  padding: '8px 16px', border: 'none', cursor: 'pointer', borderRadius: 24,
+                  background: isActive ? 'var(--accent)' : 'transparent',
+                  color: isActive ? '#fff' : 'var(--text-muted)',
+                  fontWeight: isActive ? 600 : 400, fontSize: 13,
+                  transition: 'all .2s', fontFamily: 'var(--sans)',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                <span style={{ fontSize: 15 }}>{c.icon}</span>{c.label}
+                {c.label}
               </button>
             );
           })}
+        </nav>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {authLoading ? null : user ? (
+            <>
+              {user.picture && <img src={user.picture} alt="" style={{ width: 28, height: 28, borderRadius: '50%', border: '2px solid var(--accent)' }} referrerPolicy="no-referrer" />}
+              <button onClick={signOut} style={{ padding: '6px 12px', borderRadius: 16, border: '1px solid var(--border)', cursor: 'pointer', background: 'transparent', color: 'var(--text-dim)', fontSize: 11, fontWeight: 500, fontFamily: 'var(--sans)' }}>Sign Out</button>
+            </>
+          ) : configured ? (
+            <button onClick={signIn} style={{ padding: '6px 14px', borderRadius: 16, border: '1px solid var(--accent)', cursor: 'pointer', background: 'var(--accent-dim)', color: 'var(--accent)', fontSize: 11, fontWeight: 600, fontFamily: 'var(--sans)' }}>Sign in</button>
+          ) : null}
+          <button
+            onClick={toggleTheme}
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            style={{
+              width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--border)',
+              background: 'transparent', cursor: 'pointer', fontSize: 14,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all .25s',
+            }}
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
         </div>
-        {/* Sub-tab row (hidden for single-tab categories) */}
-        {subTabs.length > 1 && <div style={{ display: 'flex', justifyContent: 'center', gap: 4, paddingBottom: 20, flexWrap: 'wrap' }}>
+      </header>
+
+      {/* Sub-tab row (hidden for single-tab categories) */}
+      {subTabs.length > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 4, padding: '12px 16px 8px', borderBottom: '1px solid var(--border)' }}>
           {subTabs.map(t => {
             const isActive = tab === t.id;
             return (
@@ -149,21 +144,19 @@ function AppContent() {
                 key={t.id}
                 onClick={() => setTab(t.id)}
                 style={{
-                  padding: '7px 14px', border: 'none', cursor: 'pointer', borderRadius: 20,
+                  padding: '6px 16px', border: 'none', cursor: 'pointer', borderRadius: 20,
                   background: isActive ? 'var(--accent-dim)' : 'transparent',
                   color: isActive ? 'var(--accent)' : 'var(--text-dim)',
-                  fontWeight: isActive ? 700 : 500, fontSize: 12,
+                  fontWeight: isActive ? 600 : 400, fontSize: 12,
                   transition: 'all .2s', fontFamily: 'var(--sans)',
-                  borderBottom: isActive ? '2px solid var(--accent)' : '2px solid transparent',
                 }}
               >
                 {t.label}
               </button>
             );
           })}
-        </div>}
-        {subTabs.length <= 1 && <div style={{ paddingBottom: 12 }} />}
-      </nav>
+        </div>
+      )}
 
       <main className="section-pad" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 40px' }}>
         {tab === 'myplan' && <MyPlan />}

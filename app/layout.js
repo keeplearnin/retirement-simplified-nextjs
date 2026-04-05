@@ -1,16 +1,16 @@
-import { Instrument_Serif, Outfit } from 'next/font/google';
+import { Inter, DM_Sans } from 'next/font/google';
 import './globals.css';
 
-const instrumentSerif = Instrument_Serif({
-  weight: '400',
+const inter = Inter({
   subsets: ['latin'],
-  variable: '--font-instrument-serif',
+  variable: '--font-inter',
   display: 'swap',
 });
 
-const outfit = Outfit({
+const dmSans = DM_Sans({
   subsets: ['latin'],
-  variable: '--font-outfit',
+  variable: '--font-dm-sans',
+  weight: ['400', '500', '600', '700'],
   display: 'swap',
 });
 
@@ -25,7 +25,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${instrumentSerif.variable} ${outfit.variable}`}>
+    <html lang="en" className={`${inter.variable} ${dmSans.variable}`}>
       <body>{children}</body>
     </html>
   );
