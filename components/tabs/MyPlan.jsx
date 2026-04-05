@@ -550,45 +550,114 @@ export default function MyPlan() {
     const retireEssentialTotal = Math.round(essentialTotal * retireScale);
     const retireDiscretionaryTotal = Math.round(discretionaryTotal * retireScale);
 
-    // Portfolio balance tracking — grows with returns + contributions, draws down in retirement
-    let portfolioBalance = (plan.savings401k || 0) + (plan.savingsRoth || 0) + (plan.savingsTaxable || 0) + (plan.savingsHSA || 0);
+    // Track account types separately for tax-aware withdrawals
+    let bal401k = plan.savings401k || 0;
+    let balRoth = plan.savingsRoth || 0;
+    let balTaxable = plan.savingsTaxable || 0;
+    let balHSA = plan.savingsHSA || 0;
+    let portfolioBalance = bal401k + balRoth + balTaxable + balHSA;
     const startingBalance = portfolioBalance;
+    const RMD_START = 73;
+
+    // RMD divisor table (simplified — key ages)
+    const rmdDivisor = (age) => {
+      const table = { 73: 26.5, 74: 25.5, 75: 24.6, 76: 23.7, 77: 22.9, 78: 22.0, 79: 21.1, 80: 20.2, 81: 19.4, 82: 18.5, 83: 17.7, 84: 16.8, 85: 16.0, 86: 15.2, 87: 14.4, 88: 13.7, 89: 12.9, 90: 12.2, 91: 11.5, 92: 10.8, 93: 10.1, 94: 9.5, 95: 8.9 };
+      return table[Math.min(age, 95)] || 8.9;
+    };
 
     // Combine with taxes + portfolio tracking
     const combined = incomeProjections.map((inc, i) => {
       const exp = expenseProjections[i] || { totalExpense: 0, healthcare: 0 };
+      const age = inc.age;
 
-      // Compute ordinary income for tax
-      const ordinaryIncome = inc.salary + inc.pension + inc.rental + inc.annuity + inc.rmd + inc.partTime + inc.otherIncome;
+      // --- RMD calculation (age 73+ from 401k balance) ---
+      let rmdAmount = 0;
+      if (age >= RMD_START && bal401k > 0) {
+        rmdAmount = Math.round(bal401k / rmdDivisor(age));
+      }
 
-      const taxResult = computeTax({
-        filingStatus,
-        ordinaryIncome,
-        socialSecurityBenefit: inc.socialSecurity,
-        capitalGains: 0,
-        stateCode,
-        age: inc.age,
+      // --- Base income (before withdrawals) ---
+      const baseOrdinaryIncome = inc.salary + inc.pension + inc.rental + inc.annuity + inc.partTime + inc.otherIncome + rmdAmount;
+      const baseIncome = baseOrdinaryIncome + inc.socialSecurity;
+
+      // --- First pass: compute taxes on known income ---
+      const taxPass1 = computeTax({
+        filingStatus, ordinaryIncome: baseOrdinaryIncome,
+        socialSecurityBenefit: inc.socialSecurity, capitalGains: 0,
+        stateCode, age,
       });
 
-      const netAfterTax = inc.totalIncome - taxResult.totalTax;
+      const netAfterTax1 = baseIncome - taxPass1.totalTax;
+      const shortfall = exp.totalExpense - netAfterTax1; // positive = need to withdraw
+
+      // --- Portfolio withdrawal (if shortfall exists) ---
+      let withdrawal401k = 0, withdrawalRoth = 0, withdrawalTaxable = 0;
+      let withdrawalTax = 0;
+
+      if (shortfall > 0 && inc.isRetired && portfolioBalance > 0) {
+        // Withdrawal order: Taxable first (lowest tax), then 401k, then Roth (tax-free last)
+        let remaining = shortfall;
+
+        // 1. Taxable account (only gains taxed at ~15% LTCG)
+        if (remaining > 0 && balTaxable > 0) {
+          withdrawalTaxable = Math.min(remaining, balTaxable);
+          remaining -= withdrawalTaxable;
+        }
+
+        // 2. 401(k) — fully taxable as ordinary income
+        if (remaining > 0 && bal401k > 0) {
+          // Need to gross up: withdraw enough to cover shortfall + tax on withdrawal
+          // Approximate marginal rate from first pass
+          const marginalRate = taxPass1.marginalRate || 0.22;
+          const grossUp = remaining / (1 - marginalRate);
+          withdrawal401k = Math.min(grossUp, bal401k);
+          remaining -= withdrawal401k * (1 - marginalRate);
+        }
+
+        // 3. Roth — tax-free
+        if (remaining > 0 && balRoth > 0) {
+          withdrawalRoth = Math.min(remaining, balRoth);
+          remaining -= withdrawalRoth;
+        }
+      }
+
+      // Ensure RMD is withdrawn even if no shortfall
+      if (rmdAmount > 0 && withdrawal401k < rmdAmount) {
+        withdrawal401k = rmdAmount;
+      }
+
+      // --- Second pass: recompute taxes with withdrawal income ---
+      const totalOrdinaryIncome = baseOrdinaryIncome + withdrawal401k;
+      const capitalGains = withdrawalTaxable > 0 ? Math.round(withdrawalTaxable * 0.5) : 0; // assume 50% of taxable is gains
+
+      const taxResult = computeTax({
+        filingStatus, ordinaryIncome: totalOrdinaryIncome,
+        socialSecurityBenefit: inc.socialSecurity, capitalGains,
+        stateCode, age,
+      });
+
+      const totalIncome = baseIncome + withdrawal401k + withdrawalRoth + withdrawalTaxable;
+      const netAfterTax = totalIncome - taxResult.totalTax;
       const gap = netAfterTax - exp.totalExpense;
 
-      // Portfolio tracking:
+      // --- Update account balances ---
       const balanceStart = portfolioBalance;
+      const retiredReturn = inc.isRetired ? returnRate * 0.6 : returnRate;
+
       if (!inc.isRetired) {
-        // Working: grow at full return rate + add contributions
-        portfolioBalance = portfolioBalance * (1 + returnRate) + monthlyContrib * 12;
+        // Working: grow all accounts + add contributions (split: 60% 401k, 20% Roth, 20% taxable)
+        bal401k = bal401k * (1 + returnRate) + monthlyContrib * 12 * 0.6;
+        balRoth = balRoth * (1 + returnRate) + monthlyContrib * 12 * 0.2;
+        balTaxable = balTaxable * (1 + returnRate) + monthlyContrib * 12 * 0.2;
+        balHSA = balHSA * (1 + returnRate * 0.5); // HSA: conservative
       } else {
-        // Retired: conservative return (60% of working return — bonds-heavy allocation)
-        const retiredReturn = returnRate * 0.6;
-        portfolioBalance = portfolioBalance * (1 + retiredReturn);
-        // Withdraw to cover the gap between income and expenses
-        if (gap < 0) {
-          portfolioBalance += gap; // gap is negative, so this subtracts
-        }
-        // Positive gap: income covers expenses, portfolio just earns conservative return
-        // We do NOT add surplus to portfolio — it's spent or kept as cash
+        // Retired: grow at conservative rate, subtract withdrawals
+        bal401k = Math.max(0, bal401k * (1 + retiredReturn) - withdrawal401k);
+        balRoth = Math.max(0, balRoth * (1 + retiredReturn) - withdrawalRoth);
+        balTaxable = Math.max(0, balTaxable * (1 + retiredReturn) - withdrawalTaxable);
+        balHSA = Math.max(0, balHSA * (1 + retiredReturn * 0.5));
       }
+      portfolioBalance = bal401k + balRoth + balTaxable + balHSA;
       if (portfolioBalance < 0) portfolioBalance = 0;
 
       return {
@@ -598,7 +667,11 @@ export default function MyPlan() {
         socialSecurity: inc.socialSecurity,
         pension: inc.pension,
         rental: inc.rental,
-        totalIncome: inc.totalIncome,
+        rmd: rmdAmount,
+        withdrawal401k,
+        withdrawalRoth,
+        withdrawalTaxable,
+        totalIncome,
         totalExpense: exp.totalExpense,
         healthcare: exp.healthcare,
         federalTax: taxResult.federalTax,
@@ -781,7 +854,7 @@ export default function MyPlan() {
                   <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--blue)' }}>{fmtFull(Math.abs(retireMonthlyNet))}/mo</span>
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'right', marginTop: 2 }}>
-                  {fmt(results.portfolioAtRetire)} portfolio covers {Math.round(results.portfolioAtRetire / (Math.abs(retireMonthlyNet) * 12))} years
+                  {fmt(results.portfolioAtRetire)} portfolio covers {Math.abs(retireMonthlyNet) > 0 ? Math.round(results.portfolioAtRetire / (Math.abs(retireMonthlyNet) * 12)) : '∞'} years
                 </div>
               </>
             ) : (
@@ -838,7 +911,10 @@ export default function MyPlan() {
         </div>
         <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
           <Slider label="Monthly Investment" value={plan.monthlyContribution} onChange={v => updatePlan('monthlyContribution', v)} min={0} max={10000} step={100} format={fmt} />
-          <Slider label="Expected Return" value={plan.expectedReturn} onChange={v => updatePlan('expectedReturn', v)} min={3} max={12} step={0.5} suffix="%" />
+          <Slider label="Expected Return (working years)" value={plan.expectedReturn} onChange={v => updatePlan('expectedReturn', v)} min={3} max={12} step={0.5} suffix="%" />
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -16, marginBottom: 8 }}>
+            Retirement return: {((plan.expectedReturn || 7) * 0.6).toFixed(1)}% (60% of working — assumes bonds-heavy allocation)
+          </div>
         </div>
       </Collapsible>
 

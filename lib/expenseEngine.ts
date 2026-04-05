@@ -233,12 +233,10 @@ export function projectExpenses(plan: ExpensePlan): YearlyExpense[] {
 /**
  * Build a sensible default ExpensePlan from minimal inputs.
  *
- * `annualSpend` is total current spending. We split it roughly:
- *   - 60% essential (housing 30%, food 12%, utilities 6%, transport 8%, insurance 4%)
- *   - 25% discretionary (travel 8%, dining 5%, hobbies 5%, entertainment 4%, gifts 3%)
- *   - 15% is assumed to be taxes/savings/debt (not modeled here as expense)
- *
- * Healthcare is handled separately via the healthcare array.
+ * `annualSpend` is total current spending (what the user actually spends).
+ * We split it: 60% essential, 40% discretionary.
+ * Taxes are modeled separately by taxEngine — no haircut applied here.
+ * Healthcare is added on top via the healthcare array.
  */
 export function createDefaultExpensePlan(
   currentAge: number,
@@ -247,30 +245,30 @@ export function createDefaultExpensePlan(
 ): ExpensePlan {
   const longevityAge = 95;
 
-  // Allocate spending (85% of total — remaining 15% assumed taxes/savings)
-  const spendBase = annualSpend * 0.85;
-  const essentialPct = 0.70; // 70% of spendBase
-  const discretionaryPct = 0.30; // 30% of spendBase
+  // Use full user-entered spending — taxes are modeled separately by taxEngine
+  const spendBase = annualSpend;
+  const essentialPct = 0.60; // 60% essential
+  const discretionaryPct = 0.40; // 40% discretionary
 
   const essentialTotal = spendBase * essentialPct;
   const discretionaryTotal = spendBase * discretionaryPct;
 
   const essentialExpenses: ExpenseCategory[] = [
-    { name: 'Housing', annualAmount: essentialTotal * 0.43, type: 'essential' },
-    { name: 'Food & Groceries', annualAmount: essentialTotal * 0.17, type: 'essential' },
-    { name: 'Utilities', annualAmount: essentialTotal * 0.09, type: 'essential' },
-    { name: 'Transportation', annualAmount: essentialTotal * 0.12, type: 'essential' },
-    { name: 'Insurance', annualAmount: essentialTotal * 0.06, type: 'essential' },
-    { name: 'Personal & Misc', annualAmount: essentialTotal * 0.13, type: 'essential' },
+    { name: 'Housing', annualAmount: essentialTotal * 0.42, type: 'essential' },
+    { name: 'Food & Groceries', annualAmount: essentialTotal * 0.18, type: 'essential' },
+    { name: 'Utilities', annualAmount: essentialTotal * 0.10, type: 'essential' },
+    { name: 'Transportation', annualAmount: essentialTotal * 0.13, type: 'essential' },
+    { name: 'Insurance', annualAmount: essentialTotal * 0.07, type: 'essential' },
+    { name: 'Personal & Misc', annualAmount: essentialTotal * 0.10, type: 'essential' },
   ];
 
   const discretionaryExpenses: ExpenseCategory[] = [
-    { name: 'Travel', annualAmount: discretionaryTotal * 0.27, type: 'discretionary' },
+    { name: 'Travel', annualAmount: discretionaryTotal * 0.25, type: 'discretionary' },
     { name: 'Dining Out', annualAmount: discretionaryTotal * 0.20, type: 'discretionary' },
-    { name: 'Hobbies', annualAmount: discretionaryTotal * 0.17, type: 'discretionary' },
-    { name: 'Entertainment', annualAmount: discretionaryTotal * 0.13, type: 'discretionary' },
+    { name: 'Hobbies', annualAmount: discretionaryTotal * 0.15, type: 'discretionary' },
+    { name: 'Entertainment', annualAmount: discretionaryTotal * 0.15, type: 'discretionary' },
     { name: 'Gifts & Charitable', annualAmount: discretionaryTotal * 0.10, type: 'discretionary' },
-    { name: 'Other Discretionary', annualAmount: discretionaryTotal * 0.13, type: 'discretionary' },
+    { name: 'Other Discretionary', annualAmount: discretionaryTotal * 0.15, type: 'discretionary' },
   ];
 
   // Healthcare defaults
