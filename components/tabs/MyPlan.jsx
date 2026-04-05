@@ -481,14 +481,20 @@ export default function MyPlan() {
       const netAfterTax = inc.totalIncome - taxResult.totalTax;
       const gap = netAfterTax - exp.totalExpense;
 
-      // Portfolio: grow by return, add contributions pre-retirement, withdraw gap post-retirement
+      // Portfolio tracking:
+      // Pre-retirement: grows with returns + monthly contributions
+      // Retirement: grows with returns, but draws down to cover any income gap
       const balanceStart = portfolioBalance;
       portfolioBalance = portfolioBalance * (1 + returnRate);
       if (!inc.isRetired) {
-        portfolioBalance += monthlyContrib * 12; // saving
-      }
-      if (gap < 0) {
-        portfolioBalance += gap; // withdraw from savings (gap is negative)
+        // Working: add contributions
+        portfolioBalance += monthlyContrib * 12;
+      } else {
+        // Retired: if income doesn't cover expenses, draw from portfolio
+        if (gap < 0) {
+          portfolioBalance += gap; // gap is negative, so this subtracts
+        }
+        // Do NOT add positive gap to portfolio — surplus income is just cash, not invested
       }
       if (portfolioBalance < 0) portfolioBalance = 0;
 
@@ -517,18 +523,18 @@ export default function MyPlan() {
     });
 
     // Portfolio at retirement
-    const retireRow = combined.find(r => r.age === retireAge);
-    const portfolioAtRetire = retireRow ? retireRow.portfolioBalance : 0;
+    const retireRowData = combined.find(r => r.age === retireAge);
+    const portfolioAtRetire = retireRowData ? retireRowData.portfolioBalance : 0;
 
     // Summary metrics
     const totalLifetimeIncome = combined.reduce((s, r) => s + r.totalIncome, 0);
     const totalLifetimeTax = combined.reduce((s, r) => s + r.totalTax, 0);
     const totalLifetimeExpense = combined.reduce((s, r) => s + r.totalExpense, 0);
     const totalSurplusOrShortfall = combined.reduce((s, r) => s + r.gap, 0);
-    const yearsWithPositiveGap = combined.filter(r => r.gap >= 0 || r.portfolioBalance > 0).length;
     const avgEffectiveRate = totalLifetimeIncome > 0 ? totalLifetimeTax / totalLifetimeIncome : 0;
 
-    // Find when portfolio runs out
+    // Find when you're truly broke: retired + portfolio empty + income < expenses
+    // This is the definitive "money lasts to" age
     let moneyLastsAge = longevityAge;
     for (const r of combined) {
       if (r.isRetired && r.portfolioBalance <= 0 && r.gap < 0) {
@@ -537,15 +543,14 @@ export default function MyPlan() {
       }
     }
 
-    // Find when money runs out (cumulative gap)
-    let cumulativeGap = 0;
-    // moneyLastsAge already calculated above
-    for (const r of combined) {
-      cumulativeGap += r.gap;
-      // This is simplified - just tracks first gap year
-    }
+    // Count years where you're covered (income covers expenses OR portfolio can fill the gap)
+    const yearsCovered = combined.filter(r => {
+      if (r.gap >= 0) return true; // income covers expenses
+      if (r.portfolioBalance > 0) return true; // portfolio can fill the gap
+      return false;
+    }).length;
 
-    const firstGapAge = combined.find(r => r.gap < 0)?.age;
+    const firstGapAge = combined.find(r => r.gap < 0 && r.portfolioBalance <= 0)?.age;
 
     return {
       combined,
@@ -558,7 +563,7 @@ export default function MyPlan() {
       totalLifetimeTax,
       totalLifetimeExpense,
       totalSurplusOrShortfall,
-      yearsWithPositiveGap,
+      yearsCovered,
       avgEffectiveRate,
       moneyLastsAge,
       firstGapAge,
@@ -573,15 +578,16 @@ export default function MyPlan() {
   const nowMonthlyExpense = Math.round((nowRow.totalExpense || 0) / 12);
   const nowMonthlyNet = nowMonthlyIncome - nowMonthlyExpense;
 
-  // For retirement, show the year when all income sources are active (SS, pension)
-  // not just the retire age (which might have $0 income if SS starts later)
+  // Retirement snapshot: show AT retire age (what user actually set)
   const ssSource = plan.incomeSources.find(s => s.type === 'socialSecurity');
-  const ssStartAge = ssSource?.startAge || plan.retireAge;
-  const retireSnapshotAge = Math.max(plan.retireAge, ssStartAge);
-  const retireRow = combined.find(r => r.age === retireSnapshotAge) || combined.find(r => r.age === plan.retireAge) || {};
+  const ssStartAge = ssSource?.startAge || null;
+  const retireRow = combined.find(r => r.age === plan.retireAge) || {};
   const retireMonthlyIncome = Math.round((retireRow.totalIncome || 0) / 12);
   const retireMonthlyExpense = Math.round((retireRow.totalExpense || 0) / 12);
   const retireMonthlyNet = retireMonthlyIncome - retireMonthlyExpense;
+  // Also show "full income" age when SS kicks in (if different from retire age)
+  const fullIncomeRow = ssStartAge && ssStartAge > plan.retireAge ? combined.find(r => r.age === ssStartAge) : null;
+  const fullMonthlyIncome = fullIncomeRow ? Math.round(fullIncomeRow.totalIncome / 12) : null;
 
   // Add income dropdown
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -657,7 +663,7 @@ export default function MyPlan() {
         {/* At Retirement */}
         <div className="glass-card" style={{ padding: '16px 20px' }}>
           <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 2, fontWeight: 600, marginBottom: 10 }}>
-            Retirement (Age {retireSnapshotAge}){retireSnapshotAge > plan.retireAge && <span style={{ color: 'var(--blue)', textTransform: 'none', letterSpacing: 0 }}> · SS starts {ssStartAge}</span>}
+            Retirement (Age {plan.retireAge})
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
             <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Income</span>
@@ -676,6 +682,11 @@ export default function MyPlan() {
           {retireMonthlyNet < 0 && results.portfolioAtRetire > 0 && (
             <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'right', marginTop: 2 }}>
               {fmt(results.portfolioAtRetire)} covers ~{Math.round(results.portfolioAtRetire / (Math.abs(retireMonthlyNet) * 12))} years of gap
+            </div>
+          )}
+          {ssStartAge && ssStartAge > plan.retireAge && (
+            <div style={{ fontSize: 10, color: 'var(--blue)', marginTop: 4, padding: '4px 8px', background: 'var(--blue-dim)', borderRadius: 4, textAlign: 'center' }}>
+              SS starts at {ssStartAge}{fullMonthlyIncome ? ` → income becomes ${fmtFull(fullMonthlyIncome)}/mo` : ''}
             </div>
           )}
         </div>
