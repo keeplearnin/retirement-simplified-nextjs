@@ -52,37 +52,22 @@ function AppContent() {
   }
 
   const categories = [
-    { id: 'overview', label: 'Overview', icon: '📊', tabs: [
+    { id: 'plan', label: 'My Plan', icon: '📊', tabs: [
       { id: 'myplan', label: 'My Plan' },
-      { id: 'dashboard', label: 'Dashboard' },
+    ]},
+    { id: 'build', label: 'Build', icon: '🎯', tabs: [
+      { id: 'portfolio', label: 'Portfolio Builder' },
       { id: 'growth', label: 'Growth Projector' },
       { id: 'goals', label: 'Goal Planner' },
-      { id: 'scenarios', label: 'Scenarios' },
     ]},
-    { id: 'invest', label: 'Invest', icon: '🎯', tabs: [
-      { id: 'portfolio', label: 'Portfolio Builder' },
-      { id: 'rebalance', label: 'Rebalance' },
-      { id: 'fees', label: 'Fee Analyzer' },
-    ]},
-    { id: 'taxes', label: 'Taxes', icon: '🏦', tabs: [
-      { id: 'tax', label: 'Roth vs Traditional' },
-      { id: 'taxloss', label: 'Tax-Loss Harvesting' },
-      { id: 'withdrawal', label: 'Withdrawal Strategy' },
-    ]},
-    { id: 'analyze', label: 'Analyze', icon: '🔬', tabs: [
+    { id: 'optimize', label: 'Optimize', icon: '⚡', tabs: [
+      { id: 'tax', label: 'Tax Strategy' },
+      { id: 'withdrawal', label: 'Withdrawal' },
       { id: 'montecarlo', label: 'Monte Carlo' },
-      { id: 'ssa', label: 'Social Security' },
     ]},
     { id: 'learn', label: 'Learn', icon: '💡', tabs: [
-      { id: 'riskquiz', label: 'Risk Profile' },
-      { id: 'investing', label: 'Investing 101' },
       { id: 'guide', label: 'Getting Started' },
       { id: 'advisor', label: 'AI Advisor' },
-    ]},
-    { id: 'me', label: 'My Data', icon: '👤', tabs: [
-      { id: 'linked', label: 'Linked Accounts' },
-      { id: 'myplans', label: 'My Plans' },
-      { id: 'journal', label: 'Journal' },
     ]},
   ];
 
@@ -155,8 +140,8 @@ function AppContent() {
             );
           })}
         </div>
-        {/* Sub-tab row */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 4, paddingBottom: 20, flexWrap: 'wrap' }}>
+        {/* Sub-tab row (hidden for single-tab categories) */}
+        {subTabs.length > 1 && <div style={{ display: 'flex', justifyContent: 'center', gap: 4, paddingBottom: 20, flexWrap: 'wrap' }}>
           {subTabs.map(t => {
             const isActive = tab === t.id;
             return (
@@ -176,7 +161,8 @@ function AppContent() {
               </button>
             );
           })}
-        </div>
+        </div>}
+        {subTabs.length <= 1 && <div style={{ paddingBottom: 12 }} />}
       </nav>
 
       <main className="section-pad" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 40px' }}>
