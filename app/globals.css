@@ -85,6 +85,11 @@ body::before {
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
 
+/* Hide number input spinners globally */
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
+
 input[type=range] {
   -webkit-appearance: none; appearance: none;
   width: 100%; height: 5px; border-radius: 3px; outline: none; cursor: pointer;

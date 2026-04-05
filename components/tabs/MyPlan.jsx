@@ -856,15 +856,20 @@ export default function MyPlan() {
                     <span style={{ width: 6, height: 6, borderRadius: '50%', background: isEssential ? 'var(--accent)' : 'var(--blue)', flexShrink: 0 }} />
                     <span style={{ fontSize: 12, color: 'var(--text-muted)', flex: 1 }}>{cat.label}</span>
                     <input
-                      type="number"
-                      value={val}
+                      type="text"
+                      inputMode="numeric"
+                      value={val.toLocaleString()}
+                      onFocus={e => { e.target.value = String(val); e.target.select(); }}
                       onChange={e => {
-                        const newBreakdown = { ...expenseBreakdown, [cat.key]: Math.max(0, parseInt(e.target.value) || 0) };
+                        const raw = e.target.value.replace(/[^0-9]/g, '');
+                        const num = Math.max(0, parseInt(raw) || 0);
+                        const newBreakdown = { ...expenseBreakdown, [cat.key]: num };
                         updatePlan('expenseBreakdown', newBreakdown);
                         updatePlan('annualSpending', Object.values(newBreakdown).reduce((s, v) => s + v, 0));
                       }}
+                      onBlur={e => { e.target.value = (expenseBreakdown[cat.key] || 0).toLocaleString(); }}
                       style={{
-                        width: 80, padding: '4px 8px', borderRadius: 6, textAlign: 'right',
+                        width: 90, padding: '4px 8px', borderRadius: 6, textAlign: 'right',
                         border: '1px solid var(--border)', background: 'var(--bg)',
                         color: 'var(--text)', fontSize: 12, fontFamily: 'var(--sans)',
                       }}

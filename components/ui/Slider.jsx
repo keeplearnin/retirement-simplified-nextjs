@@ -48,14 +48,12 @@ export default function Slider({ label, value, onChange, min, max, step = 1, for
         {editing ? (
           <input
             ref={inputRef}
-            type="number"
+            type="text"
+            inputMode="decimal"
             value={editVal}
             onChange={e => setEditVal(e.target.value)}
             onBlur={commitEdit}
             onKeyDown={handleKeyDown}
-            min={min}
-            max={max}
-            step={step}
             style={{
               width: 90, padding: '2px 8px', borderRadius: 6, textAlign: 'right',
               border: '1.5px solid var(--accent)', background: 'var(--bg)',
