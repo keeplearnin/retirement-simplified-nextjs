@@ -58,6 +58,7 @@ const DEFAULT_PLAN = {
   expectedReturn: 7,
   // Expenses
   annualSpending: 75000, // 75% of default $100K salary
+  retireSpending: 60000, // 80% of current spending
   expenseMode: 'simple',
   expenseBreakdown: null,
   goGoEndAge: 75,
@@ -515,17 +516,37 @@ export default function MyPlan() {
 
     const incomeProjections = projectIncome(incomePlan);
 
-    // Build expense plan
+    // Build expense plan — uses retirement spending for post-retirement years
+    const retireSpend = plan.retireSpending || Math.round(annualSpending * 0.8);
     const expensePlan = createDefaultExpensePlan(currentAge, retireAge, annualSpending);
     expensePlan.longevityAge = longevityAge;
     expensePlan.goGoEndAge = goGoEndAge;
     expensePlan.slowGoEndAge = slowGoEndAge;
 
-    const expenseProjections = projectExpenses(expensePlan);
+    // Scale factor: retirement spending vs current spending
+    const retireScale = annualSpending > 0 ? retireSpend / annualSpending : 1;
 
-    // Compute essential vs discretionary totals for display
+    const rawExpenseProjections = projectExpenses(expensePlan);
+
+    // Apply retirement spending scale to post-retirement years
+    const expenseProjections = rawExpenseProjections.map(ep => {
+      if (ep.phase === 'working') return ep;
+      // Scale essential + discretionary by retireScale, keep healthcare/debt/oneTime as-is
+      const scaledEssential = ep.essential * retireScale;
+      const scaledDiscretionary = ep.discretionary * retireScale;
+      return {
+        ...ep,
+        essential: scaledEssential,
+        discretionary: scaledDiscretionary,
+        totalExpense: scaledEssential + scaledDiscretionary + ep.healthcare + ep.debtPayments + ep.oneTime,
+      };
+    });
+
+    // Compute essential vs discretionary totals for display (current spending)
     const essentialTotal = expensePlan.essentialExpenses.reduce((s, e) => s + e.annualAmount, 0);
     const discretionaryTotal = expensePlan.discretionaryExpenses.reduce((s, e) => s + e.annualAmount, 0);
+    const retireEssentialTotal = Math.round(essentialTotal * retireScale);
+    const retireDiscretionaryTotal = Math.round(discretionaryTotal * retireScale);
 
     // Portfolio balance tracking — grows with returns + contributions, draws down in retirement
     let portfolioBalance = (plan.savings401k || 0) + (plan.savingsRoth || 0) + (plan.savingsTaxable || 0) + (plan.savingsHSA || 0);
@@ -625,6 +646,8 @@ export default function MyPlan() {
       combined,
       essentialTotal,
       discretionaryTotal,
+      retireEssentialTotal,
+      retireDiscretionaryTotal,
       startingBalance,
       portfolioAtRetire,
       finalBalance: Math.round(portfolioBalance),
@@ -639,7 +662,7 @@ export default function MyPlan() {
     };
   }, [plan]);
 
-  const { combined, essentialTotal, discretionaryTotal } = results;
+  const { combined, essentialTotal, discretionaryTotal, retireEssentialTotal, retireDiscretionaryTotal } = results;
 
   // Monthly snapshot for "now" and "at retirement"
   const nowRow = combined.find(r => r.age === plan.currentAge) || combined[0] || {};
@@ -928,20 +951,34 @@ export default function MyPlan() {
 
         {expenseMode === 'simple' ? (
           <>
-            <Slider label="Total Annual Spending" value={plan.annualSpending} onChange={v => { updatePlan('annualSpending', v); updatePlan('_expenseManuallySet', true); }} min={30000} max={300000} step={5000} format={fmt} />
+            <Slider label="Current Annual Spending (today)" value={plan.annualSpending} onChange={v => { updatePlan('annualSpending', v); updatePlan('_expenseManuallySet', true); if (!plan._retireSpendManuallySet) updatePlan('retireSpending', Math.round(v * 0.8 / 1000) * 1000); }} min={30000} max={300000} step={5000} format={fmt} />
             {!plan._expenseManuallySet && (
               <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -16, marginBottom: 8 }}>
                 Auto-estimated at 75% of your salary. Adjust to match your actual spending.
               </div>
             )}
-            <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-              <div style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>Essential (~60%)</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)', marginTop: 2 }}>{fmt(essentialTotal)}/yr</div>
+            <Slider label="Retirement Annual Spending" value={plan.retireSpending || Math.round(plan.annualSpending * 0.8)} onChange={v => { updatePlan('retireSpending', v); updatePlan('_retireSpendManuallySet', true); }} min={20000} max={250000} step={5000} format={fmt} />
+            {!plan._retireSpendManuallySet && (
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -16, marginBottom: 8 }}>
+                Default 80% of current spending. Most people spend less in retirement (no commute, no work clothes, paid-off mortgage).
               </div>
-              <div style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>Discretionary (~40%)</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--blue)', marginTop: 2 }}>{fmt(discretionaryTotal)}/yr</div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>Now: Essential</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent)', marginTop: 2 }}>{fmt(essentialTotal)}/yr</div>
+              </div>
+              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>Now: Discretionary</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--blue)', marginTop: 2 }}>{fmt(discretionaryTotal)}/yr</div>
+              </div>
+              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid rgba(52,211,153,0.15)' }}>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>Retire: Essential</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent)', marginTop: 2 }}>{fmt(retireEssentialTotal)}/yr</div>
+              </div>
+              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid rgba(96,165,250,0.15)' }}>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>Retire: Discretionary</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--blue)', marginTop: 2 }}>{fmt(retireDiscretionaryTotal)}/yr</div>
               </div>
             </div>
           </>
