@@ -155,116 +155,179 @@ function IncomeSourceCard({ source, onChange, onRemove, retireAge }) {
 // ---------------------------------------------------------------------------
 
 function IncomeExpenseChart({ projections, retireAge }) {
-  const W = 700, H = 320, PAD = { top: 20, right: 20, bottom: 40, left: 70 };
+  const W = 700, H = 360, PAD = { top: 24, right: 20, bottom: 44, left: 70 };
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
 
   if (!projections || projections.length === 0) return null;
 
-  const maxVal = Math.max(
-    ...projections.map(p => Math.max(p.totalIncome, p.totalExpense))
-  ) * 1.1;
   const ages = projections.map(p => p.age);
   const minAge = ages[0];
   const maxAge = ages[ages.length - 1];
 
-  const x = (age) => PAD.left + ((age - minAge) / (maxAge - minAge)) * plotW;
-  const y = (val) => PAD.top + plotH - (val / maxVal) * plotH;
+  // Find max value across portfolio balance, income, and expenses
+  const maxVal = Math.max(
+    ...projections.map(p => Math.max(p.portfolioBalance || 0, p.totalIncome, p.totalExpense))
+  ) * 1.1;
 
-  // Income area path
-  const incomePoints = projections.map(p => `${x(p.age)},${y(p.totalIncome)}`).join(' ');
-  const incomeArea = `M ${x(minAge)},${y(0)} L ${incomePoints} L ${x(maxAge)},${y(0)} Z`;
+  const x = (age) => PAD.left + ((age - minAge) / (maxAge - minAge)) * plotW;
+  const y = (val) => PAD.top + plotH - (Math.max(0, val) / maxVal) * plotH;
+
+  // Portfolio balance area (the big one — shows wealth over time)
+  const portfolioPoints = projections.map(p => `${x(p.age)},${y(p.portfolioBalance || 0)}`).join(' ');
+  const portfolioArea = `M ${x(minAge)},${y(0)} L ${portfolioPoints} L ${x(maxAge)},${y(0)} Z`;
+
+  // Income line (stacked)
+  const incomeKeys = ['salary', 'socialSecurity', 'pension', 'rental'];
+  const incomeColors = ['#34d399', '#60a5fa', '#f59e0b', '#a78bfa'];
+  const stackedAreas = [];
+  for (let k = 0; k < incomeKeys.length; k++) {
+    const key = incomeKeys[k];
+    const topPts = [], bottomPts = [];
+    for (const p of projections) {
+      let bot = 0;
+      for (let j = 0; j < k; j++) bot += p[incomeKeys[j]] || 0;
+      topPts.push(`${x(p.age)},${y(bot + (p[key] || 0))}`);
+      bottomPts.push(`${x(p.age)},${y(bot)}`);
+    }
+    bottomPts.reverse();
+    stackedAreas.push({ key, color: incomeColors[k], path: `M ${topPts.join(' L ')} L ${bottomPts.join(' L ')} Z` });
+  }
 
   // Expense line
   const expenseLine = projections.map((p, i) => `${i === 0 ? 'M' : 'L'} ${x(p.age)},${y(p.totalExpense)}`).join(' ');
 
-  // Income breakdown stacks
-  const incomeKeys = ['salary', 'socialSecurity', 'pension', 'rental'];
-  const incomeColors = ['#34d399', '#60a5fa', '#f59e0b', '#a78bfa'];
-
-  // Build stacked areas
-  const stackedAreas = [];
-  for (let k = 0; k < incomeKeys.length; k++) {
-    const key = incomeKeys[k];
-    const topPoints = [];
-    const bottomPoints = [];
-    for (const p of projections) {
-      let stackBottom = 0;
-      for (let j = 0; j < k; j++) {
-        stackBottom += p[incomeKeys[j]] || 0;
-      }
-      const stackTop = stackBottom + (p[key] || 0);
-      topPoints.push(`${x(p.age)},${y(stackTop)}`);
-      bottomPoints.push(`${x(p.age)},${y(stackBottom)}`);
-    }
-    bottomPoints.reverse();
-    const areaPath = `M ${topPoints.join(' L ')} L ${bottomPoints.join(' L ')} Z`;
-    stackedAreas.push({ key, color: incomeColors[k], path: areaPath });
-  }
-
   // Y-axis ticks
   const yTicks = [];
-  const tickStep = maxVal > 500000 ? 100000 : maxVal > 200000 ? 50000 : 25000;
-  for (let v = 0; v <= maxVal; v += tickStep) {
-    yTicks.push(v);
-  }
+  const tickStep = maxVal > 2000000 ? 500000 : maxVal > 500000 ? 200000 : maxVal > 200000 ? 50000 : 25000;
+  for (let v = 0; v <= maxVal; v += tickStep) yTicks.push(v);
 
   // X-axis ticks every 5 years
   const xTicks = [];
-  for (let a = Math.ceil(minAge / 5) * 5; a <= maxAge; a += 5) {
-    xTicks.push(a);
-  }
+  for (let a = Math.ceil(minAge / 5) * 5; a <= maxAge; a += 5) xTicks.push(a);
 
   const retireX = x(retireAge);
+  const lastRow = projections[projections.length - 1];
+  const legacy = lastRow?.portfolioBalance || 0;
 
   return (
-    <div style={{ overflowX: 'auto' }}>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', maxWidth: W, height: 'auto' }}>
-        {/* Grid */}
-        {yTicks.map(v => (
-          <line key={v} x1={PAD.left} x2={W - PAD.right} y1={y(v)} y2={y(v)} stroke="var(--border)" strokeWidth={0.5} />
-        ))}
+    <div>
+      <div style={{ overflowX: 'auto' }}>
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', maxWidth: W, height: 'auto' }}>
+          {/* Grid */}
+          {yTicks.map(v => (
+            <line key={v} x1={PAD.left} x2={W - PAD.right} y1={y(v)} y2={y(v)} stroke="var(--border)" strokeWidth={0.5} />
+          ))}
 
-        {/* Stacked income areas */}
-        {stackedAreas.map(sa => (
-          <path key={sa.key} d={sa.path} fill={sa.color} opacity={0.35} />
-        ))}
+          {/* Portfolio balance area — the hero curve */}
+          <path d={portfolioArea} fill="url(#portfolioGrad)" opacity={0.25} />
+          <path d={`M ${portfolioPoints}`} fill="none" stroke="var(--accent)" strokeWidth={2.5} />
 
-        {/* Expense line */}
-        <path d={expenseLine} fill="none" stroke="#ef4444" strokeWidth={2.5} strokeDasharray="6,3" />
+          {/* Stacked income areas (smaller, behind) */}
+          {stackedAreas.map(sa => (
+            <path key={sa.key} d={sa.path} fill={sa.color} opacity={0.2} />
+          ))}
 
-        {/* Retirement marker */}
-        <line x1={retireX} x2={retireX} y1={PAD.top} y2={PAD.top + plotH} stroke="var(--accent)" strokeWidth={1.5} strokeDasharray="4,4" />
-        <text x={retireX} y={PAD.top - 4} textAnchor="middle" fill="var(--accent)" fontSize={10} fontFamily="var(--sans)">Retire {retireAge}</text>
+          {/* Expense line */}
+          <path d={expenseLine} fill="none" stroke="#ef4444" strokeWidth={2} strokeDasharray="6,3" />
 
-        {/* Y-axis labels */}
-        {yTicks.map(v => (
-          <text key={v} x={PAD.left - 8} y={y(v) + 4} textAnchor="end" fill="var(--text-dim)" fontSize={10} fontFamily="var(--sans)">{fmt(v)}</text>
-        ))}
+          {/* Retirement marker */}
+          <line x1={retireX} x2={retireX} y1={PAD.top} y2={PAD.top + plotH} stroke="var(--accent)" strokeWidth={1.5} strokeDasharray="4,4" />
+          <text x={retireX} y={PAD.top - 6} textAnchor="middle" fill="var(--accent)" fontSize={10} fontWeight={600} fontFamily="var(--sans)">Retire {retireAge}</text>
 
-        {/* X-axis labels */}
-        {xTicks.map(a => (
-          <text key={a} x={x(a)} y={H - 10} textAnchor="middle" fill="var(--text-dim)" fontSize={10} fontFamily="var(--sans)">{a}</text>
-        ))}
+          {/* Peak portfolio label */}
+          {(() => {
+            const peakRow = projections.reduce((max, p) => (p.portfolioBalance || 0) > (max.portfolioBalance || 0) ? p : max, projections[0]);
+            return (
+              <text x={x(peakRow.age)} y={y(peakRow.portfolioBalance) - 8} textAnchor="middle" fill="var(--accent)" fontSize={10} fontWeight={700} fontFamily="var(--sans)">
+                Peak: {fmt(peakRow.portfolioBalance)}
+              </text>
+            );
+          })()}
 
-        {/* Axes */}
-        <line x1={PAD.left} x2={PAD.left} y1={PAD.top} y2={PAD.top + plotH} stroke="var(--border)" />
-        <line x1={PAD.left} x2={W - PAD.right} y1={PAD.top + plotH} y2={PAD.top + plotH} stroke="var(--border)" />
-      </svg>
+          {/* Legacy label at end */}
+          {legacy > 0 && (
+            <>
+              <circle cx={x(maxAge)} cy={y(legacy)} r={4} fill="var(--accent)" />
+              <text x={x(maxAge) - 8} y={y(legacy) - 10} textAnchor="end" fill="var(--accent)" fontSize={10} fontWeight={600} fontFamily="var(--sans)">
+                Legacy: {fmt(legacy)}
+              </text>
+            </>
+          )}
+          {legacy <= 0 && (
+            (() => {
+              const brokeRow = projections.find(p => p.isRetired && p.portfolioBalance <= 0);
+              if (!brokeRow) return null;
+              return (
+                <>
+                  <circle cx={x(brokeRow.age)} cy={y(0)} r={5} fill="#ef4444" />
+                  <text x={x(brokeRow.age)} y={y(0) - 10} textAnchor="middle" fill="#ef4444" fontSize={10} fontWeight={700} fontFamily="var(--sans)">
+                    Depleted at {brokeRow.age}
+                  </text>
+                </>
+              );
+            })()
+          )}
+
+          {/* Y-axis labels */}
+          {yTicks.map(v => (
+            <text key={v} x={PAD.left - 8} y={y(v) + 4} textAnchor="end" fill="var(--text-dim)" fontSize={10} fontFamily="var(--sans)">{fmt(v)}</text>
+          ))}
+
+          {/* X-axis labels */}
+          {xTicks.map(a => (
+            <text key={a} x={x(a)} y={H - 10} textAnchor="middle" fill="var(--text-dim)" fontSize={10} fontFamily="var(--sans)">{a}</text>
+          ))}
+
+          {/* Axes */}
+          <line x1={PAD.left} x2={PAD.left} y1={PAD.top} y2={PAD.top + plotH} stroke="var(--border)" />
+          <line x1={PAD.left} x2={W - PAD.right} y1={PAD.top + plotH} y2={PAD.top + plotH} stroke="var(--border)" />
+
+          {/* Gradient defs */}
+          <defs>
+            <linearGradient id="portfolioGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.6" />
+              <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.05" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
 
       {/* Legend */}
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 8, justifyContent: 'center' }}>
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, justifyContent: 'center', fontSize: 11 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--accent)', fontWeight: 600 }}>
+          <div style={{ width: 14, height: 3, background: 'var(--accent)', borderRadius: 2 }} /> Portfolio Balance
+        </div>
         {incomeKeys.map((key, i) => (
-          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>
-            <div style={{ width: 12, height: 12, borderRadius: 3, background: incomeColors[i], opacity: 0.7 }} />
-            {key === 'socialSecurity' ? 'Social Security' : key.charAt(0).toUpperCase() + key.slice(1)}
+          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-muted)' }}>
+            <div style={{ width: 10, height: 10, borderRadius: 2, background: incomeColors[i], opacity: 0.5 }} />
+            {key === 'socialSecurity' ? 'SS' : key.charAt(0).toUpperCase() + key.slice(1)}
           </div>
         ))}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>
-          <div style={{ width: 12, height: 3, background: '#ef4444', borderRadius: 2 }} />
-          Expenses
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-muted)' }}>
+          <div style={{ width: 14, height: 2, background: '#ef4444', borderRadius: 2 }} /> Expenses
         </div>
       </div>
+
+      {/* Legacy callout */}
+      {legacy > 0 && (
+        <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: 'var(--accent-dim)', border: '1px solid rgba(52,211,153,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>Estate / Legacy for Family</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Projected portfolio remaining at age {maxAge}</div>
+          </div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--accent)', fontFamily: 'var(--sans)' }}>{fmt(legacy)}</div>
+        </div>
+      )}
+      {legacy <= 0 && (
+        <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: 'var(--danger-dim)', border: '1px solid rgba(248,113,113,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--danger)' }}>No Legacy — Savings Depleted</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Consider: saving more, working longer, or reducing spending</div>
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--danger)', fontFamily: 'var(--sans)' }}>$0</div>
+        </div>
+      )}
     </div>
   );
 }
