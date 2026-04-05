@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { verifyAuth, checkRateLimit, getClientIp } from '@/lib/apiAuth';
 
 // ---------------------------------------------------------------------------
 // Plaid API Routes — Placeholder with commented-out real integration
@@ -31,6 +32,15 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   try {
+    // --- Auth: require a valid Cognito token ---
+    const authResult = verifyAuth(request);
+    if (authResult instanceof NextResponse) return authResult;
+
+    // --- Rate limit: 10 requests per minute per IP ---
+    const ip = getClientIp(request);
+    const rateLimited = checkRateLimit(`plaid:${ip}`, 10, 60_000);
+    if (rateLimited) return rateLimited;
+
     const body = await request.json();
     const { action } = body;
 
@@ -47,11 +57,6 @@ export async function POST(request) {
       //   products: [Products.Transactions, Products.Investments],
       //   country_codes: [CountryCode.Us],
       //   language: 'en',
-      //   // Optional: specify account filters
-      //   // account_filters: {
-      //   //   investment: { account_subtypes: ['401k', 'ira', 'roth', 'brokerage'] },
-      //   //   depository: { account_subtypes: ['checking', 'savings'] },
-      //   // },
       // });
       //
       // return NextResponse.json({
@@ -70,7 +75,6 @@ export async function POST(request) {
     // =====================================================================
     // ACTION: exchange-token
     // Exchanges the public_token from Plaid Link for a persistent access_token
-    // The access_token should be stored securely server-side (e.g., database)
     // =====================================================================
     if (action === 'exchange-token') {
       const { public_token } = body;
@@ -84,37 +88,7 @@ export async function POST(request) {
       // const exchangeResponse = await plaidClient.itemPublicTokenExchange({
       //   public_token,
       // });
-      //
-      // const accessToken = exchangeResponse.data.access_token;
-      // const itemId = exchangeResponse.data.item_id;
-      //
-      // // TODO: Store accessToken and itemId in your database, associated
-      // // with the authenticated user. NEVER send access_token to the client.
-      //
-      // // Fetch accounts using the new access_token
-      // const accountsResponse = await plaidClient.accountsGet({
-      //   access_token: accessToken,
-      // });
-      //
-      // // For investment accounts, also fetch holdings
-      // // const holdingsResponse = await plaidClient.investmentsHoldingsGet({
-      // //   access_token: accessToken,
-      // // });
-      //
-      // return NextResponse.json({
-      //   item_id: itemId,
-      //   accounts: accountsResponse.data.accounts.map(acct => ({
-      //     id: acct.account_id,
-      //     name: acct.name,
-      //     official_name: acct.official_name,
-      //     type: acct.type,
-      //     subtype: acct.subtype,
-      //     balance: acct.balances.current,
-      //     available: acct.balances.available,
-      //     currency: acct.balances.iso_currency_code,
-      //   })),
-      //   institution: accountsResponse.data.item.institution_id,
-      // });
+      // ...
       // -----------------------------------------------------------
 
       // Mock response for demo/sandbox mode
@@ -130,7 +104,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('Plaid API error:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Something went wrong. Please try again.' },
       { status: 500 }
     );
   }

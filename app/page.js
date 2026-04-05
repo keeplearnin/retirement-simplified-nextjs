@@ -18,6 +18,7 @@ import SocialSecurity from '@/components/tabs/SocialSecurity';
 import GettingStarted from '@/components/tabs/GettingStarted';
 import InvestingGuide from '@/components/tabs/InvestingGuide';
 import AIAdvisor from '@/components/tabs/AIAdvisor';
+import MyPlan from '@/components/tabs/MyPlan';
 import MyPlans from '@/components/tabs/MyPlans';
 import Journal from '@/components/tabs/Journal';
 import RiskQuiz from '@/components/tabs/RiskQuiz';
@@ -25,7 +26,7 @@ import GoalPlanner from '@/components/tabs/GoalPlanner';
 import LinkedAccounts from '@/components/tabs/LinkedAccounts';
 
 function AppContent() {
-  const [tab, setTab] = useState('growth');
+  const [tab, setTab] = useState('myplan');
   const [loaded, setLoaded] = useState(false);
   const [theme, setTheme] = useState('dark');
   const { user, isConfigured: configured, authLoading, signIn, signOut } = useAuth();
@@ -52,6 +53,7 @@ function AppContent() {
 
   const categories = [
     { id: 'overview', label: 'Overview', icon: '📊', tabs: [
+      { id: 'myplan', label: 'My Plan' },
       { id: 'dashboard', label: 'Dashboard' },
       { id: 'growth', label: 'Growth Projector' },
       { id: 'goals', label: 'Goal Planner' },
@@ -178,6 +180,7 @@ function AppContent() {
       </nav>
 
       <main className="section-pad" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 40px' }}>
+        {tab === 'myplan' && <MyPlan />}
         {tab === 'dashboard' && <AccountDashboard />}
         {tab === 'growth' && <GrowthProjector />}
         {tab === 'fees' && <FeeImpact />}

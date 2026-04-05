@@ -1,15 +1,25 @@
 import { NextResponse } from 'next/server';
 import { AI_SYSTEM_PROMPT } from '@/lib/constants';
+import { verifyAuth, checkRateLimit, getClientIp } from '@/lib/apiAuth';
 
 export async function POST(request) {
   try {
+    // --- Auth: require a valid Cognito token ---
+    const authResult = verifyAuth(request);
+    if (authResult instanceof NextResponse) return authResult;
+
+    // --- Rate limit: 20 requests per minute per IP ---
+    const ip = getClientIp(request);
+    const rateLimited = checkRateLimit(`chat:${ip}`, 20, 60_000);
+    if (rateLimited) return rateLimited;
+
     const { messages } = await request.json();
     const apiKey = process.env.ANTHROPIC_API_KEY;
 
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'ANTHROPIC_API_KEY not configured' },
-        { status: 500 }
+        { error: 'AI service is not configured' },
+        { status: 503 }
       );
     }
 
@@ -29,8 +39,11 @@ export async function POST(request) {
     });
 
     if (!resp.ok) {
-      const error = await resp.text();
-      return NextResponse.json({ error }, { status: resp.status });
+      console.error('Anthropic API error:', resp.status, await resp.text());
+      return NextResponse.json(
+        { error: 'AI service temporarily unavailable' },
+        { status: 502 }
+      );
     }
 
     const data = await resp.json();
@@ -38,6 +51,10 @@ export async function POST(request) {
 
     return NextResponse.json({ text });
   } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    console.error('Chat route error:', e);
+    return NextResponse.json(
+      { error: 'Something went wrong. Please try again.' },
+      { status: 500 }
+    );
   }
 }

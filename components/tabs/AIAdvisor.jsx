@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Card from '@/components/ui/Card';
 import { AI_SUGGESTED_QUESTIONS } from '@/lib/constants';
+import Auth from '@/lib/auth';
 
 export default function AIAdvisor() {
   const [messages, setMessages] = useState([]);
@@ -27,12 +28,24 @@ export default function AIAdvisor() {
     setLoading(true);
 
     try {
+      const token = Auth.getIdToken();
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ messages: newMessages }),
       });
       const data = await res.json();
+      if (res.status === 401) {
+        setMessages((prev) => [...prev, { role: 'assistant', content: 'Please sign in to use the AI advisor.' }]);
+        return;
+      }
+      if (res.status === 429) {
+        setMessages((prev) => [...prev, { role: 'assistant', content: 'You\'re sending messages too quickly. Please wait a moment.' }]);
+        return;
+      }
       setMessages((prev) => [...prev, { role: 'assistant', content: data.text }]);
     } catch (err) {
       setMessages((prev) => [
