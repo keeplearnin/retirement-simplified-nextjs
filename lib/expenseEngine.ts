@@ -138,7 +138,9 @@ function longTermCareCost(
       : 1;
 
   const annualBase = baseMonthlyCost * 12 * rampFactor;
-  return inflated(annualBase, healthcareInflation, age - currentAge);
+  // Cap inflated LTC at 3x base to prevent unrealistic projections
+  const raw = inflated(annualBase, healthcareInflation, age - currentAge);
+  return Math.min(raw, annualBase * 3);
 }
 
 // ---------------------------------------------------------------------------
@@ -309,6 +311,6 @@ export function createDefaultExpensePlan(
     slowGoPct: 0.85,
     noGoPct: 0.70,
     inflationRate: 0.025,
-    healthcareInflation: 0.05,
+    healthcareInflation: 0.035, // 3.5% — more realistic than 5%
   };
 }

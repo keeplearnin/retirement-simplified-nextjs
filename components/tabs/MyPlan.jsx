@@ -569,10 +569,16 @@ export default function MyPlan() {
 
   // Monthly snapshot for "now" and "at retirement"
   const nowRow = combined.find(r => r.age === plan.currentAge) || combined[0] || {};
-  const retireRow = combined.find(r => r.age === plan.retireAge) || {};
   const nowMonthlyIncome = Math.round((nowRow.totalIncome || 0) / 12);
   const nowMonthlyExpense = Math.round((nowRow.totalExpense || 0) / 12);
   const nowMonthlyNet = nowMonthlyIncome - nowMonthlyExpense;
+
+  // For retirement, show the year when all income sources are active (SS, pension)
+  // not just the retire age (which might have $0 income if SS starts later)
+  const ssSource = plan.incomeSources.find(s => s.type === 'socialSecurity');
+  const ssStartAge = ssSource?.startAge || plan.retireAge;
+  const retireSnapshotAge = Math.max(plan.retireAge, ssStartAge);
+  const retireRow = combined.find(r => r.age === retireSnapshotAge) || combined.find(r => r.age === plan.retireAge) || {};
   const retireMonthlyIncome = Math.round((retireRow.totalIncome || 0) / 12);
   const retireMonthlyExpense = Math.round((retireRow.totalExpense || 0) / 12);
   const retireMonthlyNet = retireMonthlyIncome - retireMonthlyExpense;
@@ -651,7 +657,7 @@ export default function MyPlan() {
         {/* At Retirement */}
         <div className="glass-card" style={{ padding: '16px 20px' }}>
           <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 2, fontWeight: 600, marginBottom: 10 }}>
-            Retirement (Age {plan.retireAge})
+            Retirement (Age {retireSnapshotAge}){retireSnapshotAge > plan.retireAge && <span style={{ color: 'var(--blue)', textTransform: 'none', letterSpacing: 0 }}> · SS starts {ssStartAge}</span>}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
             <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Income</span>
