@@ -516,35 +516,37 @@ export default function MyPlan() {
 
     const incomeProjections = projectIncome(incomePlan);
 
-    // Build expense plan — uses retirement spending for post-retirement years
+    // Build TWO expense plans: one for working years, one for retirement
     const retireSpend = plan.retireSpending || Math.round(annualSpending * 0.8);
-    const expensePlan = createDefaultExpensePlan(currentAge, retireAge, annualSpending);
-    expensePlan.longevityAge = longevityAge;
-    expensePlan.goGoEndAge = goGoEndAge;
-    expensePlan.slowGoEndAge = slowGoEndAge;
+    const inflationRate = 0.025;
 
-    // Scale factor: retirement spending vs current spending
-    const retireScale = annualSpending > 0 ? retireSpend / annualSpending : 1;
+    // Working years: use current spending
+    const workingExpensePlan = createDefaultExpensePlan(currentAge, retireAge, annualSpending);
+    workingExpensePlan.longevityAge = longevityAge;
+    workingExpensePlan.goGoEndAge = goGoEndAge;
+    workingExpensePlan.slowGoEndAge = slowGoEndAge;
 
-    const rawExpenseProjections = projectExpenses(expensePlan);
+    // Retirement years: use retirement spending as base (in today's dollars)
+    const retireExpensePlan = createDefaultExpensePlan(currentAge, retireAge, retireSpend);
+    retireExpensePlan.longevityAge = longevityAge;
+    retireExpensePlan.goGoEndAge = goGoEndAge;
+    retireExpensePlan.slowGoEndAge = slowGoEndAge;
 
-    // Apply retirement spending scale to post-retirement years
-    const expenseProjections = rawExpenseProjections.map(ep => {
-      if (ep.phase === 'working') return ep;
-      // Scale essential + discretionary by retireScale, keep healthcare/debt/oneTime as-is
-      const scaledEssential = ep.essential * retireScale;
-      const scaledDiscretionary = ep.discretionary * retireScale;
-      return {
-        ...ep,
-        essential: scaledEssential,
-        discretionary: scaledDiscretionary,
-        totalExpense: scaledEssential + scaledDiscretionary + ep.healthcare + ep.debtPayments + ep.oneTime,
-      };
+    const workingProjections = projectExpenses(workingExpensePlan);
+    const retireProjections = projectExpenses(retireExpensePlan);
+
+    // Merge: use working projections pre-retirement, retire projections post-retirement
+    const expenseProjections = workingProjections.map((wp, i) => {
+      const rp = retireProjections[i];
+      if (wp.phase === 'working') return wp;
+      // Post-retirement: use the retirement-spending-based projection
+      return rp || wp;
     });
 
-    // Compute essential vs discretionary totals for display (current spending)
-    const essentialTotal = expensePlan.essentialExpenses.reduce((s, e) => s + e.annualAmount, 0);
-    const discretionaryTotal = expensePlan.discretionaryExpenses.reduce((s, e) => s + e.annualAmount, 0);
+    // Compute essential vs discretionary totals for display
+    const essentialTotal = workingExpensePlan.essentialExpenses.reduce((s, e) => s + e.annualAmount, 0);
+    const discretionaryTotal = workingExpensePlan.discretionaryExpenses.reduce((s, e) => s + e.annualAmount, 0);
+    const retireScale = annualSpending > 0 ? retireSpend / annualSpending : 1;
     const retireEssentialTotal = Math.round(essentialTotal * retireScale);
     const retireDiscretionaryTotal = Math.round(discretionaryTotal * retireScale);
 
