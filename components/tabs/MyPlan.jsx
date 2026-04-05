@@ -29,6 +29,20 @@ const INCOME_TEMPLATES = {
   rental: { type: 'rental', label: 'Rental Income', monthlyNet: 1500, appreciation: 3 },
 };
 
+const EXPENSE_CATEGORIES = [
+  { key: 'housing', label: 'Housing', type: 'essential', default: 0.30 },
+  { key: 'food', label: 'Food & Groceries', type: 'essential', default: 0.12 },
+  { key: 'utilities', label: 'Utilities', type: 'essential', default: 0.05 },
+  { key: 'transport', label: 'Transportation', type: 'essential', default: 0.08 },
+  { key: 'insurance', label: 'Insurance', type: 'essential', default: 0.05 },
+  { key: 'travel', label: 'Travel', type: 'discretionary', default: 0.10 },
+  { key: 'dining', label: 'Dining Out', type: 'discretionary', default: 0.06 },
+  { key: 'entertainment', label: 'Entertainment', type: 'discretionary', default: 0.05 },
+  { key: 'hobbies', label: 'Hobbies & Fitness', type: 'discretionary', default: 0.04 },
+  { key: 'giving', label: 'Gifts & Charity', type: 'discretionary', default: 0.05 },
+  { key: 'other', label: 'Other / Misc', type: 'discretionary', default: 0.10 },
+];
+
 const DEFAULT_PLAN = {
   currentAge: 40,
   retireAge: 65,
@@ -36,6 +50,8 @@ const DEFAULT_PLAN = {
   filingStatus: 'single',
   stateCode: 'CA',
   annualSpending: 80000,
+  expenseMode: 'simple', // 'simple' or 'detailed'
+  expenseBreakdown: null, // null = auto from annualSpending, or { housing: 24000, ... }
   goGoEndAge: 75,
   slowGoEndAge: 85,
   incomeSources: [
@@ -305,13 +321,10 @@ function SuccessScore({ projections }) {
 
 function MetricCard({ label, value, sub, color }) {
   return (
-    <div style={{
-      padding: '16px 20px', borderRadius: 12, background: 'var(--bg2)',
-      border: '1px solid var(--border)', flex: '1 1 160px', minWidth: 160,
-    }}>
-      <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: color || 'var(--text)', fontFamily: 'var(--sans)' }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>{sub}</div>}
+    <div className="glass-card" style={{ padding: '12px 16px', transition: 'all .2s' }}>
+      <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4, fontWeight: 600 }}>{label}</div>
+      <div className="animate-number" style={{ fontSize: 20, fontWeight: 700, color: color || 'var(--text)', fontFamily: 'var(--sans)' }}>{value}</div>
+      {sub && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{sub}</div>}
     </div>
   );
 }
@@ -508,17 +521,48 @@ export default function MyPlan() {
   const [showAddMenu, setShowAddMenu] = useState(false);
   const existingTypes = plan.incomeSources.map(s => s.type);
 
+  // Expense mode
+  const expenseMode = plan.expenseMode || 'simple';
+  const expenseBreakdown = plan.expenseBreakdown || (() => {
+    const b = {};
+    EXPENSE_CATEGORIES.forEach(c => { b[c.key] = Math.round(plan.annualSpending * c.default); });
+    return b;
+  })();
+  const detailedTotal = Object.values(expenseBreakdown).reduce((s, v) => s + v, 0);
+
   return (
-    <div>
-      <SectionLabel>My Retirement Plan</SectionLabel>
+    <div className="slide-in">
+      {/* ============ RESULTS FIRST (hero) ============ */}
+      <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 20, marginBottom: 20, alignItems: 'start' }} className="grid-2">
+        <div className="glass-card" style={{ textAlign: 'center', padding: '20px 24px' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 6, fontWeight: 600 }}>Plan Score</div>
+          <SuccessScore projections={combined} />
+        </div>
 
-      <InfoBox icon="📋" title="Comprehensive Plan">
-        This dashboard ties together your income sources, projected expenses, and tax obligations into a single lifetime view.
-        Adjust the inputs below and see your results update in real time.
-      </InfoBox>
+        <div className="glass-card" style={{ padding: '16px 20px' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>Income vs. Expenses</div>
+          <IncomeExpenseChart projections={combined} retireAge={plan.retireAge} />
+        </div>
+      </div>
 
-      {/* ---- Section 1: Personal Info ---- */}
-      <Collapsible title="Personal Information" badge="">
+      {/* Key Metrics — horizontal strip */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginBottom: 20 }}>
+        <MetricCard label="Lifetime Income" value={fmt(results.totalLifetimeIncome)} />
+        <MetricCard label="Lifetime Taxes" value={fmt(results.totalLifetimeTax)} color="#f59e0b" />
+        <MetricCard label="Lifetime Expenses" value={fmt(results.totalLifetimeExpense)} />
+        <MetricCard
+          label="Net Surplus"
+          value={(results.totalSurplusOrShortfall >= 0 ? '+' : '-') + fmt(Math.abs(results.totalSurplusOrShortfall))}
+          color={results.totalSurplusOrShortfall >= 0 ? '#34d399' : '#ef4444'}
+        />
+        <MetricCard label="Years Covered" value={`${results.yearsWithPositiveGap}/${combined.length}`} />
+        <MetricCard label="Avg Tax Rate" value={`${(results.avgEffectiveRate * 100).toFixed(1)}%`} color="#a78bfa" />
+      </div>
+
+      {/* ============ INPUTS (collapsible, below results) ============ */}
+
+      {/* Personal Info — compact inline */}
+      <Collapsible title="Personal Info" defaultOpen={false} badge={`Age ${plan.currentAge}, retire ${plan.retireAge}`}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
           <div>
             <Slider label="Current Age" value={plan.currentAge} onChange={v => updatePlan('currentAge', v)} min={20} max={80} />
@@ -526,44 +570,35 @@ export default function MyPlan() {
             <Slider label="Plan Through Age" value={plan.longevityAge} onChange={v => updatePlan('longevityAge', v)} min={Math.max(plan.retireAge + 5, 80)} max={105} />
           </div>
           <div>
-            <div className="mb-24">
-              <div className="flex justify-between items-center mb-8">
-                <span className="slider-label">Filing Status</span>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>Filing Status</span>
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 6 }}>
                 {['single', 'mfj'].map(s => (
-                  <button
-                    key={s}
-                    onClick={() => updatePlan('filingStatus', s)}
-                    style={{
-                      flex: 1, padding: '10px 16px', borderRadius: 8, cursor: 'pointer',
-                      border: plan.filingStatus === s ? '2px solid var(--accent)' : '1px solid var(--border)',
-                      background: plan.filingStatus === s ? 'var(--accent-dim)' : 'var(--bg2)',
-                      color: plan.filingStatus === s ? 'var(--accent)' : 'var(--text-muted)',
-                      fontWeight: plan.filingStatus === s ? 700 : 400, fontSize: 13,
-                      fontFamily: 'var(--sans)',
-                    }}
-                  >
+                  <button key={s} onClick={() => updatePlan('filingStatus', s)} style={{
+                    flex: 1, padding: '8px 14px', borderRadius: 8, cursor: 'pointer',
+                    border: plan.filingStatus === s ? '1.5px solid var(--accent)' : '1px solid var(--border)',
+                    background: plan.filingStatus === s ? 'var(--accent-dim)' : 'transparent',
+                    color: plan.filingStatus === s ? 'var(--accent)' : 'var(--text-muted)',
+                    fontWeight: plan.filingStatus === s ? 600 : 400, fontSize: 12, fontFamily: 'var(--sans)',
+                    transition: 'all .2s',
+                  }}>
                     {s === 'single' ? 'Single' : 'Married Filing Jointly'}
                   </button>
                 ))}
               </div>
             </div>
-            <div className="mb-24">
-              <div className="flex justify-between items-center mb-8">
-                <span className="slider-label">State</span>
-                <span className="slider-value">{plan.stateCode}</span>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>State</span>
+                <span style={{ fontSize: 14, color: 'var(--accent)', fontWeight: 600 }}>{plan.stateCode}</span>
               </div>
-              <select
-                value={plan.stateCode}
-                onChange={e => updatePlan('stateCode', e.target.value)}
-                style={{
-                  width: '100%', padding: '10px 14px', borderRadius: 8,
-                  border: '1px solid var(--border)', background: 'var(--bg2)',
-                  color: 'var(--text)', fontSize: 13, fontFamily: 'var(--sans)',
-                  cursor: 'pointer',
-                }}
-              >
+              <select value={plan.stateCode} onChange={e => updatePlan('stateCode', e.target.value)} style={{
+                width: '100%', padding: '8px 12px', borderRadius: 8,
+                border: '1px solid var(--border)', background: 'var(--bg2)',
+                color: 'var(--text)', fontSize: 12, fontFamily: 'var(--sans)', cursor: 'pointer',
+              }}>
                 {US_STATES.map(st => <option key={st} value={st}>{st}</option>)}
               </select>
             </div>
@@ -622,74 +657,104 @@ export default function MyPlan() {
         </div>
       </Collapsible>
 
-      {/* ---- Section 3: Expense Summary ---- */}
-      <Collapsible title="Expense Summary" defaultOpen={false}>
-        <Slider label="Total Annual Spending" value={plan.annualSpending} onChange={v => updatePlan('annualSpending', v)} min={30000} max={300000} step={5000} prefix="$" format={v => (v/1000).toFixed(0) + 'K'} />
-
-        <div style={{ display: 'flex', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 140, padding: 14, borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>Essential</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#34d399', marginTop: 4 }}>{fmtFull(essentialTotal)}/yr</div>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>Housing, food, utilities, transport</div>
-          </div>
-          <div style={{ flex: 1, minWidth: 140, padding: 14, borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>Discretionary</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#60a5fa', marginTop: 4 }}>{fmtFull(discretionaryTotal)}/yr</div>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>Travel, dining, hobbies, entertainment</div>
-          </div>
+      {/* ---- Expenses with Simple/Detailed Toggle ---- */}
+      <Collapsible title="Expenses" defaultOpen={false} badge={expenseMode === 'simple' ? fmt(plan.annualSpending) + '/yr' : fmt(detailedTotal) + '/yr'}>
+        {/* Mode toggle */}
+        <div style={{ display: 'flex', gap: 2, background: 'var(--bg)', borderRadius: 20, padding: 2, marginBottom: 16, width: 'fit-content' }}>
+          {['simple', 'detailed'].map(mode => (
+            <button key={mode} onClick={() => updatePlan('expenseMode', mode)} style={{
+              padding: '6px 16px', borderRadius: 18, border: 'none', cursor: 'pointer',
+              background: expenseMode === mode ? 'var(--accent)' : 'transparent',
+              color: expenseMode === mode ? '#fff' : 'var(--text-dim)',
+              fontWeight: expenseMode === mode ? 600 : 400, fontSize: 12, fontFamily: 'var(--sans)',
+              transition: 'all .2s', textTransform: 'capitalize',
+            }}>{mode}</button>
+          ))}
         </div>
 
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 12 }}>Retirement Spending Phases</div>
-        <Slider label="Go-Go Phase Ends" value={plan.goGoEndAge} onChange={v => updatePlan('goGoEndAge', v)} min={plan.retireAge} max={plan.slowGoEndAge - 1} tooltip="Active early retirement -- 100% discretionary spending" />
-        <Slider label="Slow-Go Phase Ends" value={plan.slowGoEndAge} onChange={v => updatePlan('slowGoEndAge', v)} min={plan.goGoEndAge + 1} max={plan.longevityAge - 1} tooltip="Winding down -- 85% discretionary spending" />
-        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>
-          No-Go phase ({plan.slowGoEndAge}+): 70% discretionary spending, higher healthcare costs
+        {expenseMode === 'simple' ? (
+          <>
+            <Slider label="Total Annual Spending" value={plan.annualSpending} onChange={v => updatePlan('annualSpending', v)} min={30000} max={300000} step={5000} format={fmt} />
+            <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+              <div style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>Essential (~60%)</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)', marginTop: 2 }}>{fmt(essentialTotal)}/yr</div>
+              </div>
+              <div style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>Discretionary (~40%)</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--blue)', marginTop: 2 }}>{fmt(discretionaryTotal)}/yr</div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12 }}>
+              Customize each category. Total: <strong style={{ color: 'var(--text)' }}>{fmtFull(detailedTotal)}/yr</strong>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }} className="grid-2">
+              {EXPENSE_CATEGORIES.map(cat => {
+                const val = expenseBreakdown[cat.key] || 0;
+                const isEssential = cat.type === 'essential';
+                return (
+                  <div key={cat.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)' }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: isEssential ? 'var(--accent)' : 'var(--blue)', flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)', flex: 1 }}>{cat.label}</span>
+                    <input
+                      type="number"
+                      value={val}
+                      onChange={e => {
+                        const newBreakdown = { ...expenseBreakdown, [cat.key]: Math.max(0, parseInt(e.target.value) || 0) };
+                        updatePlan('expenseBreakdown', newBreakdown);
+                        updatePlan('annualSpending', Object.values(newBreakdown).reduce((s, v) => s + v, 0));
+                      }}
+                      style={{
+                        width: 80, padding: '4px 8px', borderRadius: 6, textAlign: 'right',
+                        border: '1px solid var(--border)', background: 'var(--bg)',
+                        color: 'var(--text)', fontSize: 12, fontFamily: 'var(--sans)',
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            {/* Visual bar showing essential vs discretionary */}
+            <div style={{ marginTop: 12, height: 8, borderRadius: 4, overflow: 'hidden', display: 'flex', background: 'var(--bg)' }}>
+              {(() => {
+                const essTotal = EXPENSE_CATEGORIES.filter(c => c.type === 'essential').reduce((s, c) => s + (expenseBreakdown[c.key] || 0), 0);
+                const discTotal = detailedTotal - essTotal;
+                const essPct = detailedTotal > 0 ? (essTotal / detailedTotal) * 100 : 60;
+                return (
+                  <>
+                    <div style={{ width: `${essPct}%`, background: 'var(--accent)', transition: 'width .3s' }} />
+                    <div style={{ width: `${100 - essPct}%`, background: 'var(--blue)', transition: 'width .3s' }} />
+                  </>
+                );
+              })()}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 10, color: 'var(--text-dim)' }}>
+              <span style={{ color: 'var(--accent)' }}>Essential</span>
+              <span style={{ color: 'var(--blue)' }}>Discretionary</span>
+            </div>
+          </>
+        )}
+
+        {/* Spending phases */}
+        <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Retirement Spending Phases</div>
+          <Slider label="Go-Go Ends" value={plan.goGoEndAge} onChange={v => updatePlan('goGoEndAge', v)} min={plan.retireAge} max={plan.slowGoEndAge - 1} />
+          <Slider label="Slow-Go Ends" value={plan.slowGoEndAge} onChange={v => updatePlan('slowGoEndAge', v)} min={plan.goGoEndAge + 1} max={plan.longevityAge - 1} />
+          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+            Go-Go: 100% spending · Slow-Go: 85% · No-Go ({plan.slowGoEndAge}+): 70%
+          </div>
         </div>
       </Collapsible>
 
-      {/* ---- Section 4: Results Dashboard ---- */}
-      <SectionLabel>Results</SectionLabel>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 20, marginBottom: 24, alignItems: 'start' }}>
-        <Card style={{ textAlign: 'center', padding: '24px 32px' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 8 }}>Plan Score</div>
-          <SuccessScore projections={combined} />
-        </Card>
-
-        <Card>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 12 }}>Income vs. Expenses Over Time</div>
-          <IncomeExpenseChart projections={combined} retireAge={plan.retireAge} />
-        </Card>
-      </div>
-
-      {/* Key Metrics */}
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
-        <MetricCard label="Lifetime Income" value={fmt(results.totalLifetimeIncome)} />
-        <MetricCard label="Lifetime Taxes" value={fmt(results.totalLifetimeTax)} color="#f59e0b" />
-        <MetricCard label="Lifetime Expenses" value={fmt(results.totalLifetimeExpense)} />
-        <MetricCard
-          label="Net Surplus / Shortfall"
-          value={(results.totalSurplusOrShortfall >= 0 ? '+' : '') + fmt(Math.abs(results.totalSurplusOrShortfall))}
-          color={results.totalSurplusOrShortfall >= 0 ? '#34d399' : '#ef4444'}
-        />
-        <MetricCard
-          label="Years Covered"
-          value={`${results.yearsWithPositiveGap} of ${combined.length}`}
-          sub={`Through age ${results.firstGapAge ? results.firstGapAge - 1 : plan.longevityAge}`}
-        />
-        <MetricCard
-          label="Avg Effective Tax Rate"
-          value={`${(results.avgEffectiveRate * 100).toFixed(1)}%`}
-          color="#a78bfa"
-        />
-      </div>
-
-      {/* Year-by-Year Table */}
+      {/* Year-by-Year & Tax (below inputs) */}
       <Collapsible title="Year-by-Year Summary" defaultOpen={false} badge="Every 5 years">
         <SummaryTable rows={combined} />
       </Collapsible>
 
-      {/* ---- Section 5: Tax Summary ---- */}
+      {/* ---- Tax Summary ---- */}
       <Collapsible title="Tax Summary" defaultOpen={false}>
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 12 }}>Effective Tax Rate by Phase</div>
