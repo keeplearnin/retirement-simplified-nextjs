@@ -517,6 +517,16 @@ export default function MyPlan() {
 
   const { combined, essentialTotal, discretionaryTotal } = results;
 
+  // Monthly snapshot for "now" and "at retirement"
+  const nowRow = combined.find(r => r.age === plan.currentAge) || combined[0] || {};
+  const retireRow = combined.find(r => r.age === plan.retireAge) || {};
+  const nowMonthlyIncome = Math.round((nowRow.totalIncome || 0) / 12);
+  const nowMonthlyExpense = Math.round((nowRow.totalExpense || 0) / 12);
+  const nowMonthlyNet = nowMonthlyIncome - nowMonthlyExpense;
+  const retireMonthlyIncome = Math.round((retireRow.totalIncome || 0) / 12);
+  const retireMonthlyExpense = Math.round((retireRow.totalExpense || 0) / 12);
+  const retireMonthlyNet = retireMonthlyIncome - retireMonthlyExpense;
+
   // Add income dropdown
   const [showAddMenu, setShowAddMenu] = useState(false);
   const existingTypes = plan.incomeSources.map(s => s.type);
@@ -532,7 +542,67 @@ export default function MyPlan() {
 
   return (
     <div className="slide-in">
-      {/* ============ RESULTS FIRST (hero) ============ */}
+      {/* ============ MONTHLY SNAPSHOT (the hero answer) ============ */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }} className="grid-2">
+        {/* Now */}
+        <div className="glass-card" style={{ padding: '16px 20px' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 2, fontWeight: 600, marginBottom: 10 }}>
+            Today (Age {plan.currentAge})
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Monthly Income</span>
+            <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)' }}>{fmtFull(nowMonthlyIncome)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Monthly Expenses</span>
+            <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{fmtFull(nowMonthlyExpense)}</span>
+          </div>
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Left Over</span>
+            <span style={{ fontSize: 18, fontWeight: 700, color: nowMonthlyNet >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
+              {nowMonthlyNet >= 0 ? '+' : '-'}{fmtFull(Math.abs(nowMonthlyNet))}
+            </span>
+          </div>
+          {nowMonthlyNet > 0 && (
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'right', marginTop: 2 }}>
+              {Math.round(nowMonthlyNet / nowMonthlyIncome * 100)}% savings rate
+            </div>
+          )}
+        </div>
+
+        {/* At Retirement */}
+        <div className="glass-card" style={{ padding: '16px 20px' }}>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 2, fontWeight: 600, marginBottom: 10 }}>
+            At Retirement (Age {plan.retireAge})
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Monthly Income</span>
+            <span style={{ fontSize: 16, fontWeight: 700, color: retireMonthlyIncome > 0 ? 'var(--blue)' : 'var(--text-dim)' }}>{fmtFull(retireMonthlyIncome)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Monthly Expenses</span>
+            <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{fmtFull(retireMonthlyExpense)}</span>
+          </div>
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Monthly Gap</span>
+            <span style={{ fontSize: 18, fontWeight: 700, color: retireMonthlyNet >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
+              {retireMonthlyNet >= 0 ? '+' : '-'}{fmtFull(Math.abs(retireMonthlyNet))}
+            </span>
+          </div>
+          {retireMonthlyNet < 0 && (
+            <div style={{ fontSize: 10, color: 'var(--danger)', textAlign: 'right', marginTop: 2 }}>
+              Need {fmtFull(Math.abs(retireMonthlyNet))}/mo from savings
+            </div>
+          )}
+          {retireMonthlyIncome === 0 && (
+            <div style={{ fontSize: 10, color: 'var(--warn)', textAlign: 'right', marginTop: 2 }}>
+              Add Social Security or pension to see retirement income
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ============ SCORE + CHART ============ */}
       <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 20, marginBottom: 20, alignItems: 'start' }} className="grid-2">
         <div className="glass-card" style={{ textAlign: 'center', padding: '20px 24px' }}>
           <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 6, fontWeight: 600 }}>Plan Score</div>
