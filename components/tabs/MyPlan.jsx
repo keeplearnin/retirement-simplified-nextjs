@@ -736,17 +736,29 @@ export default function MyPlan() {
             <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Expenses</span>
             <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{fmtFull(retireMonthlyExpense)}/mo</span>
           </div>
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Gap</span>
-            <span style={{ fontSize: 17, fontWeight: 700, color: retireMonthlyNet >= 0 ? 'var(--accent)' : 'var(--warn)' }}>
-              {retireMonthlyNet >= 0 ? '+' : '-'}{fmtFull(Math.abs(retireMonthlyNet))}/mo
-            </span>
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6 }}>
+            {retireMonthlyNet >= 0 ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Surplus</span>
+                <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--accent)' }}>+{fmtFull(retireMonthlyNet)}/mo</span>
+              </div>
+            ) : results.portfolioAtRetire > 0 ? (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>From Savings</span>
+                  <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--blue)' }}>{fmtFull(Math.abs(retireMonthlyNet))}/mo</span>
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'right', marginTop: 2 }}>
+                  {fmt(results.portfolioAtRetire)} portfolio covers {Math.round(results.portfolioAtRetire / (Math.abs(retireMonthlyNet) * 12))} years
+                </div>
+              </>
+            ) : (
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--danger)' }}>Shortfall</span>
+                <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--danger)' }}>{fmtFull(Math.abs(retireMonthlyNet))}/mo</span>
+              </div>
+            )}
           </div>
-          {retireMonthlyNet < 0 && results.portfolioAtRetire > 0 && (
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'right', marginTop: 2 }}>
-              {fmt(results.portfolioAtRetire)} covers ~{Math.round(results.portfolioAtRetire / (Math.abs(retireMonthlyNet) * 12))} years of gap
-            </div>
-          )}
           {ssStartAge && ssStartAge > plan.retireAge && (
             <div style={{ fontSize: 10, color: 'var(--blue)', marginTop: 4, padding: '4px 8px', background: 'var(--blue-dim)', borderRadius: 4, textAlign: 'center' }}>
               SS starts at {ssStartAge}{fullMonthlyIncome ? ` → income becomes ${fmtFull(fullMonthlyIncome)}/mo` : ''}
