@@ -104,17 +104,22 @@ export default function WithdrawalStrategy() {
 
         // Tax impact — estimate effective bracket based on total taxable income this year
         const ordinaryIncome = fromTraditional + conversion;
-        // SS taxation: up to 85% of SS is taxable if combined income > $34K (single)
+        // SS taxation: 2-tier formula (single filer thresholds: $25K / $34K)
         const combinedIncome = ordinaryIncome + ssIncome * 0.5;
-        const ssTaxable = combinedIncome > 34000 ? Math.min(ssIncome * 0.85, (combinedIncome - 34000) * 0.85) : 0;
+        let ssTaxable = 0;
+        if (combinedIncome > 34000) {
+          ssTaxable = Math.min(ssIncome * 0.85, 4500 + (combinedIncome - 34000) * 0.85);
+        } else if (combinedIncome > 25000) {
+          ssTaxable = Math.min(ssIncome * 0.50, (combinedIncome - 25000) * 0.50);
+        }
         const totalTaxableIncome = ordinaryIncome + ssTaxable;
-        // Progressive bracket estimate (simplified 2025 single filer)
-        const effectiveBracket = totalTaxableIncome <= 11600 ? 10
-          : totalTaxableIncome <= 47150 ? 12
-          : totalTaxableIncome <= 100525 ? 22
-          : totalTaxableIncome <= 191950 ? 24
-          : totalTaxableIncome <= 243725 ? 32
-          : totalTaxableIncome <= 609350 ? 35
+        // Progressive bracket estimate (2025 single filer)
+        const effectiveBracket = totalTaxableIncome <= 11925 ? 10
+          : totalTaxableIncome <= 48475 ? 12
+          : totalTaxableIncome <= 103350 ? 22
+          : totalTaxableIncome <= 197300 ? 24
+          : totalTaxableIncome <= 250525 ? 32
+          : totalTaxableIncome <= 626350 ? 35
           : 37;
         const ltcgRate = effectiveBracket <= 12 ? 0 : effectiveBracket >= 37 ? 0.20 : 0.15;
         // Gains ratio: early years ~70% gains, evolves as portfolio ages

@@ -511,8 +511,8 @@ export default function MyPlan() {
         rmdAmount = Math.round(bal401k / rmdDivisor(age));
       }
 
-      // --- Base income (before withdrawals) ---
-      const baseOrdinaryIncome = inc.salary + inc.pension + inc.rental + inc.annuity + inc.partTime + inc.otherIncome + rmdAmount;
+      // --- Base income (before withdrawals — RMD excluded here, counted as withdrawal) ---
+      const baseOrdinaryIncome = inc.salary + inc.pension + inc.rental + inc.annuity + inc.partTime + inc.otherIncome;
       const baseIncome = baseOrdinaryIncome + inc.socialSecurity;
 
       // --- First pass: compute taxes on known income ---
@@ -613,24 +613,24 @@ export default function MyPlan() {
         balRoth = balRoth * (1 + returnRate) + monthlyContrib * 12 * 0.2;
         balTaxable = balTaxable * (1 + returnRate) + monthlyContrib * 12 * 0.2;
         balHSA = balHSA * (1 + returnRate * 0.5);
-        balCash = balCash * (1 + 0.045); // HY savings ~4.5%
-        balCrypto = balCrypto * (1 + returnRate); // market rate
-        balPension = balPension * (1 + returnRate * 0.6); // conservative
-        balAnnuity = balAnnuity * (1 + 0.035); // fixed ~3.5%
-        balRealEstate = balRealEstate * (1 + 0.03); // 3% appreciation
-        bal529 = bal529 * (1 + returnRate * 0.8); // moderate growth
+        balCash = balCash * (1 + 0.03); // long-term savings avg ~3%
+        balCrypto = balCrypto * (1 + returnRate);
+        balPension = balPension * (1 + returnRate * 0.6);
+        balAnnuity = balAnnuity * (1 + 0.035);
+        balRealEstate = balRealEstate * (1 + 0.03);
+        bal529 = bal529 * (1 + returnRate * 0.8);
       } else {
-        // Retired: grow at conservative rate, subtract withdrawals
-        bal401k = Math.max(0, bal401k * (1 + retiredReturn) - withdrawal401k);
-        balRoth = Math.max(0, balRoth * (1 + retiredReturn) - withdrawalRoth);
-        balTaxable = Math.max(0, balTaxable * (1 + retiredReturn) - withdrawalTaxable);
+        // Retired: withdraw first, then grow remainder (beginning-of-year withdrawal)
+        bal401k = Math.max(0, (bal401k - withdrawal401k) * (1 + retiredReturn));
+        balRoth = Math.max(0, (balRoth - withdrawalRoth) * (1 + retiredReturn));
+        balTaxable = Math.max(0, (balTaxable - withdrawalTaxable) * (1 + retiredReturn));
         balHSA = Math.max(0, balHSA * (1 + retiredReturn * 0.5));
-        balCash = Math.max(0, balCash * (1 + 0.035) - withdrawalCash); // lower rate in retirement
-        balCrypto = Math.max(0, balCrypto * (1 + retiredReturn) - withdrawalCrypto);
-        balPension = Math.max(0, balPension * (1 + retiredReturn * 0.5) - withdrawalPension);
-        balAnnuity = Math.max(0, balAnnuity * (1 + 0.035) - withdrawalAnnuity);
-        balRealEstate = balRealEstate * (1 + 0.03); // keeps appreciating
-        bal529 = bal529 * (1 + retiredReturn * 0.6); // still grows, not withdrawn
+        balCash = Math.max(0, (balCash - withdrawalCash) * (1 + 0.025)); // conservative in retirement
+        balCrypto = Math.max(0, (balCrypto - withdrawalCrypto) * (1 + retiredReturn));
+        balPension = Math.max(0, (balPension - withdrawalPension) * (1 + retiredReturn * 0.5));
+        balAnnuity = Math.max(0, (balAnnuity - withdrawalAnnuity) * (1 + 0.035));
+        balRealEstate = balRealEstate * (1 + 0.03);
+        bal529 = bal529 * (1 + retiredReturn * 0.6);
       }
       portfolioBalance = bal401k + balRoth + balTaxable + balHSA + balCash + balCrypto + balPension + balAnnuity + balRealEstate + bal529;
       if (portfolioBalance < 0) portfolioBalance = 0;

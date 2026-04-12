@@ -45,7 +45,7 @@ function runSimulation({ savings, monthly, salaryGrowth, annualSpend, inflationP
         const yearlyContrib = monthly * 12 * Math.pow(1 + salGrowthRate, y - 1);
         bal = bal * (1 + r) + yearlyContrib;
       } else {
-        bal = bal * (1 + r) - annualSpend * Math.pow(1 + inflationPct / 100, y - years);
+        bal = bal * (1 + r) - annualSpend * Math.pow(1 + inflationPct / 100, y - years - 1);
       }
       if (bal < 0) { bal = 0; failed = true; }
       path.push(bal);
