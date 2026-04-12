@@ -72,7 +72,7 @@ export default function MonteCarlo() {
   const [retireAge, setRetireAge] = useState(() => plan.retireAge || 65);
   const [savings, setSavings] = useState(() => getTotalSavings(plan) || 100000);
   const [monthly, setMonthly] = useState(() => plan.monthlyContribution || 800);
-  const [annualSpend, setAnnualSpend] = useState(() => plan.annualSpending || 50000);
+  const [annualSpend, setAnnualSpend] = useState(() => plan.retireSpending || Math.round((plan.annualSpending || 50000) * 0.8));
   const [endAge, setEndAge] = useState(() => plan.longevityAge || 95);
   const [inflationPct, setInflationPct] = useState(2.5);
   const [salaryGrowth, setSalaryGrowth] = useState(3);

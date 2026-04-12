@@ -93,12 +93,10 @@ function estimateSS(annualSalary, claimAge) {
 const MILESTONE_THRESHOLDS = [100000, 250000, 500000, 1000000, 2000000, 5000000];
 
 const GP_DEFAULTS = {
-  age: 35, retireAge: 65, savings401k: 30000, taxableBalance: 15000,
-  rothBalance: 0, rothMonthly: 200, hsaBalance: 0, hsaAnnual: 3850,
-  taxableMonthly: 200, salary: 85000, salaryGrowth: 3, contribution401k: 10,
-  matchType: '50_6', customMatchPct: 50, customMatchCap: 6,
-  returnRate: 7, showInflation: false, taxBracket: 22,
-  ssClaimAge: 67, includeSSIncome: true,
+  // GP-specific fields only (age, savings, salary, returnRate come from shared PlanProvider)
+  rothMonthly: 200, hsaAnnual: 3850, taxableMonthly: 200,
+  contribution401k: 10, matchType: '50_6', customMatchPct: 50, customMatchCap: 6,
+  showInflation: false, taxBracket: 22, ssClaimAge: 67, includeSSIncome: true,
 };
 
 export default function GrowthProjector() {
@@ -281,7 +279,7 @@ export default function GrowthProjector() {
   const final = data[data.length - 1] || {};
   const totalC = final.contributed || totalSavings;
   const growth = final.balance - totalC;
-  const retirementYears = 90 - retireAge; // plan to 90
+  const retirementYears = (plan.longevityAge || 95) - retireAge;
   const swr = safeWithdrawalRate(retirementYears);
   const monthlyIncome = (final.balance * swr / 100) / 12;
   const maxBal = Math.max(
@@ -416,7 +414,7 @@ export default function GrowthProjector() {
 
       <ValidationWarning warnings={warnings} />
 
-      <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: 32 }}>
+      <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 32 }}>
         <div>
           <Card variant="input">
             <SectionLabel>Your Details</SectionLabel>

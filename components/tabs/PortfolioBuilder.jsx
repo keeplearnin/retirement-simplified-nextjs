@@ -107,14 +107,15 @@ function computeAllocation(age, risk, includeGold, intlBias) {
 
 export default function PortfolioBuilder() {
   const { plan } = usePlan();
+  const planTotal = getTotalSavings(plan);
   const [inputs, setInputs] = useLocalState('portfolio_builder', {
-    risk: 3, portfolioSize: 50000, includeGold: true, intlBias: 35, broker: 'vanguard',
+    risk: 3, includeGold: true, intlBias: 35, broker: 'vanguard',
   });
   const age = plan.currentAge;
-  const { risk, portfolioSize, includeGold, intlBias, broker } = inputs;
+  const portfolioSize = planTotal || 50000;
+  const { risk, includeGold, intlBias, broker } = inputs;
   const setField = (field, value) => setInputs(prev => ({ ...prev, [field]: value }));
   const setRisk = v => setField('risk', v);
-  const setPortfolioSize = v => setField('portfolioSize', v);
   const setIncludeGold = v => setField('includeGold', v);
   const setIntlBias = v => setField('intlBias', v);
   const setBroker = v => setField('broker', v);
@@ -210,7 +211,7 @@ export default function PortfolioBuilder() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }} className="grid-2">
           <div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Age: <strong style={{ color: 'var(--text)' }}>{age}</strong> <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>(from My Plan)</span></div>
-            <Slider label="Portfolio Size" value={portfolioSize} onChange={setPortfolioSize} min={1000} max={2000000} step={1000} format={fmt} />
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Portfolio: <strong style={{ color: 'var(--accent)' }}>{fmt(portfolioSize)}</strong> <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>(from My Plan)</span></div>
             <Slider label="International Bias" value={intlBias} onChange={setIntlBias} min={15} max={50} suffix="% of equity" />
           </div>
           <div>

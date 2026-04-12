@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Card from '@/components/ui/Card';
 import Slider from '@/components/ui/Slider';
 import SectionLabel from '@/components/ui/SectionLabel';
@@ -10,6 +10,7 @@ import { usePlan, INCOME_TEMPLATES, DEBT_TEMPLATES } from '@/components/PlanProv
 import { projectIncome } from '@/lib/incomeEngine';
 import { projectExpenses, createDefaultExpensePlan } from '@/lib/expenseEngine';
 import { computeTax, computeSSTaxable } from '@/lib/taxEngine';
+import { RMD_TABLE } from '@/lib/constants';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -500,6 +501,12 @@ function SummaryTable({ rows }) {
 export default function MyPlan() {
   const { plan, updatePlan, updateIncome, removeIncome, addIncome, addDebt, updateDebt, removeDebt } = usePlan();
 
+  // Dismissed suggestions (read from localStorage after mount to avoid hydration mismatch)
+  const [dismissedSuggestions, setDismissedSuggestions] = useState([]);
+  useEffect(() => {
+    try { setDismissedSuggestions(JSON.parse(localStorage.getItem('suggestions-dismissed') || '[]')); } catch {}
+  }, []);
+
   // ---- Heavy computation ----
   const results = useMemo(() => {
     const { currentAge, retireAge, longevityAge, filingStatus, stateCode, annualSpending, goGoEndAge, slowGoEndAge, incomeSources } = plan;
@@ -593,12 +600,7 @@ export default function MyPlan() {
     let portfolioBalance = bal401k + balRoth + balTaxable + balHSA + balCash + balCrypto + balPension + balAnnuity + balRealEstate + bal529;
     const startingBalance = portfolioBalance;
     const RMD_START = 73;
-
-    // RMD divisor table (simplified — key ages)
-    const rmdDivisor = (age) => {
-      const table = { 73: 26.5, 74: 25.5, 75: 24.6, 76: 23.7, 77: 22.9, 78: 22.0, 79: 21.1, 80: 20.2, 81: 19.4, 82: 18.5, 83: 17.7, 84: 16.8, 85: 16.0, 86: 15.2, 87: 14.4, 88: 13.7, 89: 12.9, 90: 12.2, 91: 11.5, 92: 10.8, 93: 10.1, 94: 9.5, 95: 8.9 };
-      return table[Math.min(age, 95)] || 8.9;
-    };
+    const rmdDivisor = (age) => RMD_TABLE[Math.min(age, 110)] || 8.9;
 
     // Combine with taxes + portfolio tracking
     const combined = incomeProjections.map((inc, i) => {
@@ -1133,8 +1135,7 @@ export default function MyPlan() {
       {/* ---- Action Items (suggestions) ---- */}
       {(() => {
         const suggestions = generateSuggestions(plan, results);
-        const dismissed = (() => { try { return JSON.parse(localStorage.getItem('suggestions-dismissed') || '[]'); } catch { return []; } })();
-        const active = suggestions.filter(s => !dismissed.includes(s.id));
+        const active = suggestions.filter(s => !dismissedSuggestions.includes(s.id));
         if (active.length === 0) return null;
         const colors = { danger: 'var(--danger)', warn: 'var(--warn)', info: 'var(--blue)' };
         return (
@@ -1150,10 +1151,9 @@ export default function MyPlan() {
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{s.detail}</div>
                 </div>
                 <button onClick={() => {
-                  const cur = (() => { try { return JSON.parse(localStorage.getItem('suggestions-dismissed') || '[]'); } catch { return []; } })();
-                  localStorage.setItem('suggestions-dismissed', JSON.stringify([...cur, s.id]));
-                  // Force re-render
-                  updatePlan('_suggestionsVersion', Date.now());
+                  const next = [...dismissedSuggestions, s.id];
+                  setDismissedSuggestions(next);
+                  localStorage.setItem('suggestions-dismissed', JSON.stringify(next));
                 }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', fontSize: 16, padding: '0 4px' }} title="Dismiss">&times;</button>
               </div>
             ))}

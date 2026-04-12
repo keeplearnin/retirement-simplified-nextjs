@@ -113,7 +113,7 @@ export default function Rebalance() {
         You&apos;ll get <strong style={{ color: 'var(--text)' }}>specific trade recommendations</strong> to bring your portfolio back in line — the same thing robo-advisors charge 0.25% for.
       </InfoBox>
 
-      <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: 32, marginTop: 16 }}>
+      <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 32, marginTop: 16 }}>
         {/* LEFT COLUMN */}
         <div>
           <Card>

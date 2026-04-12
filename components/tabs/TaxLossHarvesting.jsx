@@ -95,7 +95,7 @@ export default function TaxLossHarvesting() {
 
       <ValidationWarning warnings={warnings} />
 
-      <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: 32, marginTop: 16 }}>
+      <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 32, marginTop: 16 }}>
         {/* LEFT COLUMN */}
         <div>
           <Card>

@@ -222,7 +222,7 @@ export default function WithdrawalStrategy() {
 
       <ValidationWarning warnings={warnings} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: 32, marginTop: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 32, marginTop: 16 }}>
         {/* Left Column */}
         <div>
           <Card>

@@ -87,7 +87,7 @@ export default function GoalPlanner() {
         </div>
       </Card>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: 28, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 28, alignItems: 'start' }}>
         {/* Left: Goal cards */}
         <div>
           {goals.map(goal => (
