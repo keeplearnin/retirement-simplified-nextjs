@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import Card from '@/components/ui/Card';
 import Slider from '@/components/ui/Slider';
 import SectionLabel from '@/components/ui/SectionLabel';
 import InfoBox from '@/components/ui/InfoBox';
 import { fmt, fmtFull } from '@/lib/format';
-import { useLocalState } from '@/lib/useLocalState';
+import { usePlan, INCOME_TEMPLATES } from '@/components/PlanProvider';
 import { projectIncome } from '@/lib/incomeEngine';
 import { projectExpenses, createDefaultExpensePlan } from '@/lib/expenseEngine';
 import { computeTax, computeSSTaxable } from '@/lib/taxEngine';
@@ -22,13 +22,6 @@ const US_STATES = [
   'VT','VA','WA','WV','WI','WY',
 ];
 
-const INCOME_TEMPLATES = {
-  salary: { type: 'salary', label: 'Salary', amount: 100000, growthRate: 3 },
-  socialSecurity: { type: 'socialSecurity', label: 'Social Security', monthlyBenefit: 2500, startAge: 67 },
-  pension: { type: 'pension', label: 'Pension', monthlyAmount: 1500, startAge: 65, cola: true },
-  rental: { type: 'rental', label: 'Rental Income', monthlyNet: 1500, appreciation: 3 },
-};
-
 const EXPENSE_CATEGORIES = [
   { key: 'housing', label: 'Housing', type: 'essential', default: 0.30 },
   { key: 'food', label: 'Food & Groceries', type: 'essential', default: 0.12 },
@@ -42,35 +35,6 @@ const EXPENSE_CATEGORIES = [
   { key: 'giving', label: 'Gifts & Charity', type: 'discretionary', default: 0.05 },
   { key: 'other', label: 'Other / Misc', type: 'discretionary', default: 0.10 },
 ];
-
-const DEFAULT_PLAN = {
-  currentAge: 40,
-  retireAge: 65,
-  longevityAge: 95,
-  filingStatus: 'single',
-  stateCode: 'CA',
-  // Savings / portfolio
-  savings401k: 150000,
-  savingsRoth: 50000,
-  savingsTaxable: 30000,
-  savingsHSA: 10000,
-  monthlyContribution: 1500,
-  expectedReturn: 7,
-  // Expenses
-  annualSpending: 75000, // 75% of default $100K salary
-  retireSpending: 60000, // 80% of current spending
-  expenseMode: 'simple',
-  expenseBreakdown: null,
-  goGoEndAge: 75,
-  slowGoEndAge: 85,
-  // Income
-  incomeSources: [
-    { id: 1, type: 'salary', label: 'Salary', amount: 100000, growthRate: 3 },
-    { id: 2, type: 'socialSecurity', label: 'Social Security', monthlyBenefit: 2500, startAge: 67 },
-  ],
-};
-
-// nextIncomeId moved to useRef inside component
 
 // ---------------------------------------------------------------------------
 // Collapsible Section
@@ -455,42 +419,7 @@ function SummaryTable({ rows }) {
 // ---------------------------------------------------------------------------
 
 export default function MyPlan() {
-  const incomeIdRef = useRef(100);
-  const [plan, setPlan] = useLocalState('myplan-v1', DEFAULT_PLAN);
-
-  const updatePlan = useCallback((key, val) => {
-    setPlan(prev => ({ ...prev, [key]: val }));
-  }, [setPlan]);
-
-  const updateIncome = useCallback((id, updated) => {
-    setPlan(prev => {
-      const newSources = prev.incomeSources.map(s => s.id === id ? updated : s);
-      const next = { ...prev, incomeSources: newSources };
-      // Auto-derive spending from salary if user hasn't manually set expenses
-      if (updated.type === 'salary' && !prev._expenseManuallySet) {
-        const salary = updated.amount || 0;
-        next.annualSpending = Math.round(salary * 0.75 / 1000) * 1000; // 75% of gross, rounded to $1K
-      }
-      return next;
-    });
-  }, [setPlan]);
-
-  const removeIncome = useCallback((id) => {
-    setPlan(prev => ({
-      ...prev,
-      incomeSources: prev.incomeSources.filter(s => s.id !== id),
-    }));
-  }, [setPlan]);
-
-  const addIncome = useCallback((type) => {
-    const template = INCOME_TEMPLATES[type];
-    if (!template) return;
-    incomeIdRef.current += 1;
-    setPlan(prev => ({
-      ...prev,
-      incomeSources: [...prev.incomeSources, { ...template, id: incomeIdRef.current }],
-    }));
-  }, [setPlan]);
+  const { plan, updatePlan, updateIncome, removeIncome, addIncome } = usePlan();
 
   // ---- Heavy computation ----
   const results = useMemo(() => {
@@ -771,7 +700,192 @@ export default function MyPlan() {
   const detailedTotal = Object.values(expenseBreakdown).reduce((s, v) => s + v, 0);
 
   return (
-    <div className="slide-in">
+    <div className="slide-in myplan-layout">
+      {/* ============ INPUTS SIDEBAR ============ */}
+      <div className="myplan-inputs">
+        <Collapsible title="Personal Info" defaultOpen={true} badge={`Age ${plan.currentAge}, retire ${plan.retireAge}`}>
+          <div>
+            <Slider label="Current Age" value={plan.currentAge} onChange={v => updatePlan('currentAge', v)} min={20} max={80} />
+            <Slider label="Retirement Age" value={plan.retireAge} onChange={v => updatePlan('retireAge', v)} min={Math.max(plan.currentAge + 1, 50)} max={80} />
+            <Slider label="Plan Through Age" value={plan.longevityAge} onChange={v => updatePlan('longevityAge', v)} min={Math.max(plan.retireAge + 5, 80)} max={105} />
+          </div>
+          <div>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>Filing Status</span>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {['single', 'mfj'].map(s => (
+                  <button key={s} onClick={() => updatePlan('filingStatus', s)} style={{
+                    flex: 1, padding: '8px 14px', borderRadius: 8, cursor: 'pointer',
+                    border: plan.filingStatus === s ? '1.5px solid var(--accent)' : '1px solid var(--border)',
+                    background: plan.filingStatus === s ? 'var(--accent-dim)' : 'transparent',
+                    color: plan.filingStatus === s ? 'var(--accent)' : 'var(--text-muted)',
+                    fontWeight: plan.filingStatus === s ? 600 : 400, fontSize: 12, fontFamily: 'var(--sans)',
+                    transition: 'all .2s',
+                  }}>
+                    {s === 'single' ? 'Single' : 'Married Filing Jointly'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>State</span>
+                <span style={{ fontSize: 14, color: 'var(--accent)', fontWeight: 600 }}>{plan.stateCode}</span>
+              </div>
+              <select value={plan.stateCode} onChange={e => updatePlan('stateCode', e.target.value)} style={{
+                width: '100%', padding: '8px 12px', borderRadius: 8,
+                border: '1px solid var(--border)', background: 'var(--bg2)',
+                color: 'var(--text)', fontSize: 12, fontFamily: 'var(--sans)', cursor: 'pointer',
+              }}>
+                {US_STATES.map(st => <option key={st} value={st}>{st}</option>)}
+              </select>
+            </div>
+          </div>
+        </Collapsible>
+
+        <Collapsible title="Savings & Portfolio" defaultOpen={true} badge={fmt(results.startingBalance)}>
+          <Slider label="401(k) / 403(b)" value={plan.savings401k} onChange={v => updatePlan('savings401k', v)} min={0} max={3000000} step={5000} format={fmt} />
+          <Slider label="Roth IRA" value={plan.savingsRoth} onChange={v => updatePlan('savingsRoth', v)} min={0} max={1000000} step={5000} format={fmt} />
+          <Slider label="Taxable Brokerage" value={plan.savingsTaxable} onChange={v => updatePlan('savingsTaxable', v)} min={0} max={2000000} step={5000} format={fmt} />
+          <Slider label="HSA" value={plan.savingsHSA} onChange={v => updatePlan('savingsHSA', v)} min={0} max={200000} step={1000} format={fmt} />
+          <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
+            <Slider label="Monthly Investment" value={plan.monthlyContribution} onChange={v => updatePlan('monthlyContribution', v)} min={0} max={10000} step={100} format={fmt} />
+            <Slider label="Expected Return" value={plan.expectedReturn} onChange={v => updatePlan('expectedReturn', v)} min={3} max={12} step={0.5} suffix="%" />
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -16, marginBottom: 8 }}>
+              Retirement return: {((plan.expectedReturn || 7) * 0.6).toFixed(1)}% (60% of working)
+            </div>
+          </div>
+        </Collapsible>
+
+        <Collapsible title="Income Sources" badge={`${plan.incomeSources.length} source${plan.incomeSources.length !== 1 ? 's' : ''}`}>
+          {plan.incomeSources.map(src => (
+            <IncomeSourceCard
+              key={src.id}
+              source={src}
+              onChange={updated => updateIncome(src.id, updated)}
+              onRemove={() => removeIncome(src.id)}
+              retireAge={plan.retireAge}
+            />
+          ))}
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            <button
+              onClick={() => setShowAddMenu(!showAddMenu)}
+              style={{
+                padding: '10px 20px', borderRadius: 8, cursor: 'pointer',
+                border: '1px dashed var(--accent)', background: 'transparent',
+                color: 'var(--accent)', fontSize: 13, fontWeight: 600,
+                fontFamily: 'var(--sans)',
+              }}
+            >
+              + Add Income Source
+            </button>
+            {showAddMenu && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 20,
+                background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8,
+                padding: 4, minWidth: 200, boxShadow: '0 8px 24px rgba(0,0,0,.3)',
+              }}>
+                {Object.entries(INCOME_TEMPLATES).map(([key, tmpl]) => (
+                  <button
+                    key={key}
+                    onClick={() => { addIncome(key); setShowAddMenu(false); }}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'left',
+                      padding: '10px 14px', border: 'none', cursor: 'pointer',
+                      background: 'transparent', color: 'var(--text)',
+                      fontSize: 13, fontFamily: 'var(--sans)', borderRadius: 6,
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg2)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {tmpl.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </Collapsible>
+
+        <Collapsible title="Expenses" defaultOpen={true} badge={expenseMode === 'simple' ? fmt(plan.annualSpending) + '/yr' : fmt(detailedTotal) + '/yr'}>
+          <div style={{ display: 'flex', gap: 2, background: 'var(--bg)', borderRadius: 20, padding: 2, marginBottom: 16, width: 'fit-content' }}>
+            {['simple', 'detailed'].map(mode => (
+              <button key={mode} onClick={() => updatePlan('expenseMode', mode)} style={{
+                padding: '6px 16px', borderRadius: 18, border: 'none', cursor: 'pointer',
+                background: expenseMode === mode ? 'var(--accent)' : 'transparent',
+                color: expenseMode === mode ? '#fff' : 'var(--text-dim)',
+                fontWeight: expenseMode === mode ? 600 : 400, fontSize: 12, fontFamily: 'var(--sans)',
+                transition: 'all .2s', textTransform: 'capitalize',
+              }}>{mode}</button>
+            ))}
+          </div>
+          {expenseMode === 'simple' ? (
+            <>
+              <Slider label="Current Annual Spending" value={plan.annualSpending} onChange={v => { updatePlan('annualSpending', v); updatePlan('_expenseManuallySet', true); if (!plan._retireSpendManuallySet) updatePlan('retireSpending', Math.round(v * 0.8 / 1000) * 1000); }} min={30000} max={300000} step={5000} format={fmt} />
+              {!plan._expenseManuallySet && (
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -16, marginBottom: 8 }}>
+                  Auto-estimated at 75% of salary.
+                </div>
+              )}
+              <Slider label="Retirement Spending" value={plan.retireSpending || Math.round(plan.annualSpending * 0.8)} onChange={v => { updatePlan('retireSpending', v); updatePlan('_retireSpendManuallySet', true); }} min={20000} max={250000} step={5000} format={fmt} />
+              {!plan._retireSpendManuallySet && (
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -16, marginBottom: 8 }}>
+                  Default 80% of current spending.
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12 }}>
+                Customize each category. Total: <strong style={{ color: 'var(--text)' }}>{fmtFull(detailedTotal)}/yr</strong>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
+                {EXPENSE_CATEGORIES.map(cat => {
+                  const val = expenseBreakdown[cat.key] || 0;
+                  const isEssential = cat.type === 'essential';
+                  return (
+                    <div key={cat.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: isEssential ? 'var(--accent)' : 'var(--blue)', flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', flex: 1 }}>{cat.label}</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={val.toLocaleString()}
+                        onFocus={e => { e.target.value = String(val); e.target.select(); }}
+                        onChange={e => {
+                          const raw = e.target.value.replace(/[^0-9]/g, '');
+                          const num = Math.max(0, parseInt(raw) || 0);
+                          const newBreakdown = { ...expenseBreakdown, [cat.key]: num };
+                          updatePlan('expenseBreakdown', newBreakdown);
+                          updatePlan('annualSpending', Object.values(newBreakdown).reduce((s, v) => s + v, 0));
+                        }}
+                        onBlur={e => { e.target.value = (expenseBreakdown[cat.key] || 0).toLocaleString(); }}
+                        style={{
+                          width: 90, padding: '4px 8px', borderRadius: 6, textAlign: 'right',
+                          border: '1px solid var(--border)', background: 'var(--bg)',
+                          color: 'var(--text)', fontSize: 12, fontFamily: 'var(--sans)',
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Spending Phases</div>
+            <Slider label="Go-Go Ends" value={plan.goGoEndAge} onChange={v => updatePlan('goGoEndAge', v)} min={plan.retireAge} max={plan.slowGoEndAge - 1} />
+            <Slider label="Slow-Go Ends" value={plan.slowGoEndAge} onChange={v => updatePlan('slowGoEndAge', v)} min={plan.goGoEndAge + 1} max={plan.longevityAge - 1} />
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+              Go-Go: 100% · Slow-Go: 85% · No-Go ({plan.slowGoEndAge}+): 70%
+            </div>
+          </div>
+        </Collapsible>
+      </div>
+
+      {/* ============ RESULTS COLUMN ============ */}
+      <div className="myplan-results">
       {/* ============ HERO: 3-column snapshot ============ */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 20 }} className="grid-2">
         {/* Current Savings */}
@@ -895,246 +1009,11 @@ export default function MyPlan() {
         <MetricCard label="Avg Tax Rate" value={`${(results.avgEffectiveRate * 100).toFixed(1)}%`} color="#a78bfa" />
       </div>
 
-      {/* ============ INPUTS (collapsible, below results) ============ */}
-
-      {/* Personal Info — compact inline */}
-      <Collapsible title="Savings & Portfolio" defaultOpen={false} badge={fmt(results.startingBalance)}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
-          <div>
-            <Slider label="401(k) / 403(b)" value={plan.savings401k} onChange={v => updatePlan('savings401k', v)} min={0} max={3000000} step={5000} format={fmt} />
-            <Slider label="Roth IRA" value={plan.savingsRoth} onChange={v => updatePlan('savingsRoth', v)} min={0} max={1000000} step={5000} format={fmt} />
-          </div>
-          <div>
-            <Slider label="Taxable Brokerage" value={plan.savingsTaxable} onChange={v => updatePlan('savingsTaxable', v)} min={0} max={2000000} step={5000} format={fmt} />
-            <Slider label="HSA" value={plan.savingsHSA} onChange={v => updatePlan('savingsHSA', v)} min={0} max={200000} step={1000} format={fmt} />
-          </div>
-        </div>
-        <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
-          <Slider label="Monthly Investment" value={plan.monthlyContribution} onChange={v => updatePlan('monthlyContribution', v)} min={0} max={10000} step={100} format={fmt} />
-          <Slider label="Expected Return (working years)" value={plan.expectedReturn} onChange={v => updatePlan('expectedReturn', v)} min={3} max={12} step={0.5} suffix="%" />
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -16, marginBottom: 8 }}>
-            Retirement return: {((plan.expectedReturn || 7) * 0.6).toFixed(1)}% (60% of working — assumes bonds-heavy allocation)
-          </div>
-        </div>
-      </Collapsible>
-
-      <Collapsible title="Personal Info" defaultOpen={false} badge={`Age ${plan.currentAge}, retire ${plan.retireAge}`}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-          <div>
-            <Slider label="Current Age" value={plan.currentAge} onChange={v => updatePlan('currentAge', v)} min={20} max={80} />
-            <Slider label="Retirement Age" value={plan.retireAge} onChange={v => updatePlan('retireAge', v)} min={Math.max(plan.currentAge + 1, 50)} max={80} />
-            <Slider label="Plan Through Age" value={plan.longevityAge} onChange={v => updatePlan('longevityAge', v)} min={Math.max(plan.retireAge + 5, 80)} max={105} />
-          </div>
-          <div>
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>Filing Status</span>
-              </div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {['single', 'mfj'].map(s => (
-                  <button key={s} onClick={() => updatePlan('filingStatus', s)} style={{
-                    flex: 1, padding: '8px 14px', borderRadius: 8, cursor: 'pointer',
-                    border: plan.filingStatus === s ? '1.5px solid var(--accent)' : '1px solid var(--border)',
-                    background: plan.filingStatus === s ? 'var(--accent-dim)' : 'transparent',
-                    color: plan.filingStatus === s ? 'var(--accent)' : 'var(--text-muted)',
-                    fontWeight: plan.filingStatus === s ? 600 : 400, fontSize: 12, fontFamily: 'var(--sans)',
-                    transition: 'all .2s',
-                  }}>
-                    {s === 'single' ? 'Single' : 'Married Filing Jointly'}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>State</span>
-                <span style={{ fontSize: 14, color: 'var(--accent)', fontWeight: 600 }}>{plan.stateCode}</span>
-              </div>
-              <select value={plan.stateCode} onChange={e => updatePlan('stateCode', e.target.value)} style={{
-                width: '100%', padding: '8px 12px', borderRadius: 8,
-                border: '1px solid var(--border)', background: 'var(--bg2)',
-                color: 'var(--text)', fontSize: 12, fontFamily: 'var(--sans)', cursor: 'pointer',
-              }}>
-                {US_STATES.map(st => <option key={st} value={st}>{st}</option>)}
-              </select>
-            </div>
-          </div>
-        </div>
-      </Collapsible>
-
-      {/* ---- Section 2: Income Sources ---- */}
-      <Collapsible title="Income Sources" badge={`${plan.incomeSources.length} source${plan.incomeSources.length !== 1 ? 's' : ''}`}>
-        {plan.incomeSources.map(src => (
-          <IncomeSourceCard
-            key={src.id}
-            source={src}
-            onChange={updated => updateIncome(src.id, updated)}
-            onRemove={() => removeIncome(src.id)}
-            retireAge={plan.retireAge}
-          />
-        ))}
-
-        <div style={{ position: 'relative', display: 'inline-block' }}>
-          <button
-            onClick={() => setShowAddMenu(!showAddMenu)}
-            style={{
-              padding: '10px 20px', borderRadius: 8, cursor: 'pointer',
-              border: '1px dashed var(--accent)', background: 'transparent',
-              color: 'var(--accent)', fontSize: 13, fontWeight: 600,
-              fontFamily: 'var(--sans)',
-            }}
-          >
-            + Add Income Source
-          </button>
-          {showAddMenu && (
-            <div style={{
-              position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 20,
-              background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8,
-              padding: 4, minWidth: 200, boxShadow: '0 8px 24px rgba(0,0,0,.3)',
-            }}>
-              {Object.entries(INCOME_TEMPLATES).map(([key, tmpl]) => (
-                <button
-                  key={key}
-                  onClick={() => { addIncome(key); setShowAddMenu(false); }}
-                  style={{
-                    display: 'block', width: '100%', textAlign: 'left',
-                    padding: '10px 14px', border: 'none', cursor: 'pointer',
-                    background: 'transparent', color: 'var(--text)',
-                    fontSize: 13, fontFamily: 'var(--sans)', borderRadius: 6,
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg2)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                >
-                  {tmpl.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </Collapsible>
-
-      {/* ---- Expenses with Simple/Detailed Toggle ---- */}
-      <Collapsible title="Expenses" defaultOpen={true} badge={expenseMode === 'simple' ? fmt(plan.annualSpending) + '/yr' : fmt(detailedTotal) + '/yr'}>
-        {/* Mode toggle */}
-        <div style={{ display: 'flex', gap: 2, background: 'var(--bg)', borderRadius: 20, padding: 2, marginBottom: 16, width: 'fit-content' }}>
-          {['simple', 'detailed'].map(mode => (
-            <button key={mode} onClick={() => updatePlan('expenseMode', mode)} style={{
-              padding: '6px 16px', borderRadius: 18, border: 'none', cursor: 'pointer',
-              background: expenseMode === mode ? 'var(--accent)' : 'transparent',
-              color: expenseMode === mode ? '#fff' : 'var(--text-dim)',
-              fontWeight: expenseMode === mode ? 600 : 400, fontSize: 12, fontFamily: 'var(--sans)',
-              transition: 'all .2s', textTransform: 'capitalize',
-            }}>{mode}</button>
-          ))}
-        </div>
-
-        {expenseMode === 'simple' ? (
-          <>
-            <Slider label="Current Annual Spending (today)" value={plan.annualSpending} onChange={v => { updatePlan('annualSpending', v); updatePlan('_expenseManuallySet', true); if (!plan._retireSpendManuallySet) updatePlan('retireSpending', Math.round(v * 0.8 / 1000) * 1000); }} min={30000} max={300000} step={5000} format={fmt} />
-            {!plan._expenseManuallySet && (
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -16, marginBottom: 8 }}>
-                Auto-estimated at 75% of your salary. Adjust to match your actual spending.
-              </div>
-            )}
-            <Slider label="Retirement Annual Spending" value={plan.retireSpending || Math.round(plan.annualSpending * 0.8)} onChange={v => { updatePlan('retireSpending', v); updatePlan('_retireSpendManuallySet', true); }} min={20000} max={250000} step={5000} format={fmt} />
-            {!plan._retireSpendManuallySet && (
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -16, marginBottom: 8 }}>
-                Default 80% of current spending. Most people spend less in retirement (no commute, no work clothes, paid-off mortgage).
-              </div>
-            )}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>Now: Essential</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent)', marginTop: 2 }}>{fmt(essentialTotal)}/yr</div>
-              </div>
-              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>Now: Discretionary</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--blue)', marginTop: 2 }}>{fmt(discretionaryTotal)}/yr</div>
-              </div>
-              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid rgba(52,211,153,0.15)' }}>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>Retire: Essential</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent)', marginTop: 2 }}>{fmt(retireEssentialTotal)}/yr</div>
-              </div>
-              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid rgba(96,165,250,0.15)' }}>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>Retire: Discretionary</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--blue)', marginTop: 2 }}>{fmt(retireDiscretionaryTotal)}/yr</div>
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12 }}>
-              Customize each category. Total: <strong style={{ color: 'var(--text)' }}>{fmtFull(detailedTotal)}/yr</strong>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }} className="grid-2">
-              {EXPENSE_CATEGORIES.map(cat => {
-                const val = expenseBreakdown[cat.key] || 0;
-                const isEssential = cat.type === 'essential';
-                return (
-                  <div key={cat.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)' }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: isEssential ? 'var(--accent)' : 'var(--blue)', flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)', flex: 1 }}>{cat.label}</span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={val.toLocaleString()}
-                      onFocus={e => { e.target.value = String(val); e.target.select(); }}
-                      onChange={e => {
-                        const raw = e.target.value.replace(/[^0-9]/g, '');
-                        const num = Math.max(0, parseInt(raw) || 0);
-                        const newBreakdown = { ...expenseBreakdown, [cat.key]: num };
-                        updatePlan('expenseBreakdown', newBreakdown);
-                        updatePlan('annualSpending', Object.values(newBreakdown).reduce((s, v) => s + v, 0));
-                      }}
-                      onBlur={e => { e.target.value = (expenseBreakdown[cat.key] || 0).toLocaleString(); }}
-                      style={{
-                        width: 90, padding: '4px 8px', borderRadius: 6, textAlign: 'right',
-                        border: '1px solid var(--border)', background: 'var(--bg)',
-                        color: 'var(--text)', fontSize: 12, fontFamily: 'var(--sans)',
-                      }}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-            {/* Visual bar showing essential vs discretionary */}
-            <div style={{ marginTop: 12, height: 8, borderRadius: 4, overflow: 'hidden', display: 'flex', background: 'var(--bg)' }}>
-              {(() => {
-                const essTotal = EXPENSE_CATEGORIES.filter(c => c.type === 'essential').reduce((s, c) => s + (expenseBreakdown[c.key] || 0), 0);
-                const discTotal = detailedTotal - essTotal;
-                const essPct = detailedTotal > 0 ? (essTotal / detailedTotal) * 100 : 60;
-                return (
-                  <>
-                    <div style={{ width: `${essPct}%`, background: 'var(--accent)', transition: 'width .3s' }} />
-                    <div style={{ width: `${100 - essPct}%`, background: 'var(--blue)', transition: 'width .3s' }} />
-                  </>
-                );
-              })()}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 10, color: 'var(--text-dim)' }}>
-              <span style={{ color: 'var(--accent)' }}>Essential</span>
-              <span style={{ color: 'var(--blue)' }}>Discretionary</span>
-            </div>
-          </>
-        )}
-
-        {/* Spending phases */}
-        <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Retirement Spending Phases</div>
-          <Slider label="Go-Go Ends" value={plan.goGoEndAge} onChange={v => updatePlan('goGoEndAge', v)} min={plan.retireAge} max={plan.slowGoEndAge - 1} />
-          <Slider label="Slow-Go Ends" value={plan.slowGoEndAge} onChange={v => updatePlan('slowGoEndAge', v)} min={plan.goGoEndAge + 1} max={plan.longevityAge - 1} />
-          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-            Go-Go: 100% spending · Slow-Go: 85% · No-Go ({plan.slowGoEndAge}+): 70%
-          </div>
-        </div>
-      </Collapsible>
-
-      {/* Year-by-Year & Tax (below inputs) */}
+      {/* Year-by-Year & Tax */}
       <Collapsible title="Year-by-Year Summary" defaultOpen={false} badge="Every 5 years">
         <SummaryTable rows={combined} />
       </Collapsible>
 
-      {/* ---- Tax Summary ---- */}
       <Collapsible title="Tax Summary" defaultOpen={false}>
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 12 }}>Effective Tax Rate by Phase</div>
@@ -1193,6 +1072,7 @@ export default function MyPlan() {
           </div>
         )}
       </Collapsible>
+      </div>{/* end myplan-results */}
     </div>
   );
 }

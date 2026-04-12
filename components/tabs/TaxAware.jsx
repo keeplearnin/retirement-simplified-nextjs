@@ -10,12 +10,14 @@ import MiniChart from '@/components/ui/MiniChart';
 import BracketButtons from '@/components/ui/BracketButtons';
 import { fmt } from '@/lib/format';
 import { TAX_BRACKETS } from '@/lib/constants';
+import { usePlan } from '@/components/PlanProvider';
 
 export default function TaxAware() {
-  const [age, setAge] = useState(35);
-  const [retireAge, setRetireAge] = useState(65);
+  const { plan } = usePlan();
+  const age = plan.currentAge;
+  const retireAge = plan.retireAge;
+  const returnRate = plan.expectedReturn;
   const [annualContrib, setAnnualContrib] = useState(7000);
-  const [returnRate, setReturnRate] = useState(7);
   const [currentBracket, setCurrentBracket] = useState(24);
   const [retireBracket, setRetireBracket] = useState(22);
 
@@ -62,10 +64,11 @@ export default function TaxAware() {
         <div>
           <Card>
             <SectionLabel>Your Scenario</SectionLabel>
-            <Slider label="Current Age" value={age} onChange={setAge} min={18} max={60} suffix=" yrs" />
-            <Slider label="Retirement Age" value={retireAge} onChange={setRetireAge} min={50} max={75} suffix=" yrs" />
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: 'var(--bg2)' }}>
+              Age {age} · Retire at {retireAge} · {returnRate}% return
+              <span style={{ fontSize: 10, color: 'var(--text-dim)', display: 'block', marginTop: 2 }}>Edit in My Plan</span>
+            </div>
             <Slider label="Annual Contribution" value={annualContrib} onChange={setAnnualContrib} min={500} max={7000} step={500} format={fmt} />
-            <Slider label="Expected Return" value={returnRate} onChange={setReturnRate} min={4} max={12} step={0.5} suffix="%" />
           </Card>
 
           <Card style={{ marginTop: 14 }}>

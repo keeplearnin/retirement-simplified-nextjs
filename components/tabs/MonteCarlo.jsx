@@ -9,6 +9,7 @@ import InfoBox from '@/components/ui/InfoBox';
 import { fmt } from '@/lib/format';
 import ValidationWarning from '@/components/ui/ValidationWarning';
 import { GRID_FRACS } from '@/lib/constants';
+import { usePlan, getTotalSavings } from '@/components/PlanProvider';
 
 // ── Portfolio-aware return/volatility profiles ──────────────────────────
 // Based on historical data: Ibbotson SBBI, Vanguard research, DFA returns matrix
@@ -66,12 +67,13 @@ function runSimulation({ savings, monthly, salaryGrowth, annualSpend, inflationP
 }
 
 export default function MonteCarlo() {
-  const [age, setAge] = useState(35);
-  const [retireAge, setRetireAge] = useState(65);
-  const [savings, setSavings] = useState(100000);
-  const [monthly, setMonthly] = useState(800);
-  const [annualSpend, setAnnualSpend] = useState(50000);
-  const [endAge, setEndAge] = useState(95);
+  const { plan } = usePlan();
+  const [age, setAge] = useState(() => plan.currentAge || 35);
+  const [retireAge, setRetireAge] = useState(() => plan.retireAge || 65);
+  const [savings, setSavings] = useState(() => getTotalSavings(plan) || 100000);
+  const [monthly, setMonthly] = useState(() => plan.monthlyContribution || 800);
+  const [annualSpend, setAnnualSpend] = useState(() => plan.annualSpending || 50000);
+  const [endAge, setEndAge] = useState(() => plan.longevityAge || 95);
   const [inflationPct, setInflationPct] = useState(2.5);
   const [salaryGrowth, setSalaryGrowth] = useState(3);
   const [runs, setRuns] = useState(1000);

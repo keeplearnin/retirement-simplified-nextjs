@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import AuthProvider, { useAuth } from '@/components/AuthProvider';
+import { PlanProvider } from '@/components/PlanProvider';
+import Onboarding from '@/components/Onboarding';
 import Auth, { isConfigured } from '@/lib/auth';
 
 import AccountDashboard from '@/components/tabs/AccountDashboard';
@@ -31,6 +33,8 @@ function AppContent() {
   const [theme, setTheme] = useState('dark');
   const { user, isConfigured: configured, authLoading, signIn, signOut } = useAuth();
 
+  const [onboarded, setOnboarded] = useState(true); // true initially to avoid flash
+
   useEffect(() => {
     setTimeout(() => setLoaded(true), 100);
     const handler = (e) => setTab(e.detail);
@@ -41,6 +45,10 @@ function AppContent() {
       setTheme(saved);
       document.documentElement.setAttribute('data-theme', saved);
     }
+    // Check onboarding
+    const hasOnboarded = localStorage.getItem('retirement-onboarded') === 'true';
+    const hasPlan = localStorage.getItem('myplan-v1') !== null;
+    setOnboarded(hasOnboarded || hasPlan);
     return () => window.removeEventListener('navigate-tab', handler);
   }, []);
 
@@ -76,10 +84,16 @@ function AppContent() {
 
   return (
     <div style={{ opacity: loaded ? 1 : 0, transition: 'opacity .5s ease', position: 'relative', zIndex: 1 }}>
+      {!onboarded && (
+        <Onboarding onComplete={() => {
+          localStorage.setItem('retirement-onboarded', 'true');
+          setOnboarded(true);
+        }} />
+      )}
       {/* Compact header — logo + nav + actions in one row */}
       <header className="app-header">
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flexShrink: 0 }} onClick={() => setTab('myplan')}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flexShrink: 1, minWidth: 0, overflow: 'hidden' }} onClick={() => setTab('myplan')}>
           <span style={{ fontSize: 20, fontWeight: 700, fontFamily: 'var(--sans)', color: 'var(--text)', letterSpacing: '-0.02em' }}>
             Retire<span style={{ color: 'var(--accent)' }}>.</span>Simplified
           </span>
@@ -87,7 +101,7 @@ function AppContent() {
         </div>
 
         {/* Nav pills */}
-        <nav style={{ display: 'flex', gap: 2, background: 'var(--bg2)', borderRadius: 28, padding: 3 }}>
+        <nav className="nav-scroll" style={{ display: 'flex', gap: 2, background: 'var(--bg2)', borderRadius: 28, padding: 3, flex: '1 1 auto', minWidth: 0 }}>
           {categories.map(c => {
             const isActive = c.id === activeCategory.id;
             return (
@@ -194,7 +208,9 @@ function AppContent() {
 export default function Home() {
   return (
     <AuthProvider>
-      <AppContent />
+      <PlanProvider>
+        <AppContent />
+      </PlanProvider>
     </AuthProvider>
   );
 }

@@ -12,6 +12,7 @@ import SavePlanButton from '@/components/tabs/SavePlanButton';
 import { fmt, fmtFull } from '@/lib/format';
 import { useLocalState } from '@/lib/useLocalState';
 import { MAX_401K_CONTRIBUTION, CATCHUP_401K_CONTRIBUTION, SS_WAGE_CAP, SS_BEND_POINTS, SS_FACTORS, SS_FRA } from '@/lib/constants';
+import { usePlan, getSalary, getSalaryGrowth } from '@/components/PlanProvider';
 
 const MATCH_TYPES = [
   { id: 'none', label: 'No Match' },
@@ -101,32 +102,34 @@ const GP_DEFAULTS = {
 };
 
 export default function GrowthProjector() {
+  const { plan, bulkUpdate } = usePlan();
   const [inputs, setInputs] = useLocalState('growth_projector', GP_DEFAULTS);
   const set = useCallback((field, value) => setInputs(prev => ({ ...prev, [field]: value })), [setInputs]);
 
-  // Destructure for readability
-  const { age, retireAge, savings401k, taxableBalance, rothBalance, rothMonthly,
-    hsaBalance, hsaAnnual, taxableMonthly, salary, salaryGrowth, contribution401k,
-    matchType, customMatchPct, customMatchCap, returnRate, showInflation, taxBracket,
+  // Shared fields from My Plan context
+  const age = plan.currentAge;
+  const retireAge = plan.retireAge;
+  const salary = getSalary(plan);
+  const salaryGrowth = getSalaryGrowth(plan);
+  const savings401k = plan.savings401k || 0;
+  const taxableBalance = plan.savingsTaxable || 0;
+  const rothBalance = plan.savingsRoth || 0;
+  const hsaBalance = plan.savingsHSA || 0;
+  const returnRate = plan.expectedReturn || 7;
+
+  // GP-specific fields stay local
+  const { rothMonthly, hsaAnnual, taxableMonthly, contribution401k,
+    matchType, customMatchPct, customMatchCap, showInflation, taxBracket,
     ssClaimAge, includeSSIncome } = inputs;
 
-  // Convenience setters
-  const setAge = v => set('age', v);
-  const setRetireAge = v => set('retireAge', v);
-  const setSavings401k = v => set('savings401k', v);
-  const setTaxableBalance = v => set('taxableBalance', v);
-  const setRothBalance = v => set('rothBalance', v);
+  // Convenience setters (GP-specific fields only)
   const setRothMonthly = v => set('rothMonthly', v);
-  const setHsaBalance = v => set('hsaBalance', v);
   const setHsaAnnual = v => set('hsaAnnual', v);
   const setTaxableMonthly = v => set('taxableMonthly', v);
-  const setSalary = v => set('salary', v);
-  const setSalaryGrowth = v => set('salaryGrowth', v);
   const setContribution401k = v => set('contribution401k', v);
   const setMatchType = v => set('matchType', v);
   const setCustomMatchPct = v => set('customMatchPct', v);
   const setCustomMatchCap = v => set('customMatchCap', v);
-  const setReturnRate = v => set('returnRate', v);
   const setShowInflation = v => set('showInflation', v);
   const setTaxBracket = v => set('taxBracket', v);
   const setSsClaimAge = v => set('ssClaimAge', v);
@@ -144,15 +147,26 @@ export default function GrowthProjector() {
 
   function applyProfile(p) {
     setActiveProfile(p.id);
+    // Update shared fields in My Plan context
+    bulkUpdate({
+      currentAge: p.age,
+      retireAge: p.retireAge,
+      savings401k: p.savings401k,
+      savingsTaxable: p.taxableBalance,
+      savingsRoth: p.rothBalance || 0,
+      savingsHSA: p.hsaBalance || 0,
+      expectedReturn: p.returnRate,
+      incomeSources: [
+        { id: 1, type: 'salary', label: 'Salary', amount: p.salary, growthRate: p.salaryGrowth || 3 },
+        { id: 2, type: 'socialSecurity', label: 'Social Security', monthlyBenefit: 2500, startAge: 67 },
+      ],
+    });
+    // Update GP-specific fields
     setInputs(prev => ({
       ...prev,
-      age: p.age, retireAge: p.retireAge, savings401k: p.savings401k,
-      taxableBalance: p.taxableBalance, rothBalance: p.rothBalance || 0,
-      hsaBalance: p.hsaBalance || 0, salary: p.salary,
       contribution401k: p.contribution401k, matchType: p.matchType,
       taxableMonthly: p.taxableMonthly, rothMonthly: p.rothMonthly || 200,
-      hsaAnnual: p.hsaAnnual || 3850, returnRate: p.returnRate,
-      salaryGrowth: p.salaryGrowth || 3,
+      hsaAnnual: p.hsaAnnual || 3850,
     }));
   }
 
@@ -406,18 +420,16 @@ export default function GrowthProjector() {
         <div>
           <Card variant="input">
             <SectionLabel>Your Details</SectionLabel>
-            <Slider label="Current Age" value={age} onChange={v => { setAge(v); if (retireAge <= v + 5) setRetireAge(v + 5); }} min={18} max={60} suffix=" yrs" />
-            <Slider label="Retirement Age" value={retireAge} onChange={setRetireAge} min={Math.max(age + 5, 50)} max={80} suffix=" yrs" />
-            <Slider label="Annual Salary" value={salary} onChange={setSalary} min={20000} max={500000} step={5000} format={fmt} />
-            <Slider label="Salary Growth" value={salaryGrowth} onChange={setSalaryGrowth} min={0} max={8} step={0.5} suffix="%/yr" />
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -4, marginBottom: 6 }}>
-              Salary at retirement: {fmt(salary * Math.pow(1 + salaryGrowth / 100, years))} &middot; Avg US: ~3%/yr
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: 'var(--bg2)', lineHeight: 1.8 }}>
+              Age <strong style={{ color: 'var(--text)' }}>{age}</strong> · Retire at <strong style={{ color: 'var(--text)' }}>{retireAge}</strong> · Salary <strong style={{ color: 'var(--accent)' }}>{fmt(salary)}</strong> · Growth <strong style={{ color: 'var(--text)' }}>{salaryGrowth}%</strong>/yr
+              <br />
+              <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>Salary at retirement: {fmt(salary * Math.pow(1 + salaryGrowth / 100, years))} · Edit in My Plan</span>
             </div>
           </Card>
 
           <Card variant="input" style={{ marginTop: 14 }}>
             <SectionLabel icon="🏦">401(k) / Employer Plan</SectionLabel>
-            <Slider label="Current 401(k) Balance" value={savings401k} onChange={setSavings401k} min={0} max={3000000} step={5000} format={fmt} />
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Balance: <strong style={{ color: 'var(--accent)' }}>{fmt(savings401k)}</strong> <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>(from My Plan)</span></div>
             <Slider label="Your Contribution" value={contribution401k} onChange={setContribution401k} min={0} max={25} step={1} suffix="% of salary" />
             <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: -4, marginBottom: 10 }}>
               = {fmt(annual401kNow / 12)}/mo ({fmt(annual401kNow)}/yr) &middot; 2025 limit: ${limit401k.toLocaleString()}{age >= 50 ? ' (incl. catch-up)' : ''}
@@ -456,7 +468,7 @@ export default function GrowthProjector() {
 
           <Card variant="input" style={{ marginTop: 14 }}>
             <SectionLabel icon="💼">Roth IRA</SectionLabel>
-            <Slider label="Current Roth Balance" value={rothBalance} onChange={setRothBalance} min={0} max={1000000} step={1000} format={fmt} />
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Balance: <strong style={{ color: 'var(--accent)' }}>{fmt(rothBalance)}</strong> <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>(from My Plan)</span></div>
             <Slider label="Monthly Roth Contribution" value={rothMonthly} onChange={setRothMonthly} min={0} max={2000} step={25} format={fmt} />
             <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -4 }}>
               Tax-free growth and withdrawals &middot; 2025 limit: $7,000/yr ($8,000 age 50+)
@@ -465,14 +477,14 @@ export default function GrowthProjector() {
 
           <Card variant="input" style={{ marginTop: 14 }}>
             <SectionLabel icon="💹">Taxable Brokerage</SectionLabel>
-            <Slider label="Current Taxable Balance" value={taxableBalance} onChange={setTaxableBalance} min={0} max={3000000} step={5000} format={fmt} />
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Balance: <strong style={{ color: 'var(--accent)' }}>{fmt(taxableBalance)}</strong> <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>(from My Plan)</span></div>
             <Slider label="Monthly Taxable Contribution" value={taxableMonthly} onChange={setTaxableMonthly} min={0} max={5000} step={50} format={fmt} />
             {salaryGrowth > 0 && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -4 }}>Grows with salary: {fmt(taxableMonthly)}/mo now \u2192 {fmt(taxableMonthly * Math.pow(1 + salaryGrowth / 100, years))}/mo at retirement</div>}
           </Card>
 
           <Card variant="input" style={{ marginTop: 14 }}>
             <SectionLabel icon="🩺">HSA (Health Savings Account)</SectionLabel>
-            <Slider label="Current HSA Balance" value={hsaBalance} onChange={setHsaBalance} min={0} max={200000} step={500} format={fmt} />
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Balance: <strong style={{ color: 'var(--accent)' }}>{fmt(hsaBalance)}</strong> <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>(from My Plan)</span></div>
             <Slider label="Annual HSA Contribution" value={hsaAnnual} onChange={setHsaAnnual} min={0} max={8550} step={50} format={fmt} />
             <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -4 }}>
               Triple tax advantage: pre-tax in, tax-free growth, tax-free medical withdrawals
@@ -484,7 +496,7 @@ export default function GrowthProjector() {
 
           <Card variant="input" style={{ marginTop: 14 }}>
             <SectionLabel icon="📈">Assumptions</SectionLabel>
-            <Slider label="Expected Annual Return" value={returnRate} onChange={setReturnRate} min={3} max={12} step={0.5} suffix="%" />
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Return: <strong style={{ color: 'var(--text)' }}>{returnRate}%</strong> <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>(from My Plan)</span></div>
             <Slider label="Retirement Tax Bracket" value={taxBracket} onChange={setTaxBracket} min={10} max={37} step={1} suffix="%" />
             <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>
               <input type="checkbox" checked={showInflation} onChange={e => setShowInflation(e.target.checked)} style={{ accentColor: 'var(--accent)', width: 16, height: 16 }} />

@@ -11,17 +11,22 @@ import BracketButtons from '@/components/ui/BracketButtons';
 import ValidationWarning from '@/components/ui/ValidationWarning';
 import { fmt, fmtFull } from '@/lib/format';
 import { RMD_TABLE, TAX_BRACKETS } from '@/lib/constants';
+import { usePlan } from '@/components/PlanProvider';
 
 export default function WithdrawalStrategy() {
-  const [age, setAge] = useState(62);
-  const [lifeExpectancy, setLifeExpectancy] = useState(90);
-  const [annualSpend, setAnnualSpend] = useState(60000);
+  const { plan } = usePlan();
+  const [age, setAge] = useState(() => plan.retireAge || 65);
+  const [lifeExpectancy, setLifeExpectancy] = useState(() => plan.longevityAge || 90);
+  const [annualSpend, setAnnualSpend] = useState(() => plan.retireSpending || Math.round((plan.annualSpending || 60000) * 0.8));
   const [returnRate, setReturnRate] = useState(5);
   const [inflationRate, setInflationRate] = useState(2.5);
-  const [traditional, setTraditional] = useState(500000);
-  const [roth, setRoth] = useState(200000);
-  const [taxable, setTaxable] = useState(100000);
-  const [socialSecurity, setSocialSecurity] = useState(2000);
+  const [traditional, setTraditional] = useState(() => plan.savings401k || 500000);
+  const [roth, setRoth] = useState(() => plan.savingsRoth || 200000);
+  const [taxable, setTaxable] = useState(() => plan.savingsTaxable || 100000);
+  const [socialSecurity, setSocialSecurity] = useState(() => {
+    const ss = plan.incomeSources?.find(s => s.type === 'socialSecurity');
+    return ss?.monthlyBenefit || 2000;
+  });
   const [taxBracket, setTaxBracket] = useState(22);
   const [enableRothConversion, setEnableRothConversion] = useState(false);
   const [rothConversionAmt, setRothConversionAmt] = useState(40000);
