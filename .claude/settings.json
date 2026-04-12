@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "pattern": "git push",
+        "callback": "After pushing to git, run a senior-level code review and QA validation. Follow the instructions in AGENTS.md for the review and QA process."
+      }
+    ]
+  }
+}
