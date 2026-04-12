@@ -386,22 +386,25 @@ function SummaryTable({ rows }) {
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, fontFamily: 'var(--sans)' }}>
         <thead>
           <tr style={{ borderBottom: '2px solid var(--border)' }}>
-            {['Age', 'Income', 'Expenses', 'Fed Tax', 'State Tax', 'Net After Tax', 'Surplus / Gap'].map(h => (
+            {['Age', 'Portfolio', 'Salary', 'SS + Other', 'Withdrawals', 'Expenses', 'Tax', 'Surplus / Gap'].map(h => (
               <th key={h} style={{ padding: '10px 8px', textAlign: 'right', color: 'var(--text-muted)', fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap' }}>{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {displayRows.map(r => {
+          {displayRows.map((r, i) => {
             const gapColor = r.gap >= 0 ? '#34d399' : '#ef4444';
+            const prevBal = i > 0 ? displayRows[i - 1].portfolioBalance : 0;
+            const balColor = r.portfolioBalance >= prevBal ? 'var(--accent)' : 'var(--warn)';
             return (
               <tr key={r.age} style={{ borderBottom: '1px solid var(--border)' }}>
                 <td style={{ padding: '8px', textAlign: 'right', fontWeight: r.isRetireYear ? 700 : 400, color: r.isRetireYear ? 'var(--accent)' : 'var(--text)' }}>{r.age}</td>
-                <td style={{ padding: '8px', textAlign: 'right', color: 'var(--text)' }}>{fmt(r.totalIncome)}</td>
+                <td style={{ padding: '8px', textAlign: 'right', color: balColor, fontWeight: 600 }}>{fmt(r.portfolioBalance)}</td>
+                <td style={{ padding: '8px', textAlign: 'right', color: r.salary > 0 ? 'var(--text)' : 'var(--text-dim)' }}>{r.salary > 0 ? fmt(r.salary) : '—'}</td>
+                <td style={{ padding: '8px', textAlign: 'right', color: r.ssAndOther > 0 ? 'var(--blue)' : 'var(--text-dim)' }}>{r.ssAndOther > 0 ? fmt(r.ssAndOther) : '—'}</td>
+                <td style={{ padding: '8px', textAlign: 'right', color: r.totalWithdrawals > 0 ? 'var(--purple)' : 'var(--text-dim)' }}>{r.totalWithdrawals > 0 ? fmt(r.totalWithdrawals) : '—'}</td>
                 <td style={{ padding: '8px', textAlign: 'right', color: 'var(--text)' }}>{fmt(r.totalExpense)}</td>
-                <td style={{ padding: '8px', textAlign: 'right', color: 'var(--text-muted)' }}>{fmt(r.federalTax)}</td>
-                <td style={{ padding: '8px', textAlign: 'right', color: 'var(--text-muted)' }}>{fmt(r.stateTax)}</td>
-                <td style={{ padding: '8px', textAlign: 'right', color: 'var(--text)' }}>{fmt(r.netAfterTax)}</td>
+                <td style={{ padding: '8px', textAlign: 'right', color: 'var(--text-muted)' }}>{fmt(r.totalTax)}</td>
                 <td style={{ padding: '8px', textAlign: 'right', color: gapColor, fontWeight: 600 }}>
                   {r.gap >= 0 ? '+' : ''}{fmt(Math.abs(r.gap))}{r.gap < 0 ? ' gap' : ''}
                 </td>
@@ -635,6 +638,10 @@ export default function MyPlan() {
       portfolioBalance = bal401k + balRoth + balTaxable + balHSA + balCash + balCrypto + balPension + balAnnuity + balRealEstate + bal529;
       if (portfolioBalance < 0) portfolioBalance = 0;
 
+      const totalWithdrawals = withdrawal401k + withdrawalRoth + withdrawalTaxable
+        + withdrawalCash + withdrawalCrypto + withdrawalAnnuity + withdrawalPension;
+      const ssAndOther = inc.socialSecurity + inc.pension + inc.rental + inc.annuity;
+
       return {
         age: inc.age,
         year: inc.year,
@@ -642,6 +649,8 @@ export default function MyPlan() {
         socialSecurity: inc.socialSecurity,
         pension: inc.pension,
         rental: inc.rental,
+        ssAndOther,
+        totalWithdrawals,
         rmd: rmdAmount,
         withdrawal401k,
         withdrawalRoth,
