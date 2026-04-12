@@ -484,7 +484,13 @@ export default function MyPlan() {
     let balRoth = plan.savingsRoth || 0;
     let balTaxable = plan.savingsTaxable || 0;
     let balHSA = plan.savingsHSA || 0;
-    let portfolioBalance = bal401k + balRoth + balTaxable + balHSA;
+    let balCash = plan.savingsCash || 0;
+    let balCrypto = plan.savingsCrypto || 0;
+    let balPension = plan.savingsPension || 0;
+    let balAnnuity = plan.savingsAnnuity || 0;
+    let balRealEstate = plan.savingsRealEstate || 0;
+    let bal529 = plan.savings529 || 0;
+    let portfolioBalance = bal401k + balRoth + balTaxable + balHSA + balCash + balCrypto + balPension + balAnnuity + balRealEstate + bal529;
     const startingBalance = portfolioBalance;
     const RMD_START = 73;
 
@@ -521,29 +527,54 @@ export default function MyPlan() {
 
       // --- Portfolio withdrawal (if shortfall exists) ---
       let withdrawal401k = 0, withdrawalRoth = 0, withdrawalTaxable = 0;
-      let withdrawalTax = 0;
+      let withdrawalCash = 0, withdrawalCrypto = 0, withdrawalAnnuity = 0, withdrawalPension = 0;
 
       if (shortfall > 0 && inc.isRetired && portfolioBalance > 0) {
-        // Withdrawal order: Taxable first (lowest tax), then 401k, then Roth (tax-free last)
+        // Withdrawal order: Cash → Taxable + Crypto → Annuity → 401k + Pension → Roth
+        // (Real estate & 529 excluded — illiquid / education-only)
         let remaining = shortfall;
 
-        // 1. Taxable account (only gains taxed at ~15% LTCG)
+        // 1. Cash/Savings (most liquid, interest taxed as ordinary income)
+        if (remaining > 0 && balCash > 0) {
+          withdrawalCash = Math.min(remaining, balCash);
+          remaining -= withdrawalCash;
+        }
+
+        // 2. Taxable brokerage (only gains taxed at ~15% LTCG)
         if (remaining > 0 && balTaxable > 0) {
           withdrawalTaxable = Math.min(remaining, balTaxable);
           remaining -= withdrawalTaxable;
         }
 
-        // 2. 401(k) — fully taxable as ordinary income
+        // 3. Crypto (LTCG treatment)
+        if (remaining > 0 && balCrypto > 0) {
+          withdrawalCrypto = Math.min(remaining, balCrypto);
+          remaining -= withdrawalCrypto;
+        }
+
+        // 4. Annuity (partially taxable — gains portion)
+        if (remaining > 0 && balAnnuity > 0) {
+          withdrawalAnnuity = Math.min(remaining, balAnnuity);
+          remaining -= withdrawalAnnuity;
+        }
+
+        // 5. 401(k) — fully taxable as ordinary income
         if (remaining > 0 && bal401k > 0) {
-          // Need to gross up: withdraw enough to cover shortfall + tax on withdrawal
-          // Approximate marginal rate from first pass
           const marginalRate = taxPass1.marginalRate || 0.22;
           const grossUp = remaining / (1 - marginalRate);
           withdrawal401k = Math.min(grossUp, bal401k);
           remaining -= withdrawal401k * (1 - marginalRate);
         }
 
-        // 3. Roth — tax-free
+        // 6. Pension pot — taxed as ordinary income like 401k
+        if (remaining > 0 && balPension > 0) {
+          const marginalRate = taxPass1.marginalRate || 0.22;
+          const grossUp = remaining / (1 - marginalRate);
+          withdrawalPension = Math.min(grossUp, balPension);
+          remaining -= withdrawalPension * (1 - marginalRate);
+        }
+
+        // 7. Roth — tax-free (last)
         if (remaining > 0 && balRoth > 0) {
           withdrawalRoth = Math.min(remaining, balRoth);
           remaining -= withdrawalRoth;
@@ -556,8 +587,10 @@ export default function MyPlan() {
       }
 
       // --- Second pass: recompute taxes with withdrawal income ---
-      const totalOrdinaryIncome = baseOrdinaryIncome + withdrawal401k;
-      const capitalGains = withdrawalTaxable > 0 ? Math.round(withdrawalTaxable * 0.5) : 0; // assume 50% of taxable is gains
+      const totalOrdinaryIncome = baseOrdinaryIncome + withdrawal401k + withdrawalPension + withdrawalCash;
+      const capitalGains = (withdrawalTaxable > 0 ? Math.round(withdrawalTaxable * 0.5) : 0)
+        + (withdrawalCrypto > 0 ? Math.round(withdrawalCrypto * 0.5) : 0)
+        + (withdrawalAnnuity > 0 ? Math.round(withdrawalAnnuity * 0.3) : 0); // annuity: ~30% gains portion
 
       const taxResult = computeTax({
         filingStatus, ordinaryIncome: totalOrdinaryIncome,
@@ -565,7 +598,8 @@ export default function MyPlan() {
         stateCode, age,
       });
 
-      const totalIncome = baseIncome + withdrawal401k + withdrawalRoth + withdrawalTaxable;
+      const totalIncome = baseIncome + withdrawal401k + withdrawalRoth + withdrawalTaxable
+        + withdrawalCash + withdrawalCrypto + withdrawalAnnuity + withdrawalPension;
       const netAfterTax = totalIncome - taxResult.totalTax;
       const gap = netAfterTax - exp.totalExpense;
 
@@ -578,15 +612,27 @@ export default function MyPlan() {
         bal401k = bal401k * (1 + returnRate) + monthlyContrib * 12 * 0.6;
         balRoth = balRoth * (1 + returnRate) + monthlyContrib * 12 * 0.2;
         balTaxable = balTaxable * (1 + returnRate) + monthlyContrib * 12 * 0.2;
-        balHSA = balHSA * (1 + returnRate * 0.5); // HSA: conservative
+        balHSA = balHSA * (1 + returnRate * 0.5);
+        balCash = balCash * (1 + 0.045); // HY savings ~4.5%
+        balCrypto = balCrypto * (1 + returnRate); // market rate
+        balPension = balPension * (1 + returnRate * 0.6); // conservative
+        balAnnuity = balAnnuity * (1 + 0.035); // fixed ~3.5%
+        balRealEstate = balRealEstate * (1 + 0.03); // 3% appreciation
+        bal529 = bal529 * (1 + returnRate * 0.8); // moderate growth
       } else {
         // Retired: grow at conservative rate, subtract withdrawals
         bal401k = Math.max(0, bal401k * (1 + retiredReturn) - withdrawal401k);
         balRoth = Math.max(0, balRoth * (1 + retiredReturn) - withdrawalRoth);
         balTaxable = Math.max(0, balTaxable * (1 + retiredReturn) - withdrawalTaxable);
         balHSA = Math.max(0, balHSA * (1 + retiredReturn * 0.5));
+        balCash = Math.max(0, balCash * (1 + 0.035) - withdrawalCash); // lower rate in retirement
+        balCrypto = Math.max(0, balCrypto * (1 + retiredReturn) - withdrawalCrypto);
+        balPension = Math.max(0, balPension * (1 + retiredReturn * 0.5) - withdrawalPension);
+        balAnnuity = Math.max(0, balAnnuity * (1 + 0.035) - withdrawalAnnuity);
+        balRealEstate = balRealEstate * (1 + 0.03); // keeps appreciating
+        bal529 = bal529 * (1 + retiredReturn * 0.6); // still grows, not withdrawn
       }
-      portfolioBalance = bal401k + balRoth + balTaxable + balHSA;
+      portfolioBalance = bal401k + balRoth + balTaxable + balHSA + balCash + balCrypto + balPension + balAnnuity + balRealEstate + bal529;
       if (portfolioBalance < 0) portfolioBalance = 0;
 
       return {
@@ -746,11 +792,30 @@ export default function MyPlan() {
         </Collapsible>
 
         <Collapsible title="Savings & Portfolio" defaultOpen={true} badge={fmt(results.startingBalance)}>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, fontWeight: 600 }}>Retirement Accounts</div>
           <Slider label="401(k) / 403(b)" value={plan.savings401k} onChange={v => updatePlan('savings401k', v)} min={0} max={3000000} step={5000} format={fmt} />
           <Slider label="Roth IRA" value={plan.savingsRoth} onChange={v => updatePlan('savingsRoth', v)} min={0} max={1000000} step={5000} format={fmt} />
-          <Slider label="Taxable Brokerage" value={plan.savingsTaxable} onChange={v => updatePlan('savingsTaxable', v)} min={0} max={2000000} step={5000} format={fmt} />
+          <Slider label="Pension Pot" value={plan.savingsPension || 0} onChange={v => updatePlan('savingsPension', v)} min={0} max={2000000} step={5000} format={fmt} />
+          <Slider label="Annuity Value" value={plan.savingsAnnuity || 0} onChange={v => updatePlan('savingsAnnuity', v)} min={0} max={1000000} step={5000} format={fmt} />
           <Slider label="HSA" value={plan.savingsHSA} onChange={v => updatePlan('savingsHSA', v)} min={0} max={200000} step={1000} format={fmt} />
+
           <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, fontWeight: 600 }}>Other Assets</div>
+            <Slider label="Taxable Brokerage" value={plan.savingsTaxable} onChange={v => updatePlan('savingsTaxable', v)} min={0} max={2000000} step={5000} format={fmt} />
+            <Slider label="Savings / CDs" value={plan.savingsCash || 0} onChange={v => updatePlan('savingsCash', v)} min={0} max={500000} step={1000} format={fmt} />
+            <Slider label="Crypto" value={plan.savingsCrypto || 0} onChange={v => updatePlan('savingsCrypto', v)} min={0} max={1000000} step={5000} format={fmt} />
+            <Slider label="Real Estate Equity" value={plan.savingsRealEstate || 0} onChange={v => updatePlan('savingsRealEstate', v)} min={0} max={2000000} step={10000} format={fmt} />
+            <Slider label="529 Plan" value={plan.savings529 || 0} onChange={v => updatePlan('savings529', v)} min={0} max={500000} step={5000} format={fmt} />
+            {(plan.savings529 > 0 || plan.savingsRealEstate > 0) && (
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -8, marginBottom: 8 }}>
+                {plan.savings529 > 0 ? '529: education only, not drawn for retirement. ' : ''}
+                {plan.savingsRealEstate > 0 ? 'Real estate: illiquid, counted in net worth but not drawn.' : ''}
+              </div>
+            )}
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, fontWeight: 600 }}>Contributions & Growth</div>
             <Slider label="Monthly Investment" value={plan.monthlyContribution} onChange={v => updatePlan('monthlyContribution', v)} min={0} max={10000} step={100} format={fmt} />
             <Slider label="Expected Return" value={plan.expectedReturn} onChange={v => updatePlan('expectedReturn', v)} min={3} max={12} step={0.5} suffix="%" />
             <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -16, marginBottom: 8 }}>
@@ -901,6 +966,12 @@ export default function MyPlan() {
             {plan.savingsRoth > 0 && <span style={{ color: 'var(--text-muted)' }}>Roth: {fmt(plan.savingsRoth)}</span>}
             {plan.savingsTaxable > 0 && <span style={{ color: 'var(--text-muted)' }}>Taxable: {fmt(plan.savingsTaxable)}</span>}
             {plan.savingsHSA > 0 && <span style={{ color: 'var(--text-muted)' }}>HSA: {fmt(plan.savingsHSA)}</span>}
+            {plan.savingsCash > 0 && <span style={{ color: 'var(--text-muted)' }}>Cash: {fmt(plan.savingsCash)}</span>}
+            {plan.savingsCrypto > 0 && <span style={{ color: 'var(--text-muted)' }}>Crypto: {fmt(plan.savingsCrypto)}</span>}
+            {plan.savingsPension > 0 && <span style={{ color: 'var(--text-muted)' }}>Pension: {fmt(plan.savingsPension)}</span>}
+            {plan.savingsAnnuity > 0 && <span style={{ color: 'var(--text-muted)' }}>Annuity: {fmt(plan.savingsAnnuity)}</span>}
+            {plan.savingsRealEstate > 0 && <span style={{ color: 'var(--text-muted)' }}>RE: {fmt(plan.savingsRealEstate)}</span>}
+            {plan.savings529 > 0 && <span style={{ color: 'var(--text-muted)' }}>529: {fmt(plan.savings529)}</span>}
           </div>
           <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 6, fontSize: 11 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>

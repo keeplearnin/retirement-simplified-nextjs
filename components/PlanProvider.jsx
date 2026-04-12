@@ -18,6 +18,12 @@ export const DEFAULT_PLAN = {
   savingsRoth: 50000,
   savingsTaxable: 30000,
   savingsHSA: 10000,
+  savingsRealEstate: 0,
+  savingsCash: 0,
+  savings529: 0,
+  savingsCrypto: 0,
+  savingsPension: 0,
+  savingsAnnuity: 0,
   monthlyContribution: 1500,
   expectedReturn: 7,
   // Expenses
@@ -56,7 +62,9 @@ export function getSalaryGrowth(plan) {
 }
 
 export function getTotalSavings(plan) {
-  return (plan.savings401k || 0) + (plan.savingsRoth || 0) + (plan.savingsTaxable || 0) + (plan.savingsHSA || 0);
+  return (plan.savings401k || 0) + (plan.savingsRoth || 0) + (plan.savingsTaxable || 0) + (plan.savingsHSA || 0)
+    + (plan.savingsRealEstate || 0) + (plan.savingsCash || 0) + (plan.savings529 || 0)
+    + (plan.savingsCrypto || 0) + (plan.savingsPension || 0) + (plan.savingsAnnuity || 0);
 }
 
 // ---------------------------------------------------------------------------
