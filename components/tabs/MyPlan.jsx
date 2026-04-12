@@ -6,7 +6,7 @@ import Slider from '@/components/ui/Slider';
 import SectionLabel from '@/components/ui/SectionLabel';
 import InfoBox from '@/components/ui/InfoBox';
 import { fmt, fmtFull } from '@/lib/format';
-import { usePlan, INCOME_TEMPLATES } from '@/components/PlanProvider';
+import { usePlan, INCOME_TEMPLATES, DEBT_TEMPLATES } from '@/components/PlanProvider';
 import { projectIncome } from '@/lib/incomeEngine';
 import { projectExpenses, createDefaultExpensePlan } from '@/lib/expenseEngine';
 import { computeTax, computeSSTaxable } from '@/lib/taxEngine';
@@ -113,6 +113,82 @@ function IncomeSourceCard({ source, onChange, onRemove, retireAge }) {
       )}
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Debt Card
+// ---------------------------------------------------------------------------
+
+function DebtCard({ debt, onChange, onRemove, currentAge }) {
+  const update = (key, val) => onChange({ ...debt, [key]: val });
+  // Auto-calculate payoff age
+  const monthlyRate = (debt.interestRate || 0) / 100 / 12;
+  let payoffMonths = 0;
+  if (debt.monthlyPayment > 0 && debt.remainingBalance > 0) {
+    if (monthlyRate > 0) {
+      payoffMonths = Math.ceil(-Math.log(1 - monthlyRate * debt.remainingBalance / debt.monthlyPayment) / Math.log(1 + monthlyRate));
+      if (!isFinite(payoffMonths) || payoffMonths < 0) payoffMonths = 999;
+    } else {
+      payoffMonths = Math.ceil(debt.remainingBalance / debt.monthlyPayment);
+    }
+  }
+  const payoffAge = currentAge + Math.ceil(payoffMonths / 12);
+
+  return (
+    <div style={{ padding: 16, border: '1px solid var(--border)', borderRadius: 12, marginBottom: 12, background: 'var(--bg2)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{debt.name}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 11, color: payoffAge <= 65 ? 'var(--accent)' : 'var(--warn)' }}>
+            Paid off at {payoffAge}
+          </span>
+          <button onClick={onRemove} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', fontSize: 18 }} title="Remove">&times;</button>
+        </div>
+      </div>
+      <Slider label="Balance" value={debt.remainingBalance} onChange={v => update('remainingBalance', v)} min={0} max={debt.type === 'mortgage' ? 1000000 : 200000} step={1000} format={fmt} />
+      <Slider label="Monthly Payment" value={debt.monthlyPayment} onChange={v => update('monthlyPayment', v)} min={50} max={debt.type === 'mortgage' ? 5000 : 2000} step={50} format={fmt} />
+      <Slider label="Interest Rate" value={debt.interestRate} onChange={v => update('interestRate', v)} min={0} max={30} step={0.25} suffix="%" />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Suggestion Engine
+// ---------------------------------------------------------------------------
+
+function generateSuggestions(plan, results) {
+  const suggestions = [];
+  const salary = plan.incomeSources?.find(s => s.type === 'salary')?.amount || 0;
+  const hasSS = plan.incomeSources?.some(s => s.type === 'socialSecurity');
+  const debts = plan.debts || [];
+  const monthlyExpense = (plan.annualSpending || 0) / 12;
+  const savingsRate = salary > 0 ? ((salary - plan.annualSpending) / salary * 100) : 0;
+
+  if (!hasSS) {
+    suggestions.push({ id: 'missing-ss', severity: 'warn', title: 'Add Social Security', detail: 'Include your estimated SS benefit for more accurate retirement projections.' });
+  }
+  if ((plan.savingsCash || 0) < monthlyExpense * 3 && monthlyExpense > 0) {
+    suggestions.push({ id: 'emergency-fund', severity: 'info', title: 'Build an emergency fund', detail: `You have ${fmt(plan.savingsCash || 0)} in cash — aim for ${fmt(Math.round(monthlyExpense * 3))} to ${fmt(Math.round(monthlyExpense * 6))} (3-6 months expenses).` });
+  }
+  const highDebt = debts.find(d => d.interestRate > 10);
+  if (highDebt) {
+    suggestions.push({ id: 'high-debt', severity: 'danger', title: `Pay off ${highDebt.name} (${highDebt.interestRate}%)`, detail: 'High-interest debt costs more than investment returns. Prioritize paying this off.' });
+  }
+  if (results.moneyLastsAge < plan.longevityAge) {
+    const gap = results.moneyLastsAge;
+    suggestions.push({ id: 'portfolio-gap', severity: 'danger', title: `Savings run out at age ${gap}`, detail: `Increase monthly savings or reduce spending to extend your money to age ${plan.longevityAge}.` });
+  }
+  if (plan.savings401k > 500000) {
+    suggestions.push({ id: 'rmd-warning', severity: 'info', title: 'Large 401(k) — plan for RMDs', detail: `Your ${fmt(plan.savings401k)} 401(k) will trigger Required Minimum Distributions at 73. Consider Roth conversions to reduce future tax burden.` });
+  }
+  if (salary > 0 && savingsRate < 15) {
+    suggestions.push({ id: 'low-savings', severity: 'warn', title: `Savings rate is ${Math.round(savingsRate)}%`, detail: 'Financial planners recommend saving 15-20% of gross income for retirement.' });
+  }
+  if (plan.stateCode === 'CA' && plan.filingStatus === 'single' && plan.currentAge === 40) {
+    // Only show if all defaults — user hasn't personalized
+    suggestions.push({ id: 'personalize', severity: 'info', title: 'Personalize your plan', detail: 'Update your age, state, and filing status for accurate tax projections.' });
+  }
+  return suggestions;
 }
 
 // ---------------------------------------------------------------------------
@@ -422,7 +498,7 @@ function SummaryTable({ rows }) {
 // ---------------------------------------------------------------------------
 
 export default function MyPlan() {
-  const { plan, updatePlan, updateIncome, removeIncome, addIncome } = usePlan();
+  const { plan, updatePlan, updateIncome, removeIncome, addIncome, addDebt, updateDebt, removeDebt } = usePlan();
 
   // ---- Heavy computation ----
   const results = useMemo(() => {
@@ -450,19 +526,40 @@ export default function MyPlan() {
 
     // Build TWO expense plans: one for working years, one for retirement
     const retireSpend = plan.retireSpending || Math.round(annualSpending * 0.8);
-    const inflationRate = 0.025;
+    const inflationRate = (plan.inflationRate || 2.5) / 100;
 
     // Working years: use current spending
     const workingExpensePlan = createDefaultExpensePlan(currentAge, retireAge, annualSpending);
     workingExpensePlan.longevityAge = longevityAge;
     workingExpensePlan.goGoEndAge = goGoEndAge;
     workingExpensePlan.slowGoEndAge = slowGoEndAge;
+    workingExpensePlan.inflationRate = inflationRate;
+    workingExpensePlan.healthcareInflation = (plan.healthcareInflation || 3.5) / 100;
+    // Pass debts to expense engine
+    if (plan.debts && plan.debts.length > 0) {
+      workingExpensePlan.debts = plan.debts.map(d => ({
+        name: d.name,
+        monthlyPayment: d.monthlyPayment,
+        remainingBalance: d.remainingBalance,
+        interestRate: d.interestRate / 100,
+        payoffAge: (() => {
+          const mr = (d.interestRate || 0) / 100 / 12;
+          if (d.monthlyPayment <= 0 || d.remainingBalance <= 0) return currentAge;
+          const months = mr > 0
+            ? Math.ceil(-Math.log(1 - mr * d.remainingBalance / d.monthlyPayment) / Math.log(1 + mr))
+            : Math.ceil(d.remainingBalance / d.monthlyPayment);
+          return currentAge + Math.ceil((isFinite(months) && months > 0 ? months : 0) / 12);
+        })(),
+      }));
+    }
 
     // Retirement years: use retirement spending as base (in today's dollars)
     const retireExpensePlan = createDefaultExpensePlan(currentAge, retireAge, retireSpend);
     retireExpensePlan.longevityAge = longevityAge;
     retireExpensePlan.goGoEndAge = goGoEndAge;
     retireExpensePlan.slowGoEndAge = slowGoEndAge;
+    retireExpensePlan.inflationRate = inflationRate;
+    retireExpensePlan.healthcareInflation = (plan.healthcareInflation || 3.5) / 100;
 
     const workingProjections = projectExpenses(workingExpensePlan);
     const retireProjections = projectExpenses(retireExpensePlan);
@@ -608,7 +705,11 @@ export default function MyPlan() {
 
       // --- Update account balances ---
       const balanceStart = portfolioBalance;
-      const retiredReturn = inc.isRetired ? returnRate * 0.6 : returnRate;
+      const retiredReturnPct = (plan.retiredReturnPct || 60) / 100;
+      const retiredReturn = inc.isRetired ? returnRate * retiredReturnPct : returnRate;
+      const cashRate = (plan.cashReturn || 3) / 100;
+      const annuityRate = (plan.annuityReturn || 3.5) / 100;
+      const reRate = (plan.realEstateAppreciation || 3) / 100;
 
       if (!inc.isRetired) {
         // Working: grow all accounts + add contributions (split: 60% 401k, 20% Roth, 20% taxable)
@@ -616,11 +717,11 @@ export default function MyPlan() {
         balRoth = balRoth * (1 + returnRate) + monthlyContrib * 12 * 0.2;
         balTaxable = balTaxable * (1 + returnRate) + monthlyContrib * 12 * 0.2;
         balHSA = balHSA * (1 + returnRate * 0.5);
-        balCash = balCash * (1 + 0.03); // long-term savings avg ~3%
+        balCash = balCash * (1 + cashRate);
         balCrypto = balCrypto * (1 + returnRate);
         balPension = balPension * (1 + returnRate * 0.6);
-        balAnnuity = balAnnuity * (1 + 0.035);
-        balRealEstate = balRealEstate * (1 + 0.03);
+        balAnnuity = balAnnuity * (1 + annuityRate);
+        balRealEstate = balRealEstate * (1 + reRate);
         bal529 = bal529 * (1 + returnRate * 0.8);
       } else {
         // Retired: withdraw first, then grow remainder (beginning-of-year withdrawal)
@@ -628,11 +729,11 @@ export default function MyPlan() {
         balRoth = Math.max(0, (balRoth - withdrawalRoth) * (1 + retiredReturn));
         balTaxable = Math.max(0, (balTaxable - withdrawalTaxable) * (1 + retiredReturn));
         balHSA = Math.max(0, balHSA * (1 + retiredReturn * 0.5));
-        balCash = Math.max(0, (balCash - withdrawalCash) * (1 + 0.025)); // conservative in retirement
+        balCash = Math.max(0, (balCash - withdrawalCash) * (1 + cashRate * 0.8));
         balCrypto = Math.max(0, (balCrypto - withdrawalCrypto) * (1 + retiredReturn));
         balPension = Math.max(0, (balPension - withdrawalPension) * (1 + retiredReturn * 0.5));
-        balAnnuity = Math.max(0, (balAnnuity - withdrawalAnnuity) * (1 + 0.035));
-        balRealEstate = balRealEstate * (1 + 0.03);
+        balAnnuity = Math.max(0, (balAnnuity - withdrawalAnnuity) * (1 + annuityRate));
+        balRealEstate = balRealEstate * (1 + reRate);
         bal529 = bal529 * (1 + retiredReturn * 0.6);
       }
       portfolioBalance = bal401k + balRoth + balTaxable + balHSA + balCash + balCrypto + balPension + balAnnuity + balRealEstate + bal529;
@@ -743,6 +844,7 @@ export default function MyPlan() {
 
   // Add income dropdown
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [showDebtMenu, setShowDebtMenu] = useState(false);
   const existingTypes = plan.incomeSources.map(s => s.type);
 
   // Expense mode
@@ -882,6 +984,56 @@ export default function MyPlan() {
           </div>
         </Collapsible>
 
+        {/* ---- Debts ---- */}
+        <Collapsible title="Debts" defaultOpen={(plan.debts || []).length > 0} badge={(plan.debts || []).length > 0 ? `${fmt((plan.debts || []).reduce((s, d) => s + d.monthlyPayment, 0))}/mo` : 'None'}>
+          {(plan.debts || []).map(debt => (
+            <DebtCard
+              key={debt.id}
+              debt={debt}
+              onChange={updated => updateDebt(debt.id, updated)}
+              onRemove={() => removeDebt(debt.id)}
+              currentAge={plan.currentAge}
+            />
+          ))}
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            <button
+              onClick={() => setShowDebtMenu(!showDebtMenu)}
+              style={{
+                padding: '10px 20px', borderRadius: 8, cursor: 'pointer',
+                border: '1px dashed var(--warn)', background: 'transparent',
+                color: 'var(--warn)', fontSize: 13, fontWeight: 600,
+                fontFamily: 'var(--sans)',
+              }}
+            >
+              + Add Debt
+            </button>
+            {showDebtMenu && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 20,
+                background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8,
+                padding: 4, minWidth: 200, boxShadow: '0 8px 24px rgba(0,0,0,.3)',
+              }}>
+                {Object.entries(DEBT_TEMPLATES).map(([key, tmpl]) => (
+                  <button
+                    key={key}
+                    onClick={() => { addDebt(key); setShowDebtMenu(false); }}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'left',
+                      padding: '10px 14px', border: 'none', cursor: 'pointer',
+                      background: 'transparent', color: 'var(--text)',
+                      fontSize: 13, fontFamily: 'var(--sans)', borderRadius: 6,
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg2)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {tmpl.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </Collapsible>
+
         <Collapsible title="Expenses" defaultOpen={true} badge={expenseMode === 'simple' ? fmt(plan.annualSpending) + '/yr' : fmt(detailedTotal) + '/yr'}>
           <div style={{ display: 'flex', gap: 2, background: 'var(--bg)', borderRadius: 20, padding: 2, marginBottom: 16, width: 'fit-content' }}>
             {['simple', 'detailed'].map(mode => (
@@ -956,10 +1108,58 @@ export default function MyPlan() {
             </div>
           </div>
         </Collapsible>
+
+        {/* ---- Assumptions ---- */}
+        <Collapsible title="Assumptions" defaultOpen={false} badge={`${plan.inflationRate || 2.5}% infl`}>
+          <Slider label="General Inflation" value={plan.inflationRate || 2.5} onChange={v => updatePlan('inflationRate', v)} min={1} max={5} step={0.25} suffix="%" />
+          <Slider label="Healthcare Inflation" value={plan.healthcareInflation || 3.5} onChange={v => updatePlan('healthcareInflation', v)} min={2} max={7} step={0.25} suffix="%" />
+          <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
+            <Slider label="Retirement Return (% of working)" value={plan.retiredReturnPct || 60} onChange={v => updatePlan('retiredReturnPct', v)} min={40} max={100} step={5} suffix="%" />
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -16, marginBottom: 8 }}>
+              {plan.expectedReturn || 7}% working → {((plan.expectedReturn || 7) * (plan.retiredReturnPct || 60) / 100).toFixed(1)}% retired
+            </div>
+          </div>
+          <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, fontWeight: 600 }}>Asset-Specific Returns</div>
+            <Slider label="Cash / Savings" value={plan.cashReturn || 3} onChange={v => updatePlan('cashReturn', v)} min={1} max={5} step={0.25} suffix="%" />
+            <Slider label="Real Estate Appreciation" value={plan.realEstateAppreciation || 3} onChange={v => updatePlan('realEstateAppreciation', v)} min={1} max={6} step={0.25} suffix="%" />
+            <Slider label="Annuity Return" value={plan.annuityReturn || 3.5} onChange={v => updatePlan('annuityReturn', v)} min={2} max={5} step={0.25} suffix="%" />
+          </div>
+        </Collapsible>
       </div>
 
       {/* ============ RESULTS COLUMN ============ */}
       <div className="myplan-results">
+      {/* ---- Action Items (suggestions) ---- */}
+      {(() => {
+        const suggestions = generateSuggestions(plan, results);
+        const dismissed = (() => { try { return JSON.parse(localStorage.getItem('suggestions-dismissed') || '[]'); } catch { return []; } })();
+        const active = suggestions.filter(s => !dismissed.includes(s.id));
+        if (active.length === 0) return null;
+        const colors = { danger: 'var(--danger)', warn: 'var(--warn)', info: 'var(--blue)' };
+        return (
+          <Card style={{ marginBottom: 16, borderLeft: '3px solid var(--warn)' }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 12, fontFamily: 'var(--serif)' }}>
+              Action Items ({active.length})
+            </div>
+            {active.map(s => (
+              <div key={s.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: colors[s.severity] || 'var(--blue)', marginTop: 5, flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{s.title}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{s.detail}</div>
+                </div>
+                <button onClick={() => {
+                  const cur = (() => { try { return JSON.parse(localStorage.getItem('suggestions-dismissed') || '[]'); } catch { return []; } })();
+                  localStorage.setItem('suggestions-dismissed', JSON.stringify([...cur, s.id]));
+                  // Force re-render
+                  updatePlan('_suggestionsVersion', Date.now());
+                }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', fontSize: 16, padding: '0 4px' }} title="Dismiss">&times;</button>
+              </div>
+            ))}
+          </Card>
+        );
+      })()}
       {/* ============ HERO: 3-column snapshot ============ */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 20 }} className="grid-2">
         {/* Current Savings */}
