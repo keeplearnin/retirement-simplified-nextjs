@@ -463,16 +463,36 @@ function SummaryTable({ rows }) {
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, fontFamily: 'var(--sans)' }}>
         <thead>
           <tr style={{ borderBottom: '2px solid var(--border)' }}>
-            {['Age', 'Portfolio', 'Salary', 'SS + Other', 'Withdrawals', 'Expenses', 'Tax', 'Surplus / Gap'].map(h => (
+            {['Age', 'Portfolio', 'Salary', 'SS + Other', 'Withdrawals', 'Expenses', 'Tax', 'Status'].map(h => (
               <th key={h} style={{ padding: '10px 8px', textAlign: 'right', color: 'var(--text-muted)', fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap' }}>{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {displayRows.map((r, i) => {
-            const gapColor = r.gap >= 0 ? '#34d399' : '#ef4444';
+            // Status: green when covered (income + withdrawals >= expenses), red only when truly short
+            const unmetGap = r.gap < 0 && r.totalWithdrawals <= 0 && r.portfolioBalance <= 0;
             const prevBal = i > 0 ? displayRows[i - 1].portfolioBalance : 0;
             const balColor = r.portfolioBalance >= prevBal ? 'var(--accent)' : 'var(--warn)';
+
+            let statusText, statusColor;
+            if (!r.isRetired) {
+              statusText = 'Saving';
+              statusColor = 'var(--accent)';
+            } else if (r.totalWithdrawals > 0 && r.portfolioBalance > 0) {
+              statusText = `${fmt(r.totalWithdrawals)} drawn`;
+              statusColor = 'var(--accent)';
+            } else if (r.gap >= 0) {
+              statusText = 'Covered';
+              statusColor = 'var(--accent)';
+            } else if (r.portfolioBalance > 0 && r.portfolioBalance > Math.abs(r.gap)) {
+              statusText = `${fmt(r.totalWithdrawals)} drawn`;
+              statusColor = 'var(--warn)';
+            } else {
+              statusText = `${fmt(Math.abs(r.gap))} short`;
+              statusColor = 'var(--danger)';
+            }
+
             return (
               <tr key={r.age} style={{ borderBottom: '1px solid var(--border)' }}>
                 <td style={{ padding: '8px', textAlign: 'right', fontWeight: r.isRetireYear ? 700 : 400, color: r.isRetireYear ? 'var(--accent)' : 'var(--text)' }}>{r.age}</td>
@@ -482,8 +502,8 @@ function SummaryTable({ rows }) {
                 <td style={{ padding: '8px', textAlign: 'right', color: r.totalWithdrawals > 0 ? 'var(--purple)' : 'var(--text-dim)' }}>{r.totalWithdrawals > 0 ? fmt(r.totalWithdrawals) : '—'}</td>
                 <td style={{ padding: '8px', textAlign: 'right', color: 'var(--text)' }}>{fmt(r.totalExpense)}</td>
                 <td style={{ padding: '8px', textAlign: 'right', color: 'var(--text-muted)' }}>{fmt(r.totalTax)}</td>
-                <td style={{ padding: '8px', textAlign: 'right', color: gapColor, fontWeight: 600 }}>
-                  {r.gap >= 0 ? '+' : ''}{fmt(Math.abs(r.gap))}{r.gap < 0 ? ' gap' : ''}
+                <td style={{ padding: '8px', textAlign: 'right', color: statusColor, fontWeight: 600, fontSize: 11 }}>
+                  {statusText}
                 </td>
               </tr>
             );
