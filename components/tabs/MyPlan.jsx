@@ -470,27 +470,27 @@ function SummaryTable({ rows }) {
         </thead>
         <tbody>
           {displayRows.map((r, i) => {
-            // Status: green when covered (income + withdrawals >= expenses), red only when truly short
-            const unmetGap = r.gap < 0 && r.totalWithdrawals <= 0 && r.portfolioBalance <= 0;
+            // Status: use liquidBalance (excludes illiquid RE and 529) for coverage check
             const prevBal = i > 0 ? displayRows[i - 1].portfolioBalance : 0;
             const balColor = r.portfolioBalance >= prevBal ? 'var(--accent)' : 'var(--warn)';
+            const liquid = r.liquidBalance || 0;
 
             let statusText, statusColor;
             if (!r.isRetired) {
               statusText = 'Saving';
               statusColor = 'var(--accent)';
-            } else if (r.totalWithdrawals > 0 && r.portfolioBalance > 0) {
+            } else if (r.totalWithdrawals > 0) {
               statusText = `${fmt(r.totalWithdrawals)} drawn`;
               statusColor = 'var(--accent)';
             } else if (r.gap >= 0) {
               statusText = 'Covered';
               statusColor = 'var(--accent)';
-            } else if (r.portfolioBalance > 0 && r.portfolioBalance > Math.abs(r.gap)) {
-              statusText = `${fmt(r.totalWithdrawals)} drawn`;
-              statusColor = 'var(--warn)';
-            } else {
+            } else if (liquid <= 0) {
               statusText = `${fmt(Math.abs(r.gap))} short`;
               statusColor = 'var(--danger)';
+            } else {
+              statusText = `${fmt(r.totalWithdrawals || 0)} drawn`;
+              statusColor = 'var(--warn)';
             }
 
             return (
@@ -651,7 +651,10 @@ export default function MyPlan() {
       let withdrawal401k = 0, withdrawalRoth = 0, withdrawalTaxable = 0;
       let withdrawalCash = 0, withdrawalCrypto = 0, withdrawalAnnuity = 0, withdrawalPension = 0;
 
-      if (shortfall > 0 && inc.isRetired && portfolioBalance > 0) {
+      // Liquid balance = everything except illiquid RE and education-only 529
+      const liquidBalance = bal401k + balRoth + balTaxable + balHSA + balCash + balCrypto + balPension + balAnnuity;
+
+      if (shortfall > 0 && inc.isRetired && liquidBalance > 0) {
         // Withdrawal order: Cash → Taxable + Crypto → Annuity → 401k + Pension → Roth
         // (Real estate & 529 excluded — illiquid / education-only)
         let remaining = shortfall;
@@ -764,6 +767,7 @@ export default function MyPlan() {
       const totalWithdrawals = withdrawal401k + withdrawalRoth + withdrawalTaxable
         + withdrawalCash + withdrawalCrypto + withdrawalAnnuity + withdrawalPension;
       const ssAndOther = inc.socialSecurity + inc.pension + inc.rental + inc.annuity;
+      const liquidBalanceEnd = bal401k + balRoth + balTaxable + balHSA + balCash + balCrypto + balPension + balAnnuity;
 
       return {
         age: inc.age,
@@ -790,6 +794,7 @@ export default function MyPlan() {
         netAfterTax: Math.round(netAfterTax),
         gap: Math.round(gap),
         portfolioBalance: Math.round(balanceStart),
+        liquidBalance: Math.round(liquidBalanceEnd),
         isRetired: inc.isRetired,
         isRetireYear: inc.age === retireAge,
       };
@@ -806,11 +811,11 @@ export default function MyPlan() {
     const totalSurplusOrShortfall = combined.reduce((s, r) => s + r.gap, 0);
     const avgEffectiveRate = totalLifetimeIncome > 0 ? totalLifetimeTax / totalLifetimeIncome : 0;
 
-    // Find when you're truly broke: retired + portfolio empty + income < expenses
-    // This is the definitive "money lasts to" age
+    // Find when you're truly broke: retired + liquid assets depleted + income < expenses
+    // Uses liquidBalance (excludes illiquid RE and 529) since those can't be withdrawn
     let moneyLastsAge = longevityAge;
     for (const r of combined) {
-      if (r.isRetired && r.portfolioBalance <= 0 && r.gap < 0) {
+      if (r.isRetired && r.liquidBalance <= 0 && r.gap < 0) {
         moneyLastsAge = r.age;
         break;
       }
