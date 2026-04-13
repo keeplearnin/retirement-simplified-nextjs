@@ -126,8 +126,10 @@ function longTermCareCost(
   const ltcStartAge = Math.max(85, longevityAge - 5);
   if (age < ltcStartAge) return 0;
 
-  // Base monthly cost in today's dollars — midpoint of $4k-$8k range
-  const baseMonthlyCost = 6000;
+  // Probability-weighted monthly LTC cost in today's dollars.
+  // ~52% of people need some LTC; median stay 28 months; median cost ~$5K/mo.
+  // Weighted: 0.52 * $5K = ~$2,600/mo as expected cost.
+  const baseMonthlyCost = 2500;
 
   // Ramp: increases linearly from 50% to 100% over the LTC window
   const yearsInWindow = longevityAge - ltcStartAge;
@@ -138,9 +140,9 @@ function longTermCareCost(
       : 1;
 
   const annualBase = baseMonthlyCost * 12 * rampFactor;
-  // Cap inflated LTC at 3x base to prevent unrealistic projections
-  const raw = inflated(annualBase, healthcareInflation, age - currentAge);
-  return Math.min(raw, annualBase * 3);
+  // Use general inflation (not healthcare) for LTC to keep projections realistic.
+  // Healthcare inflation on a 55-year horizon produces unrealistic numbers.
+  return inflated(annualBase, 0.03, age - currentAge);
 }
 
 // ---------------------------------------------------------------------------
