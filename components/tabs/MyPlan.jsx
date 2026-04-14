@@ -515,6 +515,76 @@ function SummaryTable({ rows }) {
 }
 
 // ---------------------------------------------------------------------------
+// Retirement Detail Table (every year after retirement)
+// ---------------------------------------------------------------------------
+
+function RetirementDetailTable({ rows, retireAge }) {
+  const [open, setOpen] = useState(false);
+  const retireRows = rows.filter(r => r.age >= retireAge);
+  if (retireRows.length === 0) return null;
+
+  const cellStyle = { padding: '6px 8px', textAlign: 'right', fontSize: 11 };
+  const thStyle = { ...cellStyle, color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap', position: 'sticky', top: 0, background: 'var(--card)', zIndex: 1 };
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <button onClick={() => setOpen(!open)} style={{
+        display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+        background: 'none', border: 'none', cursor: 'pointer', padding: '8px 0',
+        color: 'var(--text)', fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 600,
+      }}>
+        <span>Retirement Year-by-Year Detail</span>
+        <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>({retireRows.length} years)</span>
+        <span style={{ fontSize: 12, color: 'var(--text-dim)', transition: 'transform .2s', transform: open ? 'rotate(180deg)' : 'rotate(0)', marginLeft: 'auto' }}>&#9660;</span>
+      </button>
+      {open && (
+        <div style={{ overflowX: 'auto', maxHeight: 500, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 10 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, fontFamily: 'var(--sans)' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                <th style={thStyle}>Age</th>
+                <th style={thStyle}>Portfolio</th>
+                <th style={thStyle}>Growth</th>
+                <th style={thStyle}>SS</th>
+                <th style={thStyle}>From 401k</th>
+                <th style={thStyle}>From Roth</th>
+                <th style={thStyle}>From Taxable</th>
+                <th style={thStyle}>From Cash</th>
+                <th style={thStyle}>Other Draws</th>
+                <th style={thStyle}>Total Drawn</th>
+                <th style={thStyle}>Expenses</th>
+                <th style={thStyle}>Tax</th>
+              </tr>
+            </thead>
+            <tbody>
+              {retireRows.map(r => {
+                const otherDraws = (r.withdrawalCrypto || 0) + (r.withdrawalAnnuity || 0) + (r.withdrawalPension || 0);
+                return (
+                  <tr key={r.age} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ ...cellStyle, fontWeight: r.isRetireYear ? 700 : 400, color: r.isRetireYear ? 'var(--accent)' : 'var(--text)' }}>{r.age}</td>
+                    <td style={{ ...cellStyle, color: 'var(--accent)', fontWeight: 600 }}>{fmt(r.portfolioBalance)}</td>
+                    <td style={{ ...cellStyle, color: r.portfolioGrowth >= 0 ? 'var(--accent)' : 'var(--danger)' }}>{r.portfolioGrowth >= 0 ? '+' : ''}{fmt(r.portfolioGrowth)}</td>
+                    <td style={{ ...cellStyle, color: r.socialSecurity > 0 ? 'var(--blue)' : 'var(--text-dim)' }}>{r.socialSecurity > 0 ? fmt(r.socialSecurity) : '—'}</td>
+                    <td style={{ ...cellStyle, color: r.withdrawal401k > 0 ? 'var(--text)' : 'var(--text-dim)' }}>{r.withdrawal401k > 0 ? fmt(r.withdrawal401k) : '—'}</td>
+                    <td style={{ ...cellStyle, color: r.withdrawalRoth > 0 ? 'var(--accent)' : 'var(--text-dim)' }}>{r.withdrawalRoth > 0 ? fmt(r.withdrawalRoth) : '—'}</td>
+                    <td style={{ ...cellStyle, color: r.withdrawalTaxable > 0 ? 'var(--text)' : 'var(--text-dim)' }}>{r.withdrawalTaxable > 0 ? fmt(r.withdrawalTaxable) : '—'}</td>
+                    <td style={{ ...cellStyle, color: (r.withdrawalCash || 0) > 0 ? 'var(--text)' : 'var(--text-dim)' }}>{(r.withdrawalCash || 0) > 0 ? fmt(r.withdrawalCash) : '—'}</td>
+                    <td style={{ ...cellStyle, color: otherDraws > 0 ? 'var(--text)' : 'var(--text-dim)' }}>{otherDraws > 0 ? fmt(otherDraws) : '—'}</td>
+                    <td style={{ ...cellStyle, color: r.totalWithdrawals > 0 ? 'var(--purple)' : 'var(--text-dim)', fontWeight: 600 }}>{r.totalWithdrawals > 0 ? fmt(r.totalWithdrawals) : '—'}</td>
+                    <td style={{ ...cellStyle, color: 'var(--text)' }}>{fmt(r.totalExpense)}</td>
+                    <td style={{ ...cellStyle, color: r.totalTax > 0 ? 'var(--text-muted)' : 'var(--text-dim)' }}>{r.totalTax > 0 ? fmt(r.totalTax) : '—'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
 
@@ -782,6 +852,10 @@ export default function MyPlan() {
         withdrawal401k,
         withdrawalRoth,
         withdrawalTaxable,
+        withdrawalCash,
+        withdrawalCrypto,
+        withdrawalAnnuity,
+        withdrawalPension,
         totalIncome,
         totalExpense: exp.totalExpense,
         healthcare: exp.healthcare,
@@ -794,6 +868,8 @@ export default function MyPlan() {
         netAfterTax: Math.round(netAfterTax),
         gap: Math.round(gap),
         portfolioBalance: Math.round(balanceStart),
+        portfolioEndBalance: Math.round(portfolioBalance),
+        portfolioGrowth: Math.round(portfolioBalance - balanceStart + totalWithdrawals),
         liquidBalance: Math.round(liquidBalanceEnd),
         isRetired: inc.isRetired,
         isRetireYear: inc.age === retireAge,
@@ -1317,6 +1393,7 @@ export default function MyPlan() {
       {/* Year-by-Year & Tax */}
       <Collapsible title="Year-by-Year Summary" defaultOpen={false} badge="Every 5 years">
         <SummaryTable rows={combined} />
+        <RetirementDetailTable rows={combined} retireAge={plan.retireAge} />
       </Collapsible>
 
       <Collapsible title="Tax Summary" defaultOpen={false}>
