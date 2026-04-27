@@ -37,11 +37,13 @@ export default function MyPlanV2() {
   const moneyLastsBase = baseResults.moneyLastsAge;
   const baseGap = Math.max(0, plan.longevityAge - moneyLastsBase);
 
-  // Inflection events derived from the plan, not hardcoded
+  // Inflection events derived from the plan. goGoEndAge marks the BEGINNING
+  // of the slow-go phase (slow-go runs from goGoEndAge to slowGoEndAge), so
+  // that's the inflection users should see — not slowGoEndAge.
   const events = [
     { age: plan.retireAge, label: 'Retire', tone: 'accent' },
     { age: 73, label: 'RMDs begin', tone: 'warn' },
-    { age: plan.slowGoEndAge || 85, label: 'Slow-go phase', tone: 'danger' },
+    { age: plan.goGoEndAge || 75, label: 'Slow-go begins', tone: 'danger' },
   ].filter(e => e.age >= plan.currentAge && e.age <= plan.longevityAge);
 
   return (
@@ -131,7 +133,7 @@ function Header({ currentAge, longevityAge, moneyLastsBase, baseGap, breaking })
   let breakingClause;
   if (breaking.robust) {
     breakingClause = (
-      <>Stays solvent even with a <span style={{ color: breakColor }}>−7%+</span> return shock.</>
+      <>Stays solvent even with a <span style={{ color: breakColor }}>−{breaking.shock.toFixed(1)}%</span> return shock (max we can test).</>
     );
   } else if (breaking.shock === 0) {
     breakingClause = (
@@ -169,7 +171,7 @@ function BreakingStat({ breaking, longevityAge }) {
     return (
       <Stat
         label="Plan breaks at"
-        value="−7%+"
+        value={`−${breaking.shock.toFixed(1)}%+`}
         sub="robust — no shock tested broke it"
         tone="good"
       />
