@@ -21,6 +21,7 @@ import GettingStarted from '@/components/tabs/GettingStarted';
 import InvestingGuide from '@/components/tabs/InvestingGuide';
 import AIAdvisor from '@/components/tabs/AIAdvisor';
 import MyPlan from '@/components/tabs/MyPlan';
+import MyPlanV2 from '@/components/tabs/MyPlanV2';
 import MyPlans from '@/components/tabs/MyPlans';
 import Journal from '@/components/tabs/Journal';
 import RiskQuiz from '@/components/tabs/RiskQuiz';
@@ -62,6 +63,7 @@ function AppContent() {
   const categories = [
     { id: 'plan', label: 'My Plan', icon: '📊', tabs: [
       { id: 'myplan', label: 'My Plan' },
+      { id: 'myplan-v2', label: 'Dashboard (new)' },
     ]},
     { id: 'build', label: 'Build', icon: '🎯', tabs: [
       { id: 'portfolio', label: 'Portfolio Builder' },
@@ -174,6 +176,7 @@ function AppContent() {
 
       <main className="section-pad" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 40px' }}>
         {tab === 'myplan' && <MyPlan />}
+        {tab === 'myplan-v2' && <MyPlanV2 />}
         {tab === 'dashboard' && <AccountDashboard />}
         {tab === 'growth' && <GrowthProjector />}
         {tab === 'fees' && <FeeImpact />}
