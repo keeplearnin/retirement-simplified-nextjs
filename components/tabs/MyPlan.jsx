@@ -601,6 +601,77 @@ function RetirementDetailTable({ rows, retireAge }) {
 }
 
 // ---------------------------------------------------------------------------
+// RMD Projection Table — shows the year-by-year forced withdrawal once the
+// user hits age 73, alongside which years trigger SS taxation or IRMAA.
+// ---------------------------------------------------------------------------
+
+function RmdProjectionTable({ rows }) {
+  const [open, setOpen] = useState(false);
+  const rmdRows = rows.filter(r => r.age >= 73);
+  if (rmdRows.length === 0) return null;
+  const totalLifetimeRmds = rmdRows.reduce((s, r) => s + (r.rmd || 0), 0);
+  const peakRmd = rmdRows.reduce((m, r) => Math.max(m, r.rmd || 0), 0);
+
+  const cellStyle = { padding: '6px 8px', textAlign: 'right', fontSize: 11 };
+  const thStyle = { ...cellStyle, color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap', position: 'sticky', top: 0, background: 'var(--card)', zIndex: 1 };
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <button onClick={() => setOpen(!open)} style={{
+        display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+        background: 'none', border: 'none', cursor: 'pointer', padding: '8px 0',
+        color: 'var(--text)', fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 600,
+      }}>
+        <span>RMD Projection (age 73+)</span>
+        <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+          Lifetime RMDs: {fmt(totalLifetimeRmds)} · Peak: {fmt(peakRmd)}
+        </span>
+        <span style={{ fontSize: 12, color: 'var(--text-dim)', transition: 'transform .2s', transform: open ? 'rotate(180deg)' : 'rotate(0)', marginLeft: 'auto' }}>&#9660;</span>
+      </button>
+      {open && (
+        <div style={{ overflowX: 'auto', maxHeight: 400, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 10 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, fontFamily: 'var(--sans)' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                <th style={thStyle}>Age</th>
+                <th style={thStyle}>IRS Divisor</th>
+                <th style={thStyle}>RMD</th>
+                <th style={thStyle}>Marginal Bracket</th>
+                <th style={thStyle}>SS Taxable</th>
+                <th style={thStyle}>IRMAA Surcharge</th>
+                <th style={thStyle}>Total Tax</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rmdRows.map(r => {
+                const divisor = RMD_TABLE[Math.min(r.age, 110)] || '—';
+                const triggersSS = (r.socialSecurity || 0) > 0 && (r.ssTaxablePercent || 0) > 0;
+                const triggersIrmaa = (r.irmaa || 0) > 0;
+                return (
+                  <tr key={r.age} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ ...cellStyle, color: 'var(--text)' }}>{r.age}</td>
+                    <td style={{ ...cellStyle, color: 'var(--text-muted)' }}>{typeof divisor === 'number' ? divisor.toFixed(1) : divisor}</td>
+                    <td style={{ ...cellStyle, color: 'var(--purple)', fontWeight: 600 }}>{r.rmd > 0 ? fmt(r.rmd) : '—'}</td>
+                    <td style={{ ...cellStyle, color: 'var(--text-muted)' }}>{r.marginalRate ? `${(r.marginalRate * 100).toFixed(0)}%` : '—'}</td>
+                    <td style={{ ...cellStyle, color: triggersSS ? 'var(--warn)' : 'var(--text-dim)' }}>
+                      {triggersSS ? `${r.ssTaxablePercent}% taxable` : '—'}
+                    </td>
+                    <td style={{ ...cellStyle, color: triggersIrmaa ? 'var(--danger)' : 'var(--text-dim)' }}>
+                      {triggersIrmaa ? `+${fmt(r.irmaa)}/mo` : '—'}
+                    </td>
+                    <td style={{ ...cellStyle, color: 'var(--text-muted)' }}>{r.totalTax > 0 ? fmt(r.totalTax) : '—'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
 
@@ -888,6 +959,7 @@ export default function MyPlan() {
         stateTax: taxResult.stateTax,
         totalTax: taxResult.totalTax,
         effectiveRate: taxResult.effectiveRate,
+        marginalRate: taxResult.marginalRate,
         irmaa: taxResult.irmaa,
         magi: taxResult.magi,
         ssTaxablePercent: taxResult.ssTaxablePercent,
@@ -1426,6 +1498,7 @@ export default function MyPlan() {
       <Collapsible title="Year-by-Year Summary" defaultOpen={false} badge="Every 5 years">
         <SummaryTable rows={combined} />
         <RetirementDetailTable rows={combined} retireAge={plan.retireAge} />
+        <RmdProjectionTable rows={combined} />
       </Collapsible>
 
       <Collapsible title="Tax Summary" defaultOpen={false}>
