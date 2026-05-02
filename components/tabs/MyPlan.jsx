@@ -919,37 +919,39 @@ export default function MyPlan() {
       // --- Update account balances ---
       const balanceStart = portfolioBalance;
       const retiredReturnPct = (plan.retiredReturnPct || 60) / 100;
-      const retiredReturn = inc.isRetired ? returnRate * retiredReturnPct : returnRate;
+      // Household-aware retirement allocation: shift to conservative returns
+      // only once BOTH members have stopped working. For singles, isRetired
+      // and isHouseholdRetired are equivalent.
+      const fullyRetired = plan.hasSpouse ? !!inc.isHouseholdRetired : !!inc.isRetired;
+      const yearReturn = fullyRetired ? returnRate * retiredReturnPct : returnRate;
       const cashRate = (plan.cashReturn || 3) / 100;
       const annuityRate = (plan.annuityReturn || 3.5) / 100;
       const reRate = (plan.realEstateAppreciation || 3) / 100;
 
-      if (!inc.isRetired) {
-        // Working: grow all accounts + add contributions (split: 60% 401k, 20% Roth, 20% taxable)
-        // Household contribution = primary + spouse when hasSpouse=true.
-        bal401k = bal401k * (1 + returnRate) + householdMonthlyContrib * 12 * 0.6;
-        balRoth = balRoth * (1 + returnRate) + householdMonthlyContrib * 12 * 0.2;
-        balTaxable = balTaxable * (1 + returnRate) + householdMonthlyContrib * 12 * 0.2;
-        balHSA = balHSA * (1 + returnRate * 0.5);
-        balCash = balCash * (1 + cashRate);
-        balCrypto = balCrypto * (1 + returnRate);
-        balPension = balPension * (1 + returnRate * 0.6);
-        balAnnuity = balAnnuity * (1 + annuityRate);
-        balRealEstate = balRealEstate * (1 + reRate);
-        bal529 = bal529 * (1 + returnRate * 0.8);
-      } else {
-        // Retired: withdraw first, then grow remainder (beginning-of-year withdrawal)
-        bal401k = Math.max(0, (bal401k - withdrawal401k) * (1 + retiredReturn));
-        balRoth = Math.max(0, (balRoth - withdrawalRoth) * (1 + retiredReturn));
-        balTaxable = Math.max(0, (balTaxable - withdrawalTaxable) * (1 + retiredReturn));
-        balHSA = Math.max(0, (balHSA - withdrawalHSA) * (1 + retiredReturn * 0.5));
-        balCash = Math.max(0, (balCash - withdrawalCash) * (1 + cashRate * 0.8));
-        balCrypto = Math.max(0, (balCrypto - withdrawalCrypto) * (1 + retiredReturn));
-        balPension = Math.max(0, (balPension - withdrawalPension) * (1 + retiredReturn * 0.5));
-        balAnnuity = Math.max(0, (balAnnuity - withdrawalAnnuity) * (1 + annuityRate));
-        balRealEstate = balRealEstate * (1 + reRate);
-        bal529 = bal529 * (1 + retiredReturn * 0.6);
-      }
+      // Per-spouse contribution gating. Primary's contribution flows while
+      // primary works; spouse's contribution flows while spouse works. This
+      // correctly handles "primary retires at 60, spouse keeps earning to 65"
+      // — the spouse's contributions continue feeding the pool.
+      const primaryWorking = !inc.isRetired;
+      const spouseWorking = plan.hasSpouse && inc.spouseIsRetired === false;
+      const yearContribAnnual =
+        (primaryWorking ? monthlyContrib : 0) * 12 +
+        (spouseWorking ? (plan.spouseMonthlyContribution || 0) : 0) * 12;
+
+      // Unified balance update: grow the post-withdrawal balance, then add
+      // the year's contribution. Withdrawals are zero in years where the
+      // shortfall gate didn't fire, so this degenerates to the original
+      // "grow + contribute" form for working years.
+      bal401k = Math.max(0, (bal401k - withdrawal401k) * (1 + yearReturn)) + yearContribAnnual * 0.6;
+      balRoth = Math.max(0, (balRoth - withdrawalRoth) * (1 + yearReturn)) + yearContribAnnual * 0.2;
+      balTaxable = Math.max(0, (balTaxable - withdrawalTaxable) * (1 + yearReturn)) + yearContribAnnual * 0.2;
+      balHSA = Math.max(0, (balHSA - withdrawalHSA) * (1 + yearReturn * 0.5));
+      balCash = Math.max(0, (balCash - withdrawalCash) * (1 + cashRate * (fullyRetired ? 0.8 : 1)));
+      balCrypto = Math.max(0, (balCrypto - withdrawalCrypto) * (1 + yearReturn));
+      balPension = Math.max(0, (balPension - withdrawalPension) * (1 + yearReturn * (fullyRetired ? 0.5 : 0.6)));
+      balAnnuity = Math.max(0, (balAnnuity - withdrawalAnnuity) * (1 + annuityRate));
+      balRealEstate = balRealEstate * (1 + reRate);
+      bal529 = bal529 * (1 + yearReturn * (fullyRetired ? 0.6 : 0.8));
       portfolioBalance = bal401k + balRoth + balTaxable + balHSA + balCash + balCrypto + balPension + balAnnuity + balRealEstate + bal529;
       if (portfolioBalance < 0) portfolioBalance = 0;
 
