@@ -4,6 +4,38 @@ import Card from '@/components/ui/Card';
 import { fmt } from '@/lib/format';
 import { computeHealthcare } from '@/lib/healthcare';
 
+/**
+ * When the user accepts the "Build a full plan" CTA, copy their three core
+ * verdict inputs into the main plan in localStorage so the My Plan tab loads
+ * with their numbers instead of the generic defaults. Best-effort — silent
+ * failure on quota errors so the navigation still happens.
+ */
+function promoteVerdictToPlan(input) {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem('myplan-v1');
+    const existing = raw ? JSON.parse(raw) : {};
+    const merged = {
+      ...existing,
+      currentAge: input.currentAge,
+      retireAge: input.retirementAge,
+      filingStatus: input.filingStatus,
+      monthlyContribution: input.monthlyContribution,
+      // Park current savings in 401(k) by default — user can re-allocate
+      // across account types in the My Plan sliders.
+      savings401k: input.currentSavings,
+      incomeSources: [
+        ...(existing.incomeSources?.filter(s => s.type !== 'salary') || []),
+        { id: 1, type: 'salary', label: 'Salary', amount: input.annualIncome, growthRate: 3 },
+      ],
+    };
+    localStorage.setItem('myplan-v1', JSON.stringify(merged));
+    localStorage.setItem('retirement-onboarded', 'true');
+  } catch {
+    // ignore — navigation still proceeds with whatever's in localStorage
+  }
+}
+
 const STATUS_COLORS = {
   'ahead': 'var(--accent)',
   'on-track': 'var(--accent)',
@@ -203,6 +235,7 @@ export default function VerdictResult({ output, input, onRestart }) {
         </button>
         <a
           href="/"
+          onClick={() => input && promoteVerdictToPlan(input)}
           style={{
             padding: '10px 20px', borderRadius: 10, textDecoration: 'none',
             border: 'none', background: 'var(--accent)',
