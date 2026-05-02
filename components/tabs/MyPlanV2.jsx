@@ -281,6 +281,13 @@ function ProjectionChart({ rows, events, retireAge, longevityAge, baseRows, stre
   const yAt = v => padT + (1 - v / maxY) * (H - padT - padB);
 
   const linePath = (arr) => arr.map((r, i) => `${i === 0 ? 'M' : 'L'}${xAt(i).toFixed(1)},${yAt(r.portfolioBalance).toFixed(1)}`).join(' ');
+  // Liquid path — only spendable assets (excludes RE + 529). Drawn alongside
+  // total net worth to make the divergence visible when illiquid wealth keeps
+  // appreciating after liquid is exhausted.
+  const liquidPath = (arr) => arr.map((r, i) => `${i === 0 ? 'M' : 'L'}${xAt(i).toFixed(1)},${yAt(r.liquidBalance ?? r.portfolioBalance).toFixed(1)}`).join(' ');
+  // Only render the liquid line when illiquid holdings make a material gap
+  // somewhere in the projection (otherwise the two lines would overlap).
+  const showLiquid = rows.some(r => (r.portfolioBalance || 0) - (r.liquidBalance || 0) > 25_000);
 
   const showIdx = hoverIdx ?? rows.findIndex(r => r.age === retireAge);
   const cur = rows[Math.max(0, showIdx)] || rows[0];
@@ -299,11 +306,14 @@ function ProjectionChart({ rows, events, retireAge, longevityAge, baseRows, stre
         <div>
           <div style={{ fontSize: 14, fontWeight: 600 }}>Portfolio over time</div>
           <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2 }}>
-            Solid line uses your current assumptions. Dashed line is the −2% return stress.
+            {showLiquid
+              ? 'Total net worth includes real estate / 529 (which can\'t be drawn). The blue dashed line is what you can actually spend.'
+              : 'Solid line uses your current assumptions. Dashed line is the −2% return stress.'}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 14, fontSize: 11.5, color: 'var(--text-muted)', alignItems: 'center' }}>
-          <Legend swatch="var(--accent)" label="Current plan" />
+        <div style={{ display: 'flex', gap: 14, fontSize: 11.5, color: 'var(--text-muted)', alignItems: 'center', flexWrap: 'wrap' }}>
+          <Legend swatch="var(--accent)" label="Total net worth" />
+          {showLiquid && <Legend swatch="#3b82f6" label="Liquid (spendable)" dashed />}
           <Legend swatch="var(--danger)" label="Returns −2%" dashed />
         </div>
       </div>
@@ -353,8 +363,12 @@ function ProjectionChart({ rows, events, retireAge, longevityAge, baseRows, stre
         })}
         {/* Stress (dashed danger) */}
         <path d={linePath(stressRows)} fill="none" stroke="var(--danger)" strokeWidth="1.8" strokeDasharray="5 4" opacity="0.85" />
-        {/* Live (current settings) */}
+        {/* Live (current settings) — total net worth */}
         <path d={linePath(rows)} fill="none" stroke="var(--accent)" strokeWidth="2.4" />
+        {/* Liquid (spendable) — only when illiquid wealth makes the gap visible */}
+        {showLiquid && (
+          <path d={liquidPath(rows)} fill="none" stroke="#3b82f6" strokeWidth="2" strokeDasharray="5 3" />
+        )}
         {/* Hover */}
         {showIdx >= 0 && (
           <g>

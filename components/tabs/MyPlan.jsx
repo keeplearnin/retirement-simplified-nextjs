@@ -217,9 +217,22 @@ function IncomeExpenseChart({ projections, retireAge }) {
   const x = (age) => PAD.left + ((age - minAge) / (maxAge - minAge)) * plotW;
   const y = (val) => PAD.top + plotH - (Math.max(0, val) / maxVal) * plotH;
 
-  // Portfolio balance area (the big one — shows wealth over time)
+  // Portfolio balance area (the big one — shows wealth over time, INCLUDES
+  // illiquid RE + 529).
   const portfolioPoints = projections.map(p => `${x(p.age)},${y(p.portfolioBalance || 0)}`).join(' ');
   const portfolioArea = `M ${x(minAge)},${y(0)} L ${portfolioPoints} L ${x(maxAge)},${y(0)} Z`;
+
+  // Liquid balance line — what's actually spendable (excludes RE + 529).
+  // Surfaces the difference for users with significant illiquid holdings:
+  // total wealth can keep growing (RE appreciates) while liquid is exhausted.
+  // Only show this line when illiquid assets are non-trivial enough to make
+  // the two diverge meaningfully.
+  const hasIlliquidWealth = projections.some(p =>
+    (p.portfolioBalance || 0) - (p.liquidBalance || 0) > 25_000
+  );
+  const liquidPoints = hasIlliquidWealth
+    ? projections.map(p => `${x(p.age)},${y(p.liquidBalance || 0)}`).join(' ')
+    : null;
 
   // Income line (stacked)
   const incomeKeys = ['salary', 'socialSecurity', 'pension', 'rental'];
@@ -263,9 +276,15 @@ function IncomeExpenseChart({ projections, retireAge }) {
             <line key={v} x1={PAD.left} x2={W - PAD.right} y1={y(v)} y2={y(v)} stroke="var(--border)" strokeWidth={0.5} />
           ))}
 
-          {/* Portfolio balance area — the hero curve */}
+          {/* Portfolio balance area — the hero curve (incl. illiquid RE + 529) */}
           <path d={portfolioArea} fill="url(#portfolioGrad)" opacity={0.25} />
           <path d={`M ${portfolioPoints}`} fill="none" stroke="var(--accent)" strokeWidth={2.5} />
+
+          {/* Liquid balance line — only spendable assets. Diverges from total
+              wealth when RE / 529 hold value the user can't actually draw. */}
+          {liquidPoints && (
+            <path d={`M ${liquidPoints}`} fill="none" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5,3" />
+          )}
 
           {/* Stacked income areas (smaller, behind) */}
           {stackedAreas.map(sa => (
@@ -342,8 +361,15 @@ function IncomeExpenseChart({ projections, retireAge }) {
       {/* Legend */}
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, justifyContent: 'center', fontSize: 11 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--accent)', fontWeight: 600 }}>
-          <div style={{ width: 14, height: 3, background: 'var(--accent)', borderRadius: 2 }} /> Portfolio Balance
+          <div style={{ width: 14, height: 3, background: 'var(--accent)', borderRadius: 2 }} /> Total Net Worth (incl. RE)
         </div>
+        {liquidPoints && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#3b82f6', fontWeight: 600 }}>
+            <svg width={14} height={3} style={{ overflow: 'visible' }}>
+              <line x1={0} y1={1.5} x2={14} y2={1.5} stroke="#3b82f6" strokeWidth={2} strokeDasharray="3,2" />
+            </svg> Liquid (spendable)
+          </div>
+        )}
         {incomeKeys.map((key, i) => (
           <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text-muted)' }}>
             <div style={{ width: 10, height: 10, borderRadius: 2, background: incomeColors[i], opacity: 0.5 }} />
