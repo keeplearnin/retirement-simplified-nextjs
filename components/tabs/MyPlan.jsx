@@ -475,22 +475,23 @@ function SummaryTable({ rows }) {
             const balColor = r.portfolioBalance >= prevBal ? 'var(--accent)' : 'var(--warn)';
             const liquid = r.liquidBalance || 0;
 
+            // "Covered" = income (incl. forced RMDs) was enough — user did not need
+            // to dip into savings. "Drawn" = voluntary withdrawal beyond RMD was required.
+            // "Short" = liquid depleted and a gap remains.
+            const voluntaryWithdrawal = Math.max(0, (r.totalWithdrawals || 0) - (r.rmd || 0));
             let statusText, statusColor;
             if (!r.isRetired) {
               statusText = 'Saving';
               statusColor = 'var(--accent)';
-            } else if (r.totalWithdrawals > 0) {
-              statusText = `${fmt(r.totalWithdrawals)} drawn`;
-              statusColor = 'var(--accent)';
-            } else if (r.gap >= 0) {
-              statusText = 'Covered';
-              statusColor = 'var(--accent)';
-            } else if (liquid <= 0) {
+            } else if (liquid <= 0 && r.gap < 0) {
               statusText = `${fmt(Math.abs(r.gap))} short`;
               statusColor = 'var(--danger)';
-            } else {
-              statusText = `${fmt(r.totalWithdrawals || 0)} drawn`;
+            } else if (voluntaryWithdrawal > 0) {
+              statusText = `${fmt(r.totalWithdrawals)} drawn`;
               statusColor = 'var(--warn)';
+            } else {
+              statusText = 'Covered';
+              statusColor = 'var(--accent)';
             }
 
             return (
@@ -558,7 +559,7 @@ function RetirementDetailTable({ rows, retireAge }) {
             </thead>
             <tbody>
               {retireRows.map(r => {
-                const otherDraws = (r.withdrawalCrypto || 0) + (r.withdrawalAnnuity || 0) + (r.withdrawalPension || 0);
+                const otherDraws = (r.withdrawalCrypto || 0) + (r.withdrawalAnnuity || 0) + (r.withdrawalPension || 0) + (r.withdrawalHSA || 0);
                 return (
                   <tr key={r.age} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ ...cellStyle, fontWeight: r.isRetireYear ? 700 : 400, color: r.isRetireYear ? 'var(--accent)' : 'var(--text)' }}>{r.age}</td>
@@ -718,7 +719,7 @@ export default function MyPlan() {
       const shortfall = exp.totalExpense - netAfterTax1; // positive = need to withdraw
 
       // --- Portfolio withdrawal (if shortfall exists) ---
-      let withdrawal401k = 0, withdrawalRoth = 0, withdrawalTaxable = 0;
+      let withdrawal401k = 0, withdrawalRoth = 0, withdrawalTaxable = 0, withdrawalHSA = 0;
       let withdrawalCash = 0, withdrawalCrypto = 0, withdrawalAnnuity = 0, withdrawalPension = 0;
 
       // Liquid balance = everything except illiquid RE and education-only 529
@@ -769,7 +770,14 @@ export default function MyPlan() {
           remaining -= withdrawalPension * (1 - marginalRate);
         }
 
-        // 7. Roth — tax-free (last)
+        // 7. HSA — assumes withdrawals offset qualified medical expenses (tax-free).
+        //    Drawn before Roth: HSAs lose tax-free status for non-spouse heirs.
+        if (remaining > 0 && balHSA > 0) {
+          withdrawalHSA = Math.min(remaining, balHSA);
+          remaining -= withdrawalHSA;
+        }
+
+        // 8. Roth — tax-free (last)
         if (remaining > 0 && balRoth > 0) {
           withdrawalRoth = Math.min(remaining, balRoth);
           remaining -= withdrawalRoth;
@@ -793,7 +801,7 @@ export default function MyPlan() {
         stateCode, age,
       });
 
-      const totalIncome = baseIncome + withdrawal401k + withdrawalRoth + withdrawalTaxable
+      const totalIncome = baseIncome + withdrawal401k + withdrawalRoth + withdrawalTaxable + withdrawalHSA
         + withdrawalCash + withdrawalCrypto + withdrawalAnnuity + withdrawalPension;
       const netAfterTax = totalIncome - taxResult.totalTax;
       const gap = netAfterTax - exp.totalExpense;
@@ -823,7 +831,7 @@ export default function MyPlan() {
         bal401k = Math.max(0, (bal401k - withdrawal401k) * (1 + retiredReturn));
         balRoth = Math.max(0, (balRoth - withdrawalRoth) * (1 + retiredReturn));
         balTaxable = Math.max(0, (balTaxable - withdrawalTaxable) * (1 + retiredReturn));
-        balHSA = Math.max(0, balHSA * (1 + retiredReturn * 0.5));
+        balHSA = Math.max(0, (balHSA - withdrawalHSA) * (1 + retiredReturn * 0.5));
         balCash = Math.max(0, (balCash - withdrawalCash) * (1 + cashRate * 0.8));
         balCrypto = Math.max(0, (balCrypto - withdrawalCrypto) * (1 + retiredReturn));
         balPension = Math.max(0, (balPension - withdrawalPension) * (1 + retiredReturn * 0.5));
@@ -834,7 +842,7 @@ export default function MyPlan() {
       portfolioBalance = bal401k + balRoth + balTaxable + balHSA + balCash + balCrypto + balPension + balAnnuity + balRealEstate + bal529;
       if (portfolioBalance < 0) portfolioBalance = 0;
 
-      const totalWithdrawals = withdrawal401k + withdrawalRoth + withdrawalTaxable
+      const totalWithdrawals = withdrawal401k + withdrawalRoth + withdrawalTaxable + withdrawalHSA
         + withdrawalCash + withdrawalCrypto + withdrawalAnnuity + withdrawalPension;
       const ssAndOther = inc.socialSecurity + inc.pension + inc.rental + inc.annuity;
       const liquidBalanceEnd = bal401k + balRoth + balTaxable + balHSA + balCash + balCrypto + balPension + balAnnuity;
@@ -852,6 +860,7 @@ export default function MyPlan() {
         withdrawal401k,
         withdrawalRoth,
         withdrawalTaxable,
+        withdrawalHSA,
         withdrawalCash,
         withdrawalCrypto,
         withdrawalAnnuity,
@@ -904,7 +913,8 @@ export default function MyPlan() {
       return false;
     }).length;
 
-    const firstGapAge = combined.find(r => r.gap < 0 && r.portfolioBalance <= 0)?.age;
+    // Use liquidBalance — illiquid RE and 529 can't be drawn, matches moneyLastsAge logic.
+    const firstGapAge = combined.find(r => r.gap < 0 && r.liquidBalance <= 0)?.age;
 
     return {
       combined,
