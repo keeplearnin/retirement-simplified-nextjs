@@ -127,54 +127,107 @@ export function generateVerdictText(out: VerdictOutput): string {
 
 function rankActions(input: VerdictInput): ActionItem[] {
   const yearsToRetirement = Math.max(0, input.retirementAge - input.currentAge);
-  const tenYears = Math.min(10, yearsToRetirement);
+  const tenYears = Math.min(10, yearsToRetirement || 1);
+  const yearsAvailable = yearsToRetirement || 1;
+  const estMonthlySSAtFRA = (input.annualIncome * 0.40) / 12;
 
   const actions: ActionItem[] = [];
 
-  // Action: bump 401(k) by 4% of salary
-  const bump = (input.annualIncome * 0.04) / 12;
+  // Lever 1: bump 401(k) by 4% of salary
+  const bumpMonthly = (input.annualIncome * 0.04) / 12;
   actions.push({
     id: '401k-bump-4',
     action: 'Increase 401(k) contribution by 4%',
-    detail: `Adds ${fmtUSD(futureValueStream(bump, tenYears))} to your balance over the next ${tenYears} years.`,
-    dollarImpact: futureValueStream(bump, tenYears),
+    detail: `Adds ${fmtUSD(futureValueStream(bumpMonthly, tenYears))} to your balance over the next ${tenYears} years.`,
+    dollarImpact: futureValueStream(bumpMonthly, tenYears),
     urgency: 'this-year',
   });
 
-  // Action: max age-50+ catch-up (only relevant if age >= 50)
+  // Lever 2: max age-50+ catch-up (only relevant if age >= 50)
   if (input.currentAge >= 50) {
-    const catchUp = 8000 / 12; // 2026 catch-up = $8,000
+    const catchUpMonthly = 8000 / 12; // 2026 catch-up = $8,000
     actions.push({
       id: 'catchup-50plus',
       action: 'Max age-50+ catch-up contributions',
-      detail: `Add $8,000/yr in catch-up. Adds ${fmtUSD(futureValueStream(catchUp, tenYears))} over the next ${tenYears} years.`,
-      dollarImpact: futureValueStream(catchUp, tenYears),
+      detail: `Add $8,000/yr in catch-up. Adds ${fmtUSD(futureValueStream(catchUpMonthly, tenYears))} over the next ${tenYears} years.`,
+      dollarImpact: futureValueStream(catchUpMonthly, tenYears),
       urgency: 'this-year',
     });
   }
 
-  // Action: delay SS from 67 to 70 (24% lifetime benefit increase)
-  // Approximate value: 24% * estimated SS at FRA * ~17 yrs of post-70 collection
-  // Rule of thumb monthly SS at FRA: 40% replacement of pre-retirement income
-  const estMonthlySSAtFRA = (input.annualIncome * 0.40) / 12;
-  const ssDelayValue = estMonthlySSAtFRA * 0.24 * 12 * 17;
+  // Lever 3: SECURE 2.0 super catch-up (ages 60–63, $11,250 in 2026)
+  if (input.currentAge >= 60 && input.currentAge <= 63) {
+    const superCatchMonthly = 11250 / 12;
+    actions.push({
+      id: 'catchup-60to63',
+      action: 'Use SECURE 2.0 super catch-up (60–63)',
+      detail: `Limit jumps to $11,250 for ages 60–63. ${fmtUSD(futureValueStream(superCatchMonthly, Math.min(4, yearsToRetirement || 4)))} extra by retirement.`,
+      dollarImpact: futureValueStream(superCatchMonthly, Math.min(4, yearsToRetirement || 4)),
+      urgency: 'immediate',
+    });
+  }
+
+  // Lever 4: delay SS from 67 to 70 (24% lifetime benefit increase × ~17 yrs).
+  if (input.retirementAge < 70 && input.currentAge < 70) {
+    const ssDelayValue = estMonthlySSAtFRA * 0.24 * 12 * 17;
+    actions.push({
+      id: 'delay-ss-70',
+      action: 'Delay Social Security to age 70',
+      detail: `Increases monthly benefit by 24% permanently — roughly ${fmtUSD(ssDelayValue)} more over a typical retirement.`,
+      dollarImpact: ssDelayValue,
+      urgency: 'this-decade',
+    });
+  }
+
+  // Lever 5: work 2 more years before retiring. Compounds: extra contributions
+  // continue, drawdown is delayed, and SS is bigger if still pre-FRA.
+  if (yearsToRetirement < 30 && input.retirementAge < 75) {
+    const extraContrib = futureValueStream(input.monthlyContribution, 2) * Math.pow(1.07, yearsToRetirement);
+    const ssBoost = input.retirementAge < 67 ? estMonthlySSAtFRA * 0.13 * 12 * 17 : 0;
+    const value = extraContrib + ssBoost;
+    actions.push({
+      id: 'work-2-more',
+      action: `Retire at ${input.retirementAge + 2} instead of ${input.retirementAge}`,
+      detail: `Extra contributions plus a longer time to compound, ${input.retirementAge < 67 ? 'plus larger Social Security, ' : ''}adds about ${fmtUSD(value)}.`,
+      dollarImpact: value,
+      urgency: 'this-decade',
+    });
+  }
+
+  // Lever 6: increase income by $5K/yr (raise, side income). Assume the full
+  // amount is saved.
+  const incomeBumpMonthly = 5000 / 12;
   actions.push({
-    id: 'delay-ss-70',
-    action: 'Delay Social Security to age 70',
-    detail: `Increases monthly benefit by 24% permanently — roughly ${fmtUSD(ssDelayValue)} more over a typical retirement.`,
-    dollarImpact: ssDelayValue,
-    urgency: 'this-decade',
+    id: 'income-bump-5k',
+    action: 'Add $5,000/yr in income (raise or side work)',
+    detail: `Saved at 7%, adds ${fmtUSD(futureValueStream(incomeBumpMonthly, tenYears))} over ${tenYears} years.`,
+    dollarImpact: futureValueStream(incomeBumpMonthly, tenYears),
+    urgency: 'this-year',
   });
 
-  // Action: reduce annual expenses by $5K (compound benefit on portfolio + lower need)
+  // Lever 7: reduce annual expenses by $5K. Frees cash for savings AND lowers
+  // the 25× need at retirement.
   const expenseReduction = 5000;
-  const portfolioBoost = futureValueStream(expenseReduction / 12, tenYears);
+  const expenseValue = futureValueStream(expenseReduction / 12, tenYears) + expenseReduction * 25;
   actions.push({
     id: 'reduce-expenses-5k',
     action: 'Reduce annual expenses by $5,000',
-    detail: `Frees ${fmtUSD(expenseReduction)}/yr for savings. Compounds to ${fmtUSD(portfolioBoost)} over ${tenYears} years.`,
-    dollarImpact: portfolioBoost,
+    detail: `Frees ${fmtUSD(expenseReduction)}/yr to save AND lowers your retirement need by ${fmtUSD(expenseReduction * 25)} (4% rule). Total impact ${fmtUSD(expenseValue)}.`,
+    dollarImpact: expenseValue,
     urgency: 'this-year',
+  });
+
+  // Lever 8: part-time work in retirement ($20K/yr for the first 5 years).
+  // Pushes back drawdowns and lets the portfolio compound longer.
+  const partTimeAnnual = 20000;
+  const partTimeYears = 5;
+  const partTimeValue = partTimeAnnual * partTimeYears + (input.currentSavings * 0.05 * partTimeYears);
+  actions.push({
+    id: 'part-time-retirement',
+    action: 'Plan $20K/yr part-time work for first 5 years of retirement',
+    detail: `Defers drawdowns and lets the portfolio compound. About ${fmtUSD(partTimeValue)} of total benefit.`,
+    dollarImpact: partTimeValue,
+    urgency: 'this-decade',
   });
 
   return actions.sort((a, b) => b.dollarImpact - a.dollarImpact).slice(0, 3);
