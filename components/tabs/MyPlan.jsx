@@ -690,11 +690,18 @@ export default function MyPlan() {
     const returnRate = (plan.expectedReturn || 7) / 100;
     const monthlyContrib = plan.monthlyContribution || 0;
 
-    // Build income plan
-    const salarySource = incomeSources.find(s => s.type === 'salary');
-    const ssSource = incomeSources.find(s => s.type === 'socialSecurity');
-    const pensionSource = incomeSources.find(s => s.type === 'pension');
+    // Build income plan. Each lookup respects the optional `owner` tag —
+    // absence implies primary so legacy single-user plans keep working.
+    const isPrimaryOwner = (s) => (s.owner || 'primary') === 'primary';
+    const salarySource = incomeSources.find(s => s.type === 'salary' && isPrimaryOwner(s));
+    const ssSource = incomeSources.find(s => s.type === 'socialSecurity' && isPrimaryOwner(s));
+    const pensionSource = incomeSources.find(s => s.type === 'pension' && isPrimaryOwner(s));
     const rentalSource = incomeSources.find(s => s.type === 'rental');
+
+    // Spouse income lookups (Phase C). Only consulted when hasSpouse is true.
+    const spouseSalarySource = plan.hasSpouse ? incomeSources.find(s => s.type === 'salary' && s.owner === 'spouse') : undefined;
+    const spouseSsSource = plan.hasSpouse ? incomeSources.find(s => s.type === 'socialSecurity' && s.owner === 'spouse') : undefined;
+    const spousePensionSource = plan.hasSpouse ? incomeSources.find(s => s.type === 'pension' && s.owner === 'spouse') : undefined;
 
     const incomePlan = {
       currentAge,
@@ -704,6 +711,14 @@ export default function MyPlan() {
       socialSecurity: ssSource ? { monthlyBenefitAtFRA: ssSource.monthlyBenefit, startAge: ssSource.startAge, cola: 0.02 } : undefined,
       pension: pensionSource ? { monthlyAmount: pensionSource.monthlyAmount, startAge: pensionSource.startAge, cola: pensionSource.cola ? 0.02 : 0 } : undefined,
       rental: rentalSource ? { monthlyNetIncome: rentalSource.monthlyNet, annualAppreciation: rentalSource.appreciation / 100 } : undefined,
+      spouse: plan.hasSpouse ? {
+        currentAge: plan.spouseCurrentAge ?? currentAge,
+        retireAge: plan.spouseRetireAge ?? retireAge,
+        longevityAge: plan.spouseLongevityAge ?? longevityAge,
+        salary: spouseSalarySource ? { annualAmount: spouseSalarySource.amount, growthRate: spouseSalarySource.growthRate / 100 } : undefined,
+        socialSecurity: spouseSsSource ? { monthlyBenefitAtFRA: spouseSsSource.monthlyBenefit, startAge: spouseSsSource.startAge, cola: 0.02 } : undefined,
+        pension: spousePensionSource ? { monthlyAmount: spousePensionSource.monthlyAmount, startAge: spousePensionSource.startAge, cola: spousePensionSource.cola ? 0.02 : 0 } : undefined,
+      } : undefined,
     };
 
     const incomeProjections = projectIncome(incomePlan);
@@ -767,17 +782,25 @@ export default function MyPlan() {
     const retireEssentialTotal = Math.round(essentialTotal * retireScale);
     const retireDiscretionaryTotal = Math.round(discretionaryTotal * retireScale);
 
-    // Track account types separately for tax-aware withdrawals
-    let bal401k = plan.savings401k || 0;
-    let balRoth = plan.savingsRoth || 0;
+    // Per-person tax-advantaged buckets are summed to a single household pool
+    // for projection purposes. Phase D will likely separate them again so each
+    // spouse's RMD divisor and withdrawal sequence can be tracked individually,
+    // but for now the household-level math is a meaningful improvement over
+    // primary-only.
+    const spouseFactor = plan.hasSpouse ? 1 : 0;
+    let bal401k = (plan.savings401k || 0) + spouseFactor * (plan.spouseSavings401k || 0);
+    let balRoth = (plan.savingsRoth || 0) + spouseFactor * (plan.spouseSavingsRoth || 0);
+    let balHSA = (plan.savingsHSA || 0) + spouseFactor * (plan.spouseSavingsHSA || 0);
+    let balPension = (plan.savingsPension || 0) + spouseFactor * (plan.spouseSavingsPension || 0);
+    // Joint household accounts — already at household level.
     let balTaxable = plan.savingsTaxable || 0;
-    let balHSA = plan.savingsHSA || 0;
     let balCash = plan.savingsCash || 0;
     let balCrypto = plan.savingsCrypto || 0;
-    let balPension = plan.savingsPension || 0;
     let balAnnuity = plan.savingsAnnuity || 0;
     let balRealEstate = plan.savingsRealEstate || 0;
     let bal529 = plan.savings529 || 0;
+    // Combined monthly contribution while either spouse is still working.
+    const householdMonthlyContrib = monthlyContrib + spouseFactor * (plan.spouseMonthlyContribution || 0);
     let portfolioBalance = bal401k + balRoth + balTaxable + balHSA + balCash + balCrypto + balPension + balAnnuity + balRealEstate + bal529;
     const startingBalance = portfolioBalance;
     const RMD_START = 73;
@@ -903,9 +926,10 @@ export default function MyPlan() {
 
       if (!inc.isRetired) {
         // Working: grow all accounts + add contributions (split: 60% 401k, 20% Roth, 20% taxable)
-        bal401k = bal401k * (1 + returnRate) + monthlyContrib * 12 * 0.6;
-        balRoth = balRoth * (1 + returnRate) + monthlyContrib * 12 * 0.2;
-        balTaxable = balTaxable * (1 + returnRate) + monthlyContrib * 12 * 0.2;
+        // Household contribution = primary + spouse when hasSpouse=true.
+        bal401k = bal401k * (1 + returnRate) + householdMonthlyContrib * 12 * 0.6;
+        balRoth = balRoth * (1 + returnRate) + householdMonthlyContrib * 12 * 0.2;
+        balTaxable = balTaxable * (1 + returnRate) + householdMonthlyContrib * 12 * 0.2;
         balHSA = balHSA * (1 + returnRate * 0.5);
         balCash = balCash * (1 + cashRate);
         balCrypto = balCrypto * (1 + returnRate);

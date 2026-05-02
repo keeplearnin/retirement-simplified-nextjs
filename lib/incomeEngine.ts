@@ -89,6 +89,26 @@ export interface OtherIncome {
 // Retirement plan & projection interfaces
 // ---------------------------------------------------------------------------
 
+/**
+ * Optional second household member. When present, the engine projects each
+ * member's salary / SS / pension keyed off their own age and retirement age,
+ * sums them into the existing aggregate fields, and exposes per-member
+ * breakdowns for downstream consumers that want to render couples-aware UI.
+ *
+ * Joint accounts (taxable, RE, cash, RMDs from joint inherited accounts) stay
+ * at the top level — couples mode only splits per-person income streams.
+ */
+export interface SpouseMember {
+  currentAge: number;
+  retireAge: number;
+  /** Defaults to primary's longevityAge when omitted. Survivor analysis
+   *  (one outliving the other) is Phase F territory. */
+  longevityAge?: number;
+  salary?: SalaryIncome;
+  socialSecurity?: SocialSecurityIncome;
+  pension?: PensionIncome;
+}
+
 export interface RetirementPlan {
   currentAge: number;
   retireAge: number;
@@ -103,13 +123,18 @@ export interface RetirementPlan {
   rmd?: RMDSource;
   partTime?: PartTimeIncome;
   otherIncome?: OtherIncome[];
+
+  spouse?: SpouseMember;
 }
 
 export interface YearlyProjection {
   age: number;
   year: number;
+  /** Aggregate salary across both household members. */
   salary: number;
+  /** Aggregate SS income across both household members. */
   socialSecurity: number;
+  /** Aggregate pension income across both household members. */
   pension: number;
   rental: number;
   annuity: number;
@@ -117,7 +142,19 @@ export interface YearlyProjection {
   partTime: number;
   otherIncome: number;
   totalIncome: number;
+  /** Primary member's retirement status (legacy semantics — many consumers
+   *  use this as the gate for withdrawal logic). */
   isRetired: boolean;
+
+  // ── Couples-mode breakdown (only present when spouse is configured) ──
+  spouseAge?: number;
+  spouseSalary?: number;
+  spouseSocialSecurity?: number;
+  spousePension?: number;
+  spouseIsRetired?: boolean;
+  /** True only when BOTH members have stopped working. Useful for gates that
+   *  should fire only after the household stops earning wages. */
+  isHouseholdRetired?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -169,6 +206,7 @@ export function projectIncome(plan: RetirementPlan): YearlyProjection[] {
     rmd,
     partTime,
     otherIncome,
+    spouse,
   } = plan;
 
   const currentYear = new Date().getFullYear();
@@ -178,18 +216,30 @@ export function projectIncome(plan: RetirementPlan): YearlyProjection[] {
   let taxDeferredBalance = rmd?.taxDeferredBalance ?? 0;
   const rmdGrowthRate = rmd?.growthRate ?? 0.06;
 
+  // The age gap stays constant across the projection — spouse's age in any
+  // given year of the loop is just (yearsFromStart + spouse.currentAge).
+  const spouseAgeOffset = spouse ? spouse.currentAge - currentAge : 0;
+
   for (let age = currentAge; age <= longevityAge; age++) {
     const year = currentYear + (age - currentAge);
     const isRetired = age >= retireAge;
     const yearsFromStart = age - currentAge;
+    const spouseAge = spouse ? age + spouseAgeOffset : null;
+    const spouseIsRetired = spouse && spouseAge !== null ? spouseAge >= spouse.retireAge : false;
+    const isHouseholdRetired = isRetired && (!spouse || spouseIsRetired);
 
-    // ------ Salary ------
+    // ------ Salary (primary) ------
     let salaryAmt = 0;
     if (salary && age < (salary.endAge ?? retireAge)) {
       salaryAmt = salary.annualAmount * Math.pow(1 + salary.growthRate, yearsFromStart);
     }
+    // ------ Salary (spouse) — keyed off spouse's age and retire age ------
+    let spouseSalaryAmt = 0;
+    if (spouse?.salary && spouseAge !== null && spouseAge < (spouse.salary.endAge ?? spouse.retireAge)) {
+      spouseSalaryAmt = spouse.salary.annualAmount * Math.pow(1 + spouse.salary.growthRate, yearsFromStart);
+    }
 
-    // ------ Social Security ------
+    // ------ Social Security (primary) ------
     let ssAmt = 0;
     if (socialSecurity && age >= socialSecurity.startAge) {
       const cola = socialSecurity.cola ?? 0.02;
@@ -198,13 +248,29 @@ export function projectIncome(plan: RetirementPlan): YearlyProjection[] {
       const yearsSinceStart = age - socialSecurity.startAge;
       ssAmt = adjustedMonthly * 12 * Math.pow(1 + cola, yearsSinceStart);
     }
+    // ------ Social Security (spouse) — keyed off spouse's claim age ------
+    let spouseSsAmt = 0;
+    if (spouse?.socialSecurity && spouseAge !== null && spouseAge >= spouse.socialSecurity.startAge) {
+      const cola = spouse.socialSecurity.cola ?? 0.02;
+      const factor = ssClaimingFactor(spouse.socialSecurity.startAge, SS_FRA);
+      const adjustedMonthly = spouse.socialSecurity.monthlyBenefitAtFRA * factor;
+      const yearsSinceStart = spouseAge - spouse.socialSecurity.startAge;
+      spouseSsAmt = adjustedMonthly * 12 * Math.pow(1 + cola, yearsSinceStart);
+    }
 
-    // ------ Pension ------
+    // ------ Pension (primary) ------
     let pensionAmt = 0;
     if (pension && age >= pension.startAge) {
       const cola = pension.cola ?? 0;
       const yearsSinceStart = age - pension.startAge;
       pensionAmt = pension.monthlyAmount * 12 * Math.pow(1 + cola, yearsSinceStart);
+    }
+    // ------ Pension (spouse) — keyed off spouse's pension start age ------
+    let spousePensionAmt = 0;
+    if (spouse?.pension && spouseAge !== null && spouseAge >= spouse.pension.startAge) {
+      const cola = spouse.pension.cola ?? 0;
+      const yearsSinceStart = spouseAge - spouse.pension.startAge;
+      spousePensionAmt = spouse.pension.monthlyAmount * 12 * Math.pow(1 + cola, yearsSinceStart);
     }
 
     // ------ Rental Income ------
@@ -263,15 +329,21 @@ export function projectIncome(plan: RetirementPlan): YearlyProjection[] {
     }
 
     // ------ Totals ------
+    // Aggregate fields are household totals (primary + spouse) so existing
+    // consumers reading `salary`, `socialSecurity`, `pension` see the full
+    // household-level number without changes.
+    const aggregateSalary = salaryAmt + spouseSalaryAmt;
+    const aggregateSs = ssAmt + spouseSsAmt;
+    const aggregatePension = pensionAmt + spousePensionAmt;
     const totalIncome =
-      salaryAmt + ssAmt + pensionAmt + rentalAmt + annuityAmt + rmdAmt + partTimeAmt + otherAmt;
+      aggregateSalary + aggregateSs + aggregatePension + rentalAmt + annuityAmt + rmdAmt + partTimeAmt + otherAmt;
 
-    projections.push({
+    const row: YearlyProjection = {
       age,
       year,
-      salary: round2(salaryAmt),
-      socialSecurity: round2(ssAmt),
-      pension: round2(pensionAmt),
+      salary: round2(aggregateSalary),
+      socialSecurity: round2(aggregateSs),
+      pension: round2(aggregatePension),
       rental: round2(rentalAmt),
       annuity: round2(annuityAmt),
       rmd: round2(rmdAmt),
@@ -279,7 +351,16 @@ export function projectIncome(plan: RetirementPlan): YearlyProjection[] {
       otherIncome: round2(otherAmt),
       totalIncome: round2(totalIncome),
       isRetired,
-    });
+    };
+    if (spouse) {
+      row.spouseAge = spouseAge ?? undefined;
+      row.spouseSalary = round2(spouseSalaryAmt);
+      row.spouseSocialSecurity = round2(spouseSsAmt);
+      row.spousePension = round2(spousePensionAmt);
+      row.spouseIsRetired = spouseIsRetired;
+      row.isHouseholdRetired = isHouseholdRetired;
+    }
+    projections.push(row);
   }
 
   return projections;
