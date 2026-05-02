@@ -10,6 +10,7 @@ import { fmt } from '@/lib/format';
 import ValidationWarning from '@/components/ui/ValidationWarning';
 import { GRID_FRACS } from '@/lib/constants';
 import { usePlan, getTotalSavings } from '@/components/PlanProvider';
+import { interpretMonteCarloResult } from '@/lib/monteCarloInterpret';
 
 // ── Portfolio-aware return/volatility profiles ──────────────────────────
 // Based on historical data: Ibbotson SBBI, Vanguard research, DFA returns matrix
@@ -273,6 +274,41 @@ export default function MonteCarlo() {
             </Card>
           ) : (
             <div>
+              {/* Plain-language interpretation banner */}
+              {(() => {
+                const interp = interpretMonteCarloResult({
+                  successRate: simData.successRate,
+                  p50: simData.percentiles.p50,
+                  p10: simData.percentiles.p10,
+                  totalYears: simData.totalYears,
+                  yearsToRetire: simData.years,
+                  startAge: age,
+                  endAge: endAge,
+                });
+                const toneColor = interp.tone === 'good' ? 'var(--accent)' : interp.tone === 'caution' ? 'var(--warn)' : 'var(--danger)';
+                const toneBg = interp.tone === 'good'
+                  ? 'rgba(52,211,153,0.08)'
+                  : interp.tone === 'caution'
+                  ? 'rgba(251,191,36,0.08)'
+                  : 'rgba(239,68,68,0.08)';
+                return (
+                  <div style={{
+                    background: toneBg,
+                    border: `1px solid ${toneColor}`,
+                    borderRadius: 12,
+                    padding: '14px 18px',
+                    marginBottom: 14,
+                  }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: toneColor, marginBottom: 6, fontFamily: 'var(--serif)' }}>
+                      {interp.headline}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                      {interp.detail}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Stats */}
               <div className="stats-row" style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
                 <Stat icon="🎯" label="Success Rate" value={`${(simData.successRate * 100).toFixed(1)}%`}
