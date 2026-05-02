@@ -15,6 +15,16 @@ export interface VerdictInput {
   currentSavings: number;
   monthlyContribution: number;
   filingStatus: 'single' | 'mfj';
+
+  /** Optional second household member. When present:
+   *   - annualIncome / currentSavings / monthlyContribution become household totals
+   *   - benchmark scales off household income (Fidelity's multiple-of-salary rule
+   *     works the same way for couples — joint income, joint benchmark)
+   *   - longevity uses the longer of the two ages, since the projection should
+   *     hold up until the surviving spouse's longevity */
+  hasSpouse?: boolean;
+  spouseCurrentAge?: number;
+  spouseRetirementAge?: number;
 }
 
 export type GapStatus = 'ahead' | 'on-track' | 'behind' | 'significantly-behind';
@@ -36,6 +46,10 @@ export interface VerdictOutput {
   shortfallAtRetirement: number; // estimatedNeed - projectedBalance. Positive = short.
   verdictText: string;
   topActions: ActionItem[];
+  /** True when the input was for a household; downstream UI uses this to
+   *  pluralize copy ("you're / you both are…") and to scale healthcare for
+   *  household size = 2. */
+  hasSpouse: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -238,8 +252,24 @@ function rankActions(input: VerdictInput): ActionItem[] {
 // ---------------------------------------------------------------------------
 
 export function computeVerdict(input: VerdictInput): VerdictOutput {
-  const yearsToRetirement = Math.max(0, input.retirementAge - input.currentAge);
-  const benchmarkSavings = Math.round(input.annualIncome * getBenchmarkMultiple(input.currentAge));
+  // For couples, we anchor years-to-retirement on whoever retires LATER —
+  // that's when the household actually transitions to drawdown. Same logic
+  // for the projection: contributions and growth continue until the later
+  // retirement age.
+  const householdRetireAge = input.hasSpouse && input.spouseRetirementAge
+    ? Math.max(input.retirementAge, input.spouseRetirementAge)
+    : input.retirementAge;
+  const householdCurrentAge = input.hasSpouse && input.spouseCurrentAge
+    ? Math.min(input.currentAge, input.spouseCurrentAge) // earlier-aged spouse is the longer time horizon
+    : input.currentAge;
+  const yearsToRetirement = Math.max(0, householdRetireAge - householdCurrentAge);
+
+  // Benchmark uses the older spouse's age (more conservative — sets a higher
+  // bar for "where you should be"). For singles this is just currentAge.
+  const benchmarkAnchorAge = input.hasSpouse && input.spouseCurrentAge
+    ? Math.max(input.currentAge, input.spouseCurrentAge)
+    : input.currentAge;
+  const benchmarkSavings = Math.round(input.annualIncome * getBenchmarkMultiple(benchmarkAnchorAge));
   const savingsGap = benchmarkSavings - input.currentSavings;
   const gapStatus = getGapStatus(input.currentSavings, benchmarkSavings);
 
@@ -262,6 +292,7 @@ export function computeVerdict(input: VerdictInput): VerdictOutput {
     shortfallAtRetirement,
     verdictText: '',
     topActions,
+    hasSpouse: !!input.hasSpouse,
   };
   out.verdictText = generateVerdictText(out);
   return out;

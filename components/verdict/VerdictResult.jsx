@@ -56,12 +56,19 @@ export default function VerdictResult({ output, input, onRestart }) {
   const isAhead = output.gapStatus === 'ahead';
   const gapAmount = Math.abs(output.savingsGap);
 
+  // Healthcare estimate. For couples: use the EARLIER retirement age — the
+  // bridge to Medicare starts when the first spouse retires (they need ACA
+  // coverage even if the other still has employer plan). Household size = 2
+  // when hasSpouse so subsidy thresholds use the couple's FPL.
+  const healthcareRetireAge = input?.hasSpouse && input.spouseRetirementAge
+    ? Math.min(input.retirementAge, input.spouseRetirementAge)
+    : input?.retirementAge;
   const healthcare = input ? computeHealthcare({
     currentAge: input.currentAge,
-    retirementAge: input.retirementAge,
+    retirementAge: healthcareRetireAge,
     longevityAge: 90,
     annualIncome: input.annualIncome,
-    householdSize: input.filingStatus === 'mfj' ? 2 : 1,
+    householdSize: input.hasSpouse ? 2 : 1,
     filingStatus: input.filingStatus,
   }) : null;
 

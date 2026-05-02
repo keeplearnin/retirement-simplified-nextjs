@@ -676,7 +676,7 @@ function RmdProjectionTable({ rows }) {
 // ---------------------------------------------------------------------------
 
 export default function MyPlan() {
-  const { plan, updatePlan, updateIncome, removeIncome, addIncome, addDebt, updateDebt, removeDebt } = usePlan();
+  const { plan, updatePlan, updateIncome, removeIncome, addIncome, addDebt, updateDebt, removeDebt, bulkUpdate } = usePlan();
 
   // Dismissed suggestions (read from localStorage after mount to avoid hydration mismatch)
   const [dismissedSuggestions, setDismissedSuggestions] = useState([]);
@@ -1090,13 +1090,51 @@ export default function MyPlan() {
     <div className="slide-in myplan-layout">
       {/* ============ INPUTS SIDEBAR ============ */}
       <div className="myplan-inputs">
-        <Collapsible title="Personal Info" defaultOpen={true} badge={`Age ${plan.currentAge}, retire ${plan.retireAge}`}>
+        <Collapsible title="Personal Info" defaultOpen={true} badge={plan.hasSpouse ? `Couple, ages ${plan.currentAge}/${plan.spouseCurrentAge}` : `Age ${plan.currentAge}, retire ${plan.retireAge}`}>
+          {/* Household-type toggle — lets a single user enable couples mode after onboarding */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>Household</span>
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {[{ id: false, label: 'Just me' }, { id: true, label: 'Me + spouse' }].map(opt => (
+                <button key={String(opt.id)} onClick={() => {
+                  // Auto-set filing status when toggling: couples default MFJ; singles default single.
+                  // User can override via the filing-status pills below.
+                  bulkUpdate({
+                    hasSpouse: opt.id,
+                    filingStatus: opt.id ? 'mfj' : 'single',
+                  });
+                }} style={{
+                  flex: 1, padding: '8px 14px', borderRadius: 8, cursor: 'pointer',
+                  border: plan.hasSpouse === opt.id ? '1.5px solid var(--accent)' : '1px solid var(--border)',
+                  background: plan.hasSpouse === opt.id ? 'var(--accent-dim)' : 'transparent',
+                  color: plan.hasSpouse === opt.id ? 'var(--accent)' : 'var(--text-muted)',
+                  fontWeight: plan.hasSpouse === opt.id ? 600 : 400, fontSize: 12, fontFamily: 'var(--sans)',
+                  transition: 'all .2s',
+                }}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {plan.hasSpouse && (
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, fontWeight: 600 }}>You</div>
+          )}
           <div>
             <Slider label="Current Age" value={plan.currentAge} onChange={v => updatePlan('currentAge', v)} min={20} max={80} />
             <Slider label="Retirement Age" value={plan.retireAge} onChange={v => updatePlan('retireAge', v)} min={Math.max(plan.currentAge + 1, 50)} max={80} />
             <Slider label="Plan Through Age" value={plan.longevityAge} onChange={v => updatePlan('longevityAge', v)} min={Math.max(plan.retireAge + 5, 80)} max={105} />
           </div>
-          <div>
+          {plan.hasSpouse && (
+            <div style={{ borderTop: '1px solid var(--border)', marginTop: 14, paddingTop: 14 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, fontWeight: 600 }}>Your spouse</div>
+              <Slider label="Spouse Current Age" value={plan.spouseCurrentAge || 40} onChange={v => updatePlan('spouseCurrentAge', v)} min={20} max={80} />
+              <Slider label="Spouse Retirement Age" value={plan.spouseRetireAge || 65} onChange={v => updatePlan('spouseRetireAge', v)} min={Math.max((plan.spouseCurrentAge || 40) + 1, 50)} max={80} />
+              <Slider label="Spouse Plan Through Age" value={plan.spouseLongevityAge || 95} onChange={v => updatePlan('spouseLongevityAge', v)} min={Math.max((plan.spouseRetireAge || 65) + 5, 80)} max={105} />
+            </div>
+          )}
+          <div style={{ borderTop: plan.hasSpouse ? '1px solid var(--border)' : 'none', marginTop: plan.hasSpouse ? 14 : 0, paddingTop: plan.hasSpouse ? 14 : 0 }}>
             <div style={{ marginBottom: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                 <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>Filing Status</span>
@@ -1136,12 +1174,22 @@ export default function MyPlan() {
         </Collapsible>
 
         <Collapsible title="Savings & Portfolio" defaultOpen={true} badge={fmt(results.startingBalance)}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, fontWeight: 600 }}>Retirement Accounts</div>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, fontWeight: 600 }}>{plan.hasSpouse ? 'Your retirement accounts' : 'Retirement Accounts'}</div>
           <Slider label="401(k) / 403(b)" value={plan.savings401k} onChange={v => updatePlan('savings401k', v)} min={0} max={3000000} step={5000} format={fmt} />
           <Slider label="Roth IRA" value={plan.savingsRoth} onChange={v => updatePlan('savingsRoth', v)} min={0} max={1000000} step={5000} format={fmt} />
           <Slider label="Pension Pot" value={plan.savingsPension || 0} onChange={v => updatePlan('savingsPension', v)} min={0} max={2000000} step={5000} format={fmt} />
           <Slider label="Annuity Value" value={plan.savingsAnnuity || 0} onChange={v => updatePlan('savingsAnnuity', v)} min={0} max={1000000} step={5000} format={fmt} />
           <Slider label="HSA" value={plan.savingsHSA} onChange={v => updatePlan('savingsHSA', v)} min={0} max={200000} step={1000} format={fmt} />
+
+          {plan.hasSpouse && (
+            <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, fontWeight: 600 }}>Spouse retirement accounts</div>
+              <Slider label="Spouse 401(k) / 403(b)" value={plan.spouseSavings401k || 0} onChange={v => updatePlan('spouseSavings401k', v)} min={0} max={3000000} step={5000} format={fmt} />
+              <Slider label="Spouse Roth IRA" value={plan.spouseSavingsRoth || 0} onChange={v => updatePlan('spouseSavingsRoth', v)} min={0} max={1000000} step={5000} format={fmt} />
+              <Slider label="Spouse Pension Pot" value={plan.spouseSavingsPension || 0} onChange={v => updatePlan('spouseSavingsPension', v)} min={0} max={2000000} step={5000} format={fmt} />
+              <Slider label="Spouse HSA" value={plan.spouseSavingsHSA || 0} onChange={v => updatePlan('spouseSavingsHSA', v)} min={0} max={200000} step={1000} format={fmt} />
+            </div>
+          )}
 
           <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
             <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, fontWeight: 600 }}>Other Assets</div>
@@ -1160,7 +1208,10 @@ export default function MyPlan() {
 
           <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
             <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, fontWeight: 600 }}>Contributions & Growth</div>
-            <Slider label="Monthly Investment" value={plan.monthlyContribution} onChange={v => updatePlan('monthlyContribution', v)} min={0} max={10000} step={100} format={fmt} />
+            <Slider label={plan.hasSpouse ? 'Your Monthly Investment' : 'Monthly Investment'} value={plan.monthlyContribution} onChange={v => updatePlan('monthlyContribution', v)} min={0} max={10000} step={100} format={fmt} />
+            {plan.hasSpouse && (
+              <Slider label="Spouse Monthly Investment" value={plan.spouseMonthlyContribution || 0} onChange={v => updatePlan('spouseMonthlyContribution', v)} min={0} max={10000} step={100} format={fmt} />
+            )}
             <Slider label="Expected Return" value={plan.expectedReturn} onChange={v => updatePlan('expectedReturn', v)} min={3} max={12} step={0.5} suffix="%" />
             <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -16, marginBottom: 8 }}>
               Retirement return: {((plan.expectedReturn || 7) * 0.6).toFixed(1)}% (60% of working)

@@ -19,13 +19,21 @@ function readSaved() {
 
 export default function VerdictInputForm({ onSubmit }) {
   const saved = readSaved();
+  const [hasSpouse, setHasSpouse] = useState(saved?.hasSpouse ?? false);
   const [currentAge, setCurrentAge] = useState(saved?.currentAge ?? 40);
   const [retirementAge, setRetirementAge] = useState(saved?.retirementAge ?? 65);
   const [annualIncome, setAnnualIncome] = useState(saved?.annualIncome ?? 100000);
   const [currentSavings, setCurrentSavings] = useState(saved?.currentSavings ?? 150000);
   const [monthlyContribution, setMonthlyContribution] = useState(saved?.monthlyContribution ?? 1500);
   const [filingStatus, setFilingStatus] = useState(saved?.filingStatus ?? 'single');
+  const [spouseCurrentAge, setSpouseCurrentAge] = useState(saved?.spouseCurrentAge ?? 40);
+  const [spouseRetirementAge, setSpouseRetirementAge] = useState(saved?.spouseRetirementAge ?? 65);
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  function setHousehold(isCouple) {
+    setHasSpouse(isCouple);
+    setFilingStatus(isCouple ? 'mfj' : 'single');
+  }
 
   function submit() {
     const input = {
@@ -35,6 +43,11 @@ export default function VerdictInputForm({ onSubmit }) {
       currentSavings,
       monthlyContribution,
       filingStatus,
+      hasSpouse,
+      ...(hasSpouse && {
+        spouseCurrentAge,
+        spouseRetirementAge,
+      }),
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(input));
@@ -56,9 +69,29 @@ export default function VerdictInputForm({ onSubmit }) {
       </div>
 
       <Card>
-        <Slider label="Current Age" value={currentAge} onChange={setCurrentAge} min={25} max={70} />
-        <Slider label="Annual Income (gross)" value={annualIncome} onChange={setAnnualIncome} min={20000} max={500000} step={5000} format={fmt} />
-        <Slider label="Current Retirement Savings" value={currentSavings} onChange={setCurrentSavings} min={0} max={5000000} step={5000} format={fmt} />
+        {/* Household toggle */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ marginBottom: 8, fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>
+            Are you planning…
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setHousehold(false)} style={pill(!hasSpouse)}>Just me</button>
+            <button onClick={() => setHousehold(true)} style={pill(hasSpouse)}>With my partner</button>
+          </div>
+        </div>
+
+        <Slider label={hasSpouse ? 'Your Current Age' : 'Current Age'} value={currentAge} onChange={setCurrentAge} min={25} max={70} />
+        {hasSpouse && (
+          <Slider label="Spouse Current Age" value={spouseCurrentAge} onChange={setSpouseCurrentAge} min={25} max={70} />
+        )}
+        <Slider
+          label={hasSpouse ? 'Household Annual Income (gross)' : 'Annual Income (gross)'}
+          value={annualIncome} onChange={setAnnualIncome} min={20000} max={1000000} step={5000} format={fmt}
+        />
+        <Slider
+          label={hasSpouse ? 'Total Household Retirement Savings' : 'Current Retirement Savings'}
+          value={currentSavings} onChange={setCurrentSavings} min={0} max={5000000} step={5000} format={fmt}
+        />
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
           style={{
@@ -71,25 +104,25 @@ export default function VerdictInputForm({ onSubmit }) {
         </button>
         {showAdvanced && (
           <div style={{ marginTop: 4 }}>
-            <Slider label="Retirement Age" value={retirementAge} onChange={setRetirementAge} min={Math.max(currentAge + 1, 50)} max={75} />
-            <Slider label="Monthly Contribution" value={monthlyContribution} onChange={setMonthlyContribution} min={0} max={5000} step={50} format={fmt} />
-            <div style={{ marginTop: 12, marginBottom: 8, fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--sans)' }}>
-              Filing Status
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={() => setFilingStatus('single')}
-                style={pill(filingStatus === 'single')}
-              >
-                Single
-              </button>
-              <button
-                onClick={() => setFilingStatus('mfj')}
-                style={pill(filingStatus === 'mfj')}
-              >
-                Married Filing Jointly
-              </button>
-            </div>
+            <Slider label={hasSpouse ? 'Your Retirement Age' : 'Retirement Age'} value={retirementAge} onChange={setRetirementAge} min={Math.max(currentAge + 1, 50)} max={75} />
+            {hasSpouse && (
+              <Slider label="Spouse Retirement Age" value={spouseRetirementAge} onChange={setSpouseRetirementAge} min={Math.max(spouseCurrentAge + 1, 50)} max={75} />
+            )}
+            <Slider
+              label={hasSpouse ? 'Combined Monthly Contribution' : 'Monthly Contribution'}
+              value={monthlyContribution} onChange={setMonthlyContribution} min={0} max={10000} step={50} format={fmt}
+            />
+            {!hasSpouse && (
+              <>
+                <div style={{ marginTop: 12, marginBottom: 8, fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--sans)' }}>
+                  Filing Status
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => setFilingStatus('single')} style={pill(filingStatus === 'single')}>Single</button>
+                  <button onClick={() => setFilingStatus('mfj')} style={pill(filingStatus === 'mfj')}>Married Filing Jointly</button>
+                </div>
+              </>
+            )}
           </div>
         )}
       </Card>
