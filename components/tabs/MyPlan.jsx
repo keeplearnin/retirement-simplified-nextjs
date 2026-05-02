@@ -9,7 +9,7 @@ import { fmt, fmtFull } from '@/lib/format';
 import { usePlan, INCOME_TEMPLATES, DEBT_TEMPLATES } from '@/components/PlanProvider';
 import { projectIncome } from '@/lib/incomeEngine';
 import { projectExpenses, createDefaultExpensePlan } from '@/lib/expenseEngine';
-import { computeTax, computeSSTaxable } from '@/lib/taxEngine';
+import { computeTax, computeSSTaxable, detectIrmaaCliff } from '@/lib/taxEngine';
 import { RMD_TABLE } from '@/lib/constants';
 
 // ---------------------------------------------------------------------------
@@ -889,6 +889,7 @@ export default function MyPlan() {
         totalTax: taxResult.totalTax,
         effectiveRate: taxResult.effectiveRate,
         irmaa: taxResult.irmaa,
+        magi: taxResult.magi,
         ssTaxablePercent: taxResult.ssTaxablePercent,
         netAfterTax: Math.round(netAfterTax),
         gap: Math.round(gap),
@@ -1462,6 +1463,31 @@ export default function MyPlan() {
             Consider Roth conversions or income timing strategies to reduce MAGI.
           </InfoBox>
         )}
+
+        {/* IRMAA Cliff Detector — flag years within $5K of crossing a threshold */}
+        {(() => {
+          const cliffYears = combined
+            .filter(r => r.isRetired && r.age >= 63 && r.magi != null)
+            .map(r => ({ age: r.age, magi: r.magi, cliff: detectIrmaaCliff(r.magi, plan.filingStatus === 'mfj' ? 'mfj' : 'single') }))
+            .filter(x => x.cliff.atRisk);
+          if (cliffYears.length === 0) return null;
+          const first = cliffYears[0];
+          const nextSurchargePerBeneficiary = (() => {
+            // Cost of crossing into the next tier (annual, per beneficiary)
+            const currentAnnual = first.cliff.annualSurcharge;
+            // Synthesize a magi just past the threshold to read the next tier
+            const justOver = first.cliff.nextThreshold + 1;
+            const next = detectIrmaaCliff(justOver, plan.filingStatus === 'mfj' ? 'mfj' : 'single');
+            return Math.max(0, next.annualSurcharge - currentAnnual);
+          })();
+          return (
+            <InfoBox icon="&#127919;" title="IRMAA cliff ahead" color="var(--warn)" bgColor="rgba(251,191,36,.08)">
+              At age {first.age}, your projected MAGI lands within {fmt(first.cliff.distanceToNextCliff)} of the next IRMAA threshold ({fmt(first.cliff.nextThreshold)}).
+              A small Roth conversion, RMD increase, or capital gain could push you over — costing roughly {fmt(nextSurchargePerBeneficiary)}/yr per Medicare beneficiary in extra Part B premiums.
+              {plan.filingStatus === 'mfj' ? ' Married couples on Medicare pay the surcharge twice.' : ''}
+            </InfoBox>
+          );
+        })()}
 
         {/* SS Taxability */}
         {combined.some(r => r.ssTaxablePercent > 0) && (

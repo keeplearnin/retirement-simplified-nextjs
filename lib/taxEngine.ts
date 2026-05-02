@@ -30,6 +30,7 @@ export interface TaxResult {
   capitalGainsTax: number;
   niit: number;
   irmaa: number;                // monthly Part B surcharge
+  magi: number;                 // approximated AGI used for IRMAA / NIIT
   totalTax: number;
   effectiveRate: number;
   marginalRate: number;
@@ -37,6 +38,47 @@ export interface TaxResult {
   standardDeduction: number;
   itemizedDeduction: number;
   deductionUsed: 'standard' | 'itemized';
+}
+
+export interface IrmaaCliff {
+  /** Tier index user falls in (0 = no surcharge, ascending). */
+  currentTier: number;
+  /** Dollars to next threshold (0 if at the highest tier). */
+  distanceToNextCliff: number;
+  /** Threshold dollar value of the next tier (Infinity if user is at top). */
+  nextThreshold: number;
+  /** Annual additional Medicare cost in current tier (per beneficiary). */
+  annualSurcharge: number;
+  /** True when user is within $5,000 of crossing into a higher tier. */
+  atRisk: boolean;
+}
+
+/**
+ * Detect whether projected MAGI is close to an IRMAA threshold. A small
+ * Roth conversion or extra withdrawal can push the user across — the cost
+ * is per-beneficiary, per-year, so cliffs are worth surfacing explicitly.
+ */
+export function detectIrmaaCliff(
+  magi: number,
+  filingStatus: 'single' | 'mfj',
+  warnWindow: number = 5000,
+): IrmaaCliff {
+  const table = filingStatus === 'single' ? IRMAA_SINGLE : IRMAA_MFJ;
+  let currentTier = table.length - 1;
+  let nextThreshold = Infinity;
+  for (let i = 0; i < table.length; i++) {
+    if (magi <= table[i].magiThreshold) {
+      currentTier = i;
+      nextThreshold = table[i].magiThreshold;
+      break;
+    }
+  }
+  const distanceToNextCliff = isFinite(nextThreshold)
+    ? Math.max(0, nextThreshold - magi)
+    : 0;
+  const annualSurcharge = table[currentTier].monthlyPartBSurcharge * 12;
+  const atRisk = distanceToNextCliff > 0 && distanceToNextCliff < warnWindow;
+  return { currentTier, distanceToNextCliff, nextThreshold, annualSurcharge, atRisk };
 }
 
 // ---------------------------------------------------------------------------
@@ -448,6 +490,7 @@ export function computeTax(input: TaxInput): TaxResult {
     capitalGainsTax: round2(capitalGainsTax),
     niit: round2(niit),
     irmaa: round2(irmaa),
+    magi: round2(magi),
     totalTax: round2(totalTax),
     effectiveRate: round4(effectiveRate),
     marginalRate,
