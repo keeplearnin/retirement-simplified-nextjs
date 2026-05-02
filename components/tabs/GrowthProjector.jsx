@@ -430,7 +430,7 @@ export default function GrowthProjector() {
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Balance: <strong style={{ color: 'var(--accent)' }}>{fmt(savings401k)}</strong> <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>(from My Plan)</span></div>
             <Slider label="Your Contribution" value={contribution401k} onChange={setContribution401k} min={0} max={25} step={1} suffix="% of salary" />
             <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: -4, marginBottom: 10 }}>
-              = {fmt(annual401kNow / 12)}/mo ({fmt(annual401kNow)}/yr) &middot; 2025 limit: ${limit401k.toLocaleString()}{age >= 50 ? ' (incl. catch-up)' : ''}
+              = {fmt(annual401kNow / 12)}/mo ({fmt(annual401kNow)}/yr) &middot; 2026 limit: ${limit401k.toLocaleString()}{age >= 50 ? ' (incl. catch-up)' : ''}
             </div>
 
             <div style={{ marginBottom: 8 }}>
@@ -469,7 +469,7 @@ export default function GrowthProjector() {
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Balance: <strong style={{ color: 'var(--accent)' }}>{fmt(rothBalance)}</strong> <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>(from My Plan)</span></div>
             <Slider label="Monthly Roth Contribution" value={rothMonthly} onChange={setRothMonthly} min={0} max={2000} step={25} format={fmt} />
             <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -4 }}>
-              Tax-free growth and withdrawals &middot; 2025 limit: $7,000/yr ($8,000 age 50+)
+              Tax-free growth and withdrawals &middot; 2026 limit: $7,500/yr ($8,600 age 50+)
             </div>
           </Card>
 
@@ -483,12 +483,12 @@ export default function GrowthProjector() {
           <Card variant="input" style={{ marginTop: 14 }}>
             <SectionLabel icon="🩺">HSA (Health Savings Account)</SectionLabel>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Balance: <strong style={{ color: 'var(--accent)' }}>{fmt(hsaBalance)}</strong> <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>(from My Plan)</span></div>
-            <Slider label="Annual HSA Contribution" value={hsaAnnual} onChange={setHsaAnnual} min={0} max={8550} step={50} format={fmt} />
+            <Slider label="Annual HSA Contribution" value={hsaAnnual} onChange={setHsaAnnual} min={0} max={8750} step={50} format={fmt} />
             <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -4 }}>
               Triple tax advantage: pre-tax in, tax-free growth, tax-free medical withdrawals
             </div>
             <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
-              2025 limits: $4,300 individual / $8,550 family &middot; {fmt(hsaAnnual / 12)}/mo
+              2026 limits: $4,400 individual / $8,750 family &middot; {fmt(hsaAnnual / 12)}/mo
             </div>
           </Card>
 

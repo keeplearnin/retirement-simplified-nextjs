@@ -342,7 +342,7 @@ export default function PortfolioBuilder() {
 
       {/* Past performance caveat */}
       <div style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)', borderRadius: 8, padding: '10px 14px', marginBottom: 20, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-        <strong style={{ color: 'var(--warn)' }}>Past performance caveat:</strong> 10yr returns reflect 2015-2025 (strong US bull market). 20yr returns include 2008 crisis and provide a more balanced view. Use 20yr figures for long-term planning. Neither predicts future results.
+        <strong style={{ color: 'var(--warn)' }}>Past performance caveat:</strong> 10yr returns reflect 2016-2026 (strong US bull market). 20yr returns include 2008 crisis and provide a more balanced view. Use 20yr figures for long-term planning. Neither predicts future results.
       </div>
 
       {/* Dollar breakdown table with returns */}

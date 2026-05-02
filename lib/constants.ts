@@ -38,12 +38,13 @@ export const DEFAULT_INFLATION: number = 2.5;     // 2.5% annual inflation
 export const LONG_TERM_CAP_GAINS_RATE: number = 0.15; // 15% for most brackets
 export const RMD_START_AGE: number = 73;          // SECURE Act 2.0
 export const LOSS_DEDUCTION_LIMIT: number = 3000; // Annual loss deduction vs ordinary income
-export const MAX_401K_CONTRIBUTION: number = 23500; // 2025 elective deferral limit
-export const CATCHUP_401K_CONTRIBUTION: number = 7500; // Age 50+ catch-up
+export const MAX_401K_CONTRIBUTION: number = 24500; // 2026 elective deferral limit
+export const CATCHUP_401K_CONTRIBUTION: number = 8000; // 2026 age 50+ catch-up
+// Note: SECURE 2.0 super catch-up (ages 60–63) is $11,250 in 2026 — not modeled here.
 
-// Social Security bend points (2025)
-export const SS_WAGE_CAP: number = 168600;
-export const SS_BEND_POINTS = [1174, 7078] as const;
+// Social Security bend points — 2026 (workers first eligible at 62 in 2026)
+export const SS_WAGE_CAP: number = 184500;
+export const SS_BEND_POINTS = [1286, 7749] as const;
 export const SS_FACTORS = [0.9, 0.32, 0.15] as const;
 export const SS_FRA: number = 67; // Full Retirement Age
 

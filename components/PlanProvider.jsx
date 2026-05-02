@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useCallback, useRef } from 'react';
+import { createContext, useContext, useCallback, useMemo, useRef } from 'react';
 import { useLocalState } from '@/lib/useLocalState';
 
 // ---------------------------------------------------------------------------
@@ -156,8 +156,15 @@ export function PlanProvider({ children }) {
     setPlan(prev => ({ ...prev, ...updates }));
   }, [setPlan]);
 
+  // Stable identity prevents every usePlan() consumer from re-rendering on
+  // unrelated PlanProvider renders. Callbacks below are already memoized.
+  const value = useMemo(
+    () => ({ plan, updatePlan, updateIncome, removeIncome, addIncome, addDebt, updateDebt, removeDebt, bulkUpdate }),
+    [plan, updatePlan, updateIncome, removeIncome, addIncome, addDebt, updateDebt, removeDebt, bulkUpdate]
+  );
+
   return (
-    <PlanContext.Provider value={{ plan, updatePlan, updateIncome, removeIncome, addIncome, addDebt, updateDebt, removeDebt, bulkUpdate }}>
+    <PlanContext.Provider value={value}>
       {children}
     </PlanContext.Provider>
   );

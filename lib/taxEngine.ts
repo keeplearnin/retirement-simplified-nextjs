@@ -40,7 +40,8 @@ export interface TaxResult {
 }
 
 // ---------------------------------------------------------------------------
-// 2025/2026 Federal Tax Brackets
+// 2026 Federal Tax Brackets — IRS Rev. Proc. 2025-32
+// Update each January when the IRS publishes new inflation-adjusted thresholds.
 // ---------------------------------------------------------------------------
 
 interface BracketEntry {
@@ -50,48 +51,48 @@ interface BracketEntry {
 }
 
 const FEDERAL_BRACKETS_SINGLE: BracketEntry[] = [
-  { min: 0,       max: 11_925,    rate: 0.10 },
-  { min: 11_925,  max: 48_475,    rate: 0.12 },
-  { min: 48_475,  max: 103_350,   rate: 0.22 },
-  { min: 103_350, max: 197_300,   rate: 0.24 },
-  { min: 197_300, max: 250_525,   rate: 0.32 },
-  { min: 250_525, max: 626_350,   rate: 0.35 },
-  { min: 626_350, max: Infinity,  rate: 0.37 },
+  { min: 0,       max: 12_400,    rate: 0.10 },
+  { min: 12_400,  max: 50_400,    rate: 0.12 },
+  { min: 50_400,  max: 105_700,   rate: 0.22 },
+  { min: 105_700, max: 201_775,   rate: 0.24 },
+  { min: 201_775, max: 256_225,   rate: 0.32 },
+  { min: 256_225, max: 640_600,   rate: 0.35 },
+  { min: 640_600, max: Infinity,  rate: 0.37 },
 ];
 
 const FEDERAL_BRACKETS_MFJ: BracketEntry[] = [
-  { min: 0,       max: 23_850,    rate: 0.10 },
-  { min: 23_850,  max: 96_950,    rate: 0.12 },
-  { min: 96_950,  max: 206_700,   rate: 0.22 },
-  { min: 206_700, max: 394_600,   rate: 0.24 },
-  { min: 394_600, max: 501_050,   rate: 0.32 },
-  { min: 501_050, max: 751_600,   rate: 0.35 },
-  { min: 751_600, max: Infinity,  rate: 0.37 },
+  { min: 0,       max: 24_800,    rate: 0.10 },
+  { min: 24_800,  max: 100_800,   rate: 0.12 },
+  { min: 100_800, max: 211_400,   rate: 0.22 },
+  { min: 211_400, max: 403_550,   rate: 0.24 },
+  { min: 403_550, max: 512_450,   rate: 0.32 },
+  { min: 512_450, max: 768_700,   rate: 0.35 },
+  { min: 768_700, max: Infinity,  rate: 0.37 },
 ];
 
 // ---------------------------------------------------------------------------
-// Standard Deductions
+// Standard Deductions — 2026
 // ---------------------------------------------------------------------------
 
-const STANDARD_DEDUCTION_SINGLE = 15_200;
-const STANDARD_DEDUCTION_MFJ = 30_400;
-const ADDITIONAL_DEDUCTION_SINGLE_65 = 1_950;
-const ADDITIONAL_DEDUCTION_MFJ_65 = 1_550; // per qualifying spouse
+const STANDARD_DEDUCTION_SINGLE = 16_100;
+const STANDARD_DEDUCTION_MFJ = 32_200;
+const ADDITIONAL_DEDUCTION_SINGLE_65 = 2_050;
+const ADDITIONAL_DEDUCTION_MFJ_65 = 1_650; // per qualifying spouse
 
 // ---------------------------------------------------------------------------
-// Capital Gains Brackets (0% / 15% / 20%)
+// Capital Gains Brackets (0% / 15% / 20%) — 2026
 // ---------------------------------------------------------------------------
 
 const CAP_GAINS_BRACKETS_SINGLE: BracketEntry[] = [
-  { min: 0,       max: 48_350,    rate: 0.00 },
-  { min: 48_350,  max: 533_400,   rate: 0.15 },
-  { min: 533_400, max: Infinity,  rate: 0.20 },
+  { min: 0,       max: 49_450,    rate: 0.00 },
+  { min: 49_450,  max: 545_500,   rate: 0.15 },
+  { min: 545_500, max: Infinity,  rate: 0.20 },
 ];
 
 const CAP_GAINS_BRACKETS_MFJ: BracketEntry[] = [
-  { min: 0,       max: 96_700,    rate: 0.00 },
-  { min: 96_700,  max: 600_050,   rate: 0.15 },
-  { min: 600_050, max: Infinity,  rate: 0.20 },
+  { min: 0,       max: 98_900,    rate: 0.00 },
+  { min: 98_900,  max: 613_700,   rate: 0.15 },
+  { min: 613_700, max: Infinity,  rate: 0.20 },
 ];
 
 // ---------------------------------------------------------------------------
@@ -110,7 +111,8 @@ const SALT_CAP = 10_000;
 // const SALT_CAP_2026 = 40_000; // if TCJA extension passes — not yet active
 
 // ---------------------------------------------------------------------------
-// IRMAA Thresholds (2025 — based on MAGI from 2 years prior)
+// IRMAA Thresholds (2025 figures — based on MAGI from 2 years prior).
+// TODO: refresh to 2026 CMS values; brackets and surcharges are CMS-published.
 // ---------------------------------------------------------------------------
 
 interface IrmaaEntry {
