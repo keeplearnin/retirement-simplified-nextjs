@@ -111,8 +111,10 @@ const SALT_CAP = 10_000;
 // const SALT_CAP_2026 = 40_000; // if TCJA extension passes — not yet active
 
 // ---------------------------------------------------------------------------
-// IRMAA Thresholds (2025 figures — based on MAGI from 2 years prior).
-// TODO: refresh to 2026 CMS values; brackets and surcharges are CMS-published.
+// IRMAA Thresholds (2026 figures — based on MAGI from 2 years prior).
+// Source: SSA POMS HI 01101.020. 2026 Part B base premium is $202.90/mo;
+// the SSA table publishes total premium per tier — surcharge below = total
+// minus base.
 // ---------------------------------------------------------------------------
 
 interface IrmaaEntry {
@@ -121,21 +123,21 @@ interface IrmaaEntry {
 }
 
 const IRMAA_SINGLE: IrmaaEntry[] = [
-  { magiThreshold: 103_000, monthlyPartBSurcharge: 0 },
-  { magiThreshold: 129_000, monthlyPartBSurcharge: 70.90 },
-  { magiThreshold: 161_000, monthlyPartBSurcharge: 176.40 },
-  { magiThreshold: 193_000, monthlyPartBSurcharge: 281.80 },
-  { magiThreshold: 500_000, monthlyPartBSurcharge: 387.30 },
-  { magiThreshold: Infinity, monthlyPartBSurcharge: 420.10 },
+  { magiThreshold: 109_000, monthlyPartBSurcharge: 0 },
+  { magiThreshold: 137_000, monthlyPartBSurcharge: 81.20 },
+  { magiThreshold: 171_000, monthlyPartBSurcharge: 202.90 },
+  { magiThreshold: 205_000, monthlyPartBSurcharge: 324.60 },
+  { magiThreshold: 500_000, monthlyPartBSurcharge: 446.30 },
+  { magiThreshold: Infinity, monthlyPartBSurcharge: 487.00 },
 ];
 
 const IRMAA_MFJ: IrmaaEntry[] = [
-  { magiThreshold: 206_000, monthlyPartBSurcharge: 0 },
-  { magiThreshold: 258_000, monthlyPartBSurcharge: 70.90 },
-  { magiThreshold: 322_000, monthlyPartBSurcharge: 176.40 },
-  { magiThreshold: 386_000, monthlyPartBSurcharge: 281.80 },
-  { magiThreshold: 750_000, monthlyPartBSurcharge: 387.30 },
-  { magiThreshold: Infinity, monthlyPartBSurcharge: 420.10 },
+  { magiThreshold: 218_000, monthlyPartBSurcharge: 0 },
+  { magiThreshold: 274_000, monthlyPartBSurcharge: 81.20 },
+  { magiThreshold: 342_000, monthlyPartBSurcharge: 202.90 },
+  { magiThreshold: 410_000, monthlyPartBSurcharge: 324.60 },
+  { magiThreshold: 750_000, monthlyPartBSurcharge: 446.30 },
+  { magiThreshold: Infinity, monthlyPartBSurcharge: 487.00 },
 ];
 
 // ---------------------------------------------------------------------------
