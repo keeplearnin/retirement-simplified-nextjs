@@ -2,6 +2,7 @@
 
 import Card from '@/components/ui/Card';
 import { fmt } from '@/lib/format';
+import { computeHealthcare } from '@/lib/healthcare';
 
 const STATUS_COLORS = {
   'ahead': 'var(--accent)',
@@ -17,11 +18,20 @@ const STATUS_LABELS = {
   'significantly-behind': 'Significantly behind',
 };
 
-export default function VerdictResult({ output, onRestart }) {
+export default function VerdictResult({ output, input, onRestart }) {
   const color = STATUS_COLORS[output.gapStatus];
   const label = STATUS_LABELS[output.gapStatus];
   const isAhead = output.gapStatus === 'ahead';
   const gapAmount = Math.abs(output.savingsGap);
+
+  const healthcare = input ? computeHealthcare({
+    currentAge: input.currentAge,
+    retirementAge: input.retirementAge,
+    longevityAge: 90,
+    annualIncome: input.annualIncome,
+    householdSize: input.filingStatus === 'mfj' ? 2 : 1,
+    filingStatus: input.filingStatus,
+  }) : null;
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px' }}>
@@ -97,6 +107,50 @@ export default function VerdictResult({ output, onRestart }) {
           </div>
         </div>
       </Card>
+
+      {/* Healthcare gap — the bridge from retirement to Medicare */}
+      {healthcare && healthcare.preMedicareYears > 0 && (
+        <Card style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14 }}>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+                Healthcare bridge: retirement → 65
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
+                {fmt(healthcare.preMedicareTotalCost)} over {healthcare.preMedicareYears} year{healthcare.preMedicareYears === 1 ? '' : 's'}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                Estimated ACA marketplace premium of {fmt(healthcare.annualAcaNetPremium)}/yr per person, after a {fmt(healthcare.annualAcaSubsidy)}/yr subsidy at your income level.
+                Most planners ignore this — it's often the largest line item in early retirement.
+              </div>
+            </div>
+            <div style={{ flexShrink: 0, textAlign: 'right' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                Lifetime
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--warn)' }}>
+                {fmt(healthcare.lifetimeHealthcareCost)}
+              </div>
+              <div style={{ fontSize: 11, color: healthcare.vsBenchmark > 0 ? 'var(--warn)' : 'var(--accent)', marginTop: 2 }}>
+                vs {fmt(healthcare.fidelityBenchmark)} avg
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+      {healthcare && healthcare.preMedicareYears === 0 && (
+        <Card style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+            Lifetime healthcare cost (Medicare era)
+          </div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
+            {fmt(healthcare.lifetimeHealthcareCost)}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            Part B + Medigap + Part D, baseline (no IRMAA). Fidelity's benchmark for someone in your situation: {fmt(healthcare.fidelityBenchmark)}.
+          </div>
+        </Card>
+      )}
 
       {/* Top 3 actions */}
       <div style={{ marginTop: 24 }}>

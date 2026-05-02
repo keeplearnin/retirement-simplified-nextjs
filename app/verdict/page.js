@@ -7,9 +7,11 @@ import { computeVerdict } from '@/lib/verdict';
 
 export default function VerdictPage() {
   const [output, setOutput] = useState(null);
+  const [input, setInput] = useState(null);
 
-  function handleSubmit(input) {
-    setOutput(computeVerdict(input));
+  function handleSubmit(submitted) {
+    setInput(submitted);
+    setOutput(computeVerdict(submitted));
     if (typeof window !== 'undefined') window.scrollTo(0, 0);
   }
 
@@ -41,7 +43,7 @@ export default function VerdictPage() {
       </div>
 
       {output ? (
-        <VerdictResult output={output} onRestart={restart} />
+        <VerdictResult output={output} input={input} onRestart={restart} />
       ) : (
         <VerdictInputForm onSubmit={handleSubmit} />
       )}
