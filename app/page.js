@@ -73,6 +73,7 @@ function AppContent() {
     { id: 'optimize', label: 'Optimize', icon: '⚡', tabs: [
       { id: 'tax', label: 'Tax Strategy' },
       { id: 'withdrawal', label: 'Withdrawal' },
+      { id: 'ssa', label: 'Social Security' },
       { id: 'montecarlo', label: 'Monte Carlo' },
     ]},
     { id: 'learn', label: 'Learn', icon: '💡', tabs: [
@@ -127,6 +128,17 @@ function AppContent() {
 
         {/* Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <a
+            href="/verdict"
+            style={{
+              padding: '6px 12px', borderRadius: 16, textDecoration: 'none',
+              border: '1px solid var(--accent)', background: 'var(--accent-dim)',
+              color: 'var(--accent)', fontSize: 11, fontWeight: 600, fontFamily: 'var(--sans)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            ⚡ Quick Verdict
+          </a>
           {authLoading ? null : user ? (
             <>
               {user.picture && <img src={user.picture} alt="" style={{ width: 28, height: 28, borderRadius: '50%', border: '2px solid var(--accent)' }} referrerPolicy="no-referrer" />}

@@ -1029,6 +1029,9 @@ export default function MyPlan() {
               }}>
                 {US_STATES.map(st => <option key={st} value={st}>{st}</option>)}
               </select>
+              <div style={{ marginTop: 8, fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.5, fontStyle: 'italic' }}>
+                State tax uses one effective rate per state. For graduated states (CA, NY, OR, etc.), high earners may owe more than this estimator shows.
+              </div>
             </div>
           </div>
         </Collapsible>
