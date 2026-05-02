@@ -8,23 +8,46 @@ import { useLocalState } from '@/lib/useLocalState';
 // ---------------------------------------------------------------------------
 
 export const DEFAULT_PLAN = {
+  // Primary household member
   currentAge: 40,
   retireAge: 65,
   longevityAge: 95,
   filingStatus: 'single',
   stateCode: 'CA',
-  // Savings / portfolio
+
+  // Couples mode (Phase A scaffold). When hasSpouse=false the spouse* fields
+  // are ignored by every consumer; when true, they participate in income,
+  // contribution-limit, and longevity math. UI to toggle this lands in Phase B.
+  hasSpouse: false,
+  spouseCurrentAge: 40,
+  spouseRetireAge: 65,
+  spouseLongevityAge: 95,
+
+  // ── Savings / portfolio ────────────────────────────────────────────────
+  // Per-person accounts (split when hasSpouse=true). Contribution limits are
+  // per-person, so the household total = primary + spouse.
   savings401k: 150000,
   savingsRoth: 50000,
-  savingsTaxable: 30000,
   savingsHSA: 10000,
+  savingsPension: 0,
+  spouseSavings401k: 0,
+  spouseSavingsRoth: 0,
+  spouseSavingsHSA: 0,
+  spouseSavingsPension: 0,
+
+  // Household-pooled accounts (joint ownership common in real life).
+  savingsTaxable: 30000,
   savingsRealEstate: 0,
   savingsCash: 0,
   savings529: 0,
   savingsCrypto: 0,
-  savingsPension: 0,
   savingsAnnuity: 0,
+
+  // Per-person monthly retirement contributions. Split lets each spouse hit
+  // their own 401(k) limit; downstream allocation (60/20/20) stays the same.
   monthlyContribution: 1500,
+  spouseMonthlyContribution: 0,
+
   expectedReturn: 7,
   // Debts
   debts: [],
@@ -42,10 +65,11 @@ export const DEFAULT_PLAN = {
   expenseBreakdown: null,
   goGoEndAge: 75,
   slowGoEndAge: 85,
-  // Income
+  // Income — each entry now carries an optional `owner: 'primary' | 'spouse'`
+  // tag; absence implies primary so existing saved plans keep working.
   incomeSources: [
-    { id: 1, type: 'salary', label: 'Salary', amount: 100000, growthRate: 3 },
-    { id: 2, type: 'socialSecurity', label: 'Social Security', monthlyBenefit: 2500, startAge: 67 },
+    { id: 1, type: 'salary', label: 'Salary', amount: 100000, growthRate: 3, owner: 'primary' },
+    { id: 2, type: 'socialSecurity', label: 'Social Security', monthlyBenefit: 2500, startAge: 67, owner: 'primary' },
   ],
 };
 
@@ -57,30 +81,70 @@ export const DEBT_TEMPLATES = {
 };
 
 export const INCOME_TEMPLATES = {
-  salary: { type: 'salary', label: 'Salary', amount: 100000, growthRate: 3 },
-  socialSecurity: { type: 'socialSecurity', label: 'Social Security', monthlyBenefit: 2500, startAge: 67 },
-  pension: { type: 'pension', label: 'Pension', monthlyAmount: 1500, startAge: 65, cola: true },
+  salary: { type: 'salary', label: 'Salary', amount: 100000, growthRate: 3, owner: 'primary' },
+  socialSecurity: { type: 'socialSecurity', label: 'Social Security', monthlyBenefit: 2500, startAge: 67, owner: 'primary' },
+  pension: { type: 'pension', label: 'Pension', monthlyAmount: 1500, startAge: 65, cola: true, owner: 'primary' },
   rental: { type: 'rental', label: 'Rental Income', monthlyNet: 1500, appreciation: 3 },
 };
+
+// ---------------------------------------------------------------------------
+// Migration
+// ---------------------------------------------------------------------------
+
+/**
+ * Existing users have localStorage entries from before couples-mode fields
+ * existed. Merging with DEFAULT_PLAN at load time backfills the missing
+ * fields with safe defaults so consumers never see `undefined`.
+ *
+ * Important: shallow merge only. Nested arrays (incomeSources, debts) come
+ * from the stored plan as-is — we don't want to clobber the user's edits.
+ */
+export function migratePlan(stored) {
+  if (!stored || typeof stored !== 'object') return DEFAULT_PLAN;
+  return { ...DEFAULT_PLAN, ...stored };
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-export function getSalary(plan) {
-  const src = plan.incomeSources?.find(s => s.type === 'salary');
+export function getSalary(plan, owner = 'primary') {
+  const src = plan.incomeSources?.find(s => s.type === 'salary' && (s.owner || 'primary') === owner);
   return src?.amount || 0;
 }
 
-export function getSalaryGrowth(plan) {
-  const src = plan.incomeSources?.find(s => s.type === 'salary');
+export function getSalaryGrowth(plan, owner = 'primary') {
+  const src = plan.incomeSources?.find(s => s.type === 'salary' && (s.owner || 'primary') === owner);
   return src?.growthRate || 3;
 }
 
+/**
+ * Total liquid + non-liquid savings across the household. When hasSpouse is
+ * true the spouse* per-person buckets are added in. Joint accounts (taxable,
+ * cash, RE, 529, crypto, annuity) are counted once regardless.
+ */
 export function getTotalSavings(plan) {
-  return (plan.savings401k || 0) + (plan.savingsRoth || 0) + (plan.savingsTaxable || 0) + (plan.savingsHSA || 0)
-    + (plan.savingsRealEstate || 0) + (plan.savingsCash || 0) + (plan.savings529 || 0)
-    + (plan.savingsCrypto || 0) + (plan.savingsPension || 0) + (plan.savingsAnnuity || 0);
+  const primary = (plan.savings401k || 0) + (plan.savingsRoth || 0) + (plan.savingsHSA || 0) + (plan.savingsPension || 0);
+  const spouse = plan.hasSpouse
+    ? (plan.spouseSavings401k || 0) + (plan.spouseSavingsRoth || 0) + (plan.spouseSavingsHSA || 0) + (plan.spouseSavingsPension || 0)
+    : 0;
+  const joint = (plan.savingsTaxable || 0) + (plan.savingsRealEstate || 0) + (plan.savingsCash || 0)
+    + (plan.savings529 || 0) + (plan.savingsCrypto || 0) + (plan.savingsAnnuity || 0);
+  return primary + spouse + joint;
+}
+
+/** Filing status the projection should use. Couples default to MFJ but the
+ *  user can override (e.g., MFS or — rarely — single after a separation). */
+export function getEffectiveFilingStatus(plan) {
+  if (plan.hasSpouse) return plan.filingStatus === 'mfj' || plan.filingStatus === 'single' ? plan.filingStatus : 'mfj';
+  return 'single';
+}
+
+/** Combined monthly contribution across both members (per-person 401(k)
+ *  limits and employer matches enforce treating these separately at the
+ *  contribution-engine layer; this helper is for UI summaries.) */
+export function getHouseholdMonthlyContribution(plan) {
+  return (plan.monthlyContribution || 0) + (plan.hasSpouse ? (plan.spouseMonthlyContribution || 0) : 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -91,7 +155,10 @@ const PlanContext = createContext(null);
 
 export function PlanProvider({ children }) {
   const incomeIdRef = useRef(100);
-  const [plan, setPlan] = useLocalState('myplan-v1', DEFAULT_PLAN);
+  const [storedPlan, setPlan] = useLocalState('myplan-v1', DEFAULT_PLAN);
+  // Backfill any fields added since the saved plan was last written so
+  // consumers downstream never encounter undefined.
+  const plan = useMemo(() => migratePlan(storedPlan), [storedPlan]);
 
   const updatePlan = useCallback((key, val) => {
     setPlan(prev => ({ ...prev, [key]: val }));
