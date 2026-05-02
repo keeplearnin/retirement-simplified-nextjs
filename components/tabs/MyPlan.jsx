@@ -300,7 +300,9 @@ function IncomeExpenseChart({ projections, retireAge }) {
           )}
           {legacy <= 0 && (
             (() => {
-              const brokeRow = projections.find(p => p.isRetired && p.portfolioBalance <= 0);
+              // Use liquidBalance — real estate / 529 can't be drawn down, so
+              // "depletion" should fire when the spendable buckets hit zero.
+              const brokeRow = projections.find(p => p.isRetired && p.liquidBalance <= 0);
               if (!brokeRow) return null;
               return (
                 <>
@@ -389,8 +391,12 @@ function SuccessScore({ projections }) {
   const ageRange = lastAge - firstAge;
   if (ageRange <= 0) return null;
 
-  // Find when portfolio runs out AND there's a gap (income < expenses)
-  const brokeAge = projections.find(p => p.isRetired && p.portfolioBalance <= 0 && p.gap < 0)?.age;
+  // Find when liquid savings run out AND there's a gap (income < expenses).
+  // Uses liquidBalance (excludes illiquid RE + 529) to match moneyLastsAge.
+  // Bug history: previously used portfolioBalance, which kept growing forever
+  // for users with real estate even after liquid hit zero — producing a 100%
+  // "Fully Funded" score that contradicted the year-by-year Status column.
+  const brokeAge = projections.find(p => p.isRetired && p.liquidBalance <= 0 && p.gap < 0)?.age;
   let score, color, label;
 
   if (brokeAge === undefined) {
@@ -1028,10 +1034,12 @@ export default function MyPlan() {
       }
     }
 
-    // Count years where you're covered (income covers expenses OR portfolio can fill the gap)
+    // Count years where you're covered (income covers expenses OR liquid
+    // savings can fill the gap). liquidBalance excludes illiquid RE + 529 —
+    // those can't be drawn for retirement spending, so they shouldn't count.
     const yearsCovered = combined.filter(r => {
       if (r.gap >= 0) return true; // income covers expenses
-      if (r.portfolioBalance > 0) return true; // portfolio can fill the gap
+      if (r.liquidBalance > 0) return true; // liquid can fill the gap
       return false;
     }).length;
 
