@@ -17,6 +17,7 @@ import MonteCarlo from '@/components/tabs/MonteCarlo';
 import TaxAware from '@/components/tabs/TaxAware';
 import ScenarioComparison from '@/components/tabs/ScenarioComparison';
 import SocialSecurity from '@/components/tabs/SocialSecurity';
+import TaxTorpedo from '@/components/tabs/TaxTorpedo';
 import GettingStarted from '@/components/tabs/GettingStarted';
 import InvestingGuide from '@/components/tabs/InvestingGuide';
 import AIAdvisor from '@/components/tabs/AIAdvisor';
@@ -74,6 +75,7 @@ function AppContent() {
       { id: 'tax', label: 'Tax Strategy' },
       { id: 'withdrawal', label: 'Withdrawal' },
       { id: 'ssa', label: 'Social Security' },
+      { id: 'torpedo', label: 'Tax Torpedo' },
       { id: 'montecarlo', label: 'Monte Carlo' },
     ]},
     { id: 'learn', label: 'Learn', icon: '💡', tabs: [
@@ -200,6 +202,7 @@ function AppContent() {
         {tab === 'tax' && <TaxAware />}
         {tab === 'scenarios' && <ScenarioComparison />}
         {tab === 'ssa' && <SocialSecurity />}
+        {tab === 'torpedo' && <TaxTorpedo />}
         {tab === 'investing' && <InvestingGuide />}
         {tab === 'advisor' && <AIAdvisor />}
         {tab === 'myplans' && <MyPlans />}
