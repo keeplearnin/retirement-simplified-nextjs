@@ -147,8 +147,14 @@ export function estimateAcaPremium(
   annualIncome: number,
   householdSize: number = 1,
 ): { gross: number; subsidy: number; net: number; fplPct: number } {
+  // Scale benchmark to household. Real ACA marketplace plans for a couple
+  // price roughly 2x single coverage at the same age; modelling as a flat
+  // householdSize multiplier is a simplification but captures the right
+  // first-order effect (without it, subsidy is computed against a single
+  // person's gross and the household ends up massively under-billed before
+  // a downstream multiplier applied a second time).
   const grossMonthly = benchmarkPremiumAt(age);
-  const grossAnnual = grossMonthly * 12;
+  const grossAnnual = grossMonthly * 12 * householdSize;
   const fpl = fplFor(householdSize);
   const fplPct = annualIncome / fpl;
   const cap = annualIncome * maxContributionPct(fplPct);
@@ -178,14 +184,17 @@ export function computeHealthcare(input: HealthcareInput): HealthcareOutput {
       aggregatedGross += gross;
       aggregatedSubsidy += subsidy;
       aggregatedNet += net;
-      preMedicareTotalCost += net * input.householdSize;
+      // gross/subsidy/net are already household-scaled by estimateAcaPremium.
+      preMedicareTotalCost += net;
     }
   }
+  // Per-year averages — already household-scaled.
   const annualAcaGrossPremium = preMedicareYears > 0 ? aggregatedGross / preMedicareYears : 0;
   const annualAcaSubsidy = preMedicareYears > 0 ? aggregatedSubsidy / preMedicareYears : 0;
   const annualAcaNetPremium = preMedicareYears > 0 ? aggregatedNet / preMedicareYears : 0;
 
   const annualMedicareCost = annualMedicareBaseline();
+  // Medicare baseline is per-person; for couples each beneficiary pays.
   const medicareTotalCost = annualMedicareCost * medicareYears * input.householdSize;
   const lifetimeHealthcareCost = preMedicareTotalCost + medicareTotalCost;
   const fidelityBenchmark = input.householdSize >= 2

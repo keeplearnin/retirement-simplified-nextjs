@@ -220,7 +220,16 @@ export function projectIncome(plan: RetirementPlan): YearlyProjection[] {
   // given year of the loop is just (yearsFromStart + spouse.currentAge).
   const spouseAgeOffset = spouse ? spouse.currentAge - currentAge : 0;
 
-  for (let age = currentAge; age <= longevityAge; age++) {
+  // Project until the longer-lived spouse's longevity (in primary's frame).
+  // This produces phantom primary income beyond primary.longevityAge; Phase F
+  // will add survivor logic to (a) zero out the deceased spouse's salary/SS/
+  // pension and (b) bump survivor SS to the deceased's higher benefit and
+  // flip filing status from MFJ to single in the year after death.
+  const projectionEndAge = spouse
+    ? Math.max(longevityAge, currentAge + ((spouse.longevityAge ?? longevityAge) - spouse.currentAge))
+    : longevityAge;
+
+  for (let age = currentAge; age <= projectionEndAge; age++) {
     const year = currentYear + (age - currentAge);
     const isRetired = age >= retireAge;
     const yearsFromStart = age - currentAge;

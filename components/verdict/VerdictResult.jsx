@@ -159,7 +159,7 @@ export default function VerdictResult({ output, input, onRestart }) {
                 {fmt(healthcare.preMedicareTotalCost)} over {healthcare.preMedicareYears} year{healthcare.preMedicareYears === 1 ? '' : 's'}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                Estimated ACA marketplace premium of {fmt(healthcare.annualAcaNetPremium)}/yr per person, after a {fmt(healthcare.annualAcaSubsidy)}/yr subsidy at your income level.
+                Estimated ACA marketplace premium of {fmt(healthcare.annualAcaNetPremium)}/yr{input?.hasSpouse ? ' for the household' : ''}, after a {fmt(healthcare.annualAcaSubsidy)}/yr subsidy at your income level.
                 Most planners ignore this — it's often the largest line item in early retirement.
               </div>
             </div>

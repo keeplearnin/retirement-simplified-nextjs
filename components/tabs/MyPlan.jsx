@@ -812,6 +812,11 @@ export default function MyPlan() {
       const age = inc.age;
 
       // --- RMD calculation (age 73+ from 401k balance) ---
+      // KNOWN LIMITATION (Phase F target): for couples, bal401k is the
+      // household sum and the divisor uses primary's age. If primary is 73
+      // and spouse is 65 with their own 401k, this over-RMDs because spouse
+      // shouldn't yet be forced to draw. Per-spouse balance tracking + per-
+      // spouse RMD math is a larger refactor — defer to Phase F.
       let rmdAmount = 0;
       if (age >= RMD_START && bal401k > 0) {
         rmdAmount = Math.round(bal401k / rmdDivisor(age));

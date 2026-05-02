@@ -264,12 +264,18 @@ export function computeVerdict(input: VerdictInput): VerdictOutput {
     : input.currentAge;
   const yearsToRetirement = Math.max(0, householdRetireAge - householdCurrentAge);
 
-  // Benchmark uses the older spouse's age (more conservative — sets a higher
-  // bar for "where you should be"). For singles this is just currentAge.
-  const benchmarkAnchorAge = input.hasSpouse && input.spouseCurrentAge
-    ? Math.max(input.currentAge, input.spouseCurrentAge)
-    : input.currentAge;
-  const benchmarkSavings = Math.round(input.annualIncome * getBenchmarkMultiple(benchmarkAnchorAge));
+  // Benchmark — Fidelity's rule is a per-person multiple of salary. For a
+  // household, split income evenly between members and apply each spouse's
+  // age multiple, then sum. For singles this collapses to the original
+  // annualIncome × multiple(currentAge). Using the older spouse's age on
+  // household income overstates the benchmark for age-gap couples by ~5–15%,
+  // so this matters.
+  const benchmarkSavings = input.hasSpouse && input.spouseCurrentAge
+    ? Math.round(
+        (input.annualIncome / 2) * getBenchmarkMultiple(input.currentAge) +
+        (input.annualIncome / 2) * getBenchmarkMultiple(input.spouseCurrentAge)
+      )
+    : Math.round(input.annualIncome * getBenchmarkMultiple(input.currentAge));
   const savingsGap = benchmarkSavings - input.currentSavings;
   const gapStatus = getGapStatus(input.currentSavings, benchmarkSavings);
 
