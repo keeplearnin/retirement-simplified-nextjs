@@ -456,7 +456,20 @@ function MetricCard({ label, value, sub, color }) {
 
 function SummaryTable({ rows }) {
   if (!rows || rows.length === 0) return null;
-  const displayRows = rows.filter((_, i) => i % 5 === 0 || i === rows.length - 1);
+  // Always include rows where the user's cashflow shifts: retirement start,
+  // first SS year, RMD-start age (73), longevity. Then thin to every 5 years
+  // for context.
+  const include = new Set();
+  rows.forEach((r, i) => {
+    if (i === 0 || i === rows.length - 1) include.add(i);
+    if (i % 5 === 0) include.add(i);
+    if (r.isRetireYear) include.add(i);
+    if (r.age === 73) include.add(i);
+    const prev = i > 0 ? rows[i - 1] : null;
+    if (r.socialSecurity > 0 && (!prev || prev.socialSecurity === 0)) include.add(i);
+    if (r.pension > 0 && (!prev || prev.pension === 0)) include.add(i);
+  });
+  const displayRows = rows.filter((_, i) => include.has(i));
 
   return (
     <div style={{ overflowX: 'auto', marginTop: 16 }}>
@@ -545,7 +558,7 @@ function RetirementDetailTable({ rows, retireAge }) {
               <tr style={{ borderBottom: '2px solid var(--border)' }}>
                 <th style={thStyle}>Age</th>
                 <th style={thStyle}>Portfolio</th>
-                <th style={thStyle}>Growth</th>
+                <th style={thStyle}>Return</th>
                 <th style={thStyle}>SS</th>
                 <th style={thStyle}>From 401k</th>
                 <th style={thStyle}>From Roth</th>
@@ -564,7 +577,7 @@ function RetirementDetailTable({ rows, retireAge }) {
                   <tr key={r.age} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ ...cellStyle, fontWeight: r.isRetireYear ? 700 : 400, color: r.isRetireYear ? 'var(--accent)' : 'var(--text)' }}>{r.age}</td>
                     <td style={{ ...cellStyle, color: 'var(--accent)', fontWeight: 600 }}>{fmt(r.portfolioBalance)}</td>
-                    <td style={{ ...cellStyle, color: r.portfolioGrowth >= 0 ? 'var(--accent)' : 'var(--danger)' }}>{r.portfolioGrowth >= 0 ? '+' : ''}{fmt(r.portfolioGrowth)}</td>
+                    <td style={{ ...cellStyle, color: r.portfolioReturn >= 0 ? 'var(--accent)' : 'var(--danger)' }}>{r.portfolioReturn >= 0 ? '+' : ''}{fmt(r.portfolioReturn)}</td>
                     <td style={{ ...cellStyle, color: r.socialSecurity > 0 ? 'var(--blue)' : 'var(--text-dim)' }}>{r.socialSecurity > 0 ? fmt(r.socialSecurity) : '—'}</td>
                     <td style={{ ...cellStyle, color: r.withdrawal401k > 0 ? 'var(--text)' : 'var(--text-dim)' }}>{r.withdrawal401k > 0 ? fmt(r.withdrawal401k) : '—'}</td>
                     <td style={{ ...cellStyle, color: r.withdrawalRoth > 0 ? 'var(--accent)' : 'var(--text-dim)' }}>{r.withdrawalRoth > 0 ? fmt(r.withdrawalRoth) : '—'}</td>
@@ -878,7 +891,9 @@ export default function MyPlan() {
         gap: Math.round(gap),
         portfolioBalance: Math.round(balanceStart),
         portfolioEndBalance: Math.round(portfolioBalance),
-        portfolioGrowth: Math.round(portfolioBalance - balanceStart + totalWithdrawals),
+        // portfolioReturn = market return on capital, ignoring drawdowns. With
+        // beginning-of-year withdrawals, this equals (end - (start - withdrawn)).
+        portfolioReturn: Math.round(portfolioBalance - balanceStart + totalWithdrawals),
         liquidBalance: Math.round(liquidBalanceEnd),
         isRetired: inc.isRetired,
         isRetireYear: inc.age === retireAge,

@@ -491,7 +491,7 @@ function RetirementDetailCard({ rows, retireAge }) {
               <tr style={{ borderBottom: '2px solid var(--border)' }}>
                 <th style={thStyle}>Age</th>
                 <th style={thStyle}>Portfolio</th>
-                <th style={thStyle}>Growth</th>
+                <th style={thStyle}>Return</th>
                 <th style={thStyle}>SS</th>
                 <th style={thStyle}>From 401k</th>
                 <th style={thStyle}>From Roth</th>
@@ -505,12 +505,12 @@ function RetirementDetailCard({ rows, retireAge }) {
             </thead>
             <tbody>
               {retireRows.map(r => {
-                const otherDraws = (r.withdrawalCrypto || 0) + (r.withdrawalAnnuity || 0) + (r.withdrawalPension || 0);
+                const otherDraws = (r.withdrawalCrypto || 0) + (r.withdrawalAnnuity || 0) + (r.withdrawalPension || 0) + (r.withdrawalHSA || 0);
                 return (
                   <tr key={r.age} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ ...cellStyle, fontWeight: r.isRetireYear ? 700 : 400, color: r.isRetireYear ? 'var(--accent)' : 'var(--text)' }}>{r.age}</td>
                     <td style={{ ...cellStyle, color: 'var(--accent)', fontWeight: 600 }}>{fmt(r.portfolioBalance)}</td>
-                    <td style={{ ...cellStyle, color: r.portfolioGrowth >= 0 ? 'var(--accent)' : 'var(--danger)' }}>{r.portfolioGrowth >= 0 ? '+' : ''}{fmt(r.portfolioGrowth)}</td>
+                    <td style={{ ...cellStyle, color: r.portfolioReturn >= 0 ? 'var(--accent)' : 'var(--danger)' }}>{r.portfolioReturn >= 0 ? '+' : ''}{fmt(r.portfolioReturn)}</td>
                     <td style={{ ...cellStyle, color: r.socialSecurity > 0 ? 'var(--blue)' : 'var(--text-dim)' }}>{r.socialSecurity > 0 ? fmt(r.socialSecurity) : '—'}</td>
                     <td style={{ ...cellStyle, color: r.withdrawal401k > 0 ? 'var(--text)' : 'var(--text-dim)' }}>{r.withdrawal401k > 0 ? fmt(r.withdrawal401k) : '—'}</td>
                     <td style={{ ...cellStyle, color: r.withdrawalRoth > 0 ? 'var(--accent)' : 'var(--text-dim)' }}>{r.withdrawalRoth > 0 ? fmt(r.withdrawalRoth) : '—'}</td>
