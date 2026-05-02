@@ -737,71 +737,68 @@ export default function MyPlan() {
       const netAfterTax1 = baseIncome - taxPass1.totalTax;
       const shortfall = exp.totalExpense - netAfterTax1; // positive = need to withdraw
 
-      // --- Portfolio withdrawal (if shortfall exists) ---
-      let withdrawal401k = 0, withdrawalRoth = 0, withdrawalTaxable = 0, withdrawalHSA = 0;
-      let withdrawalCash = 0, withdrawalCrypto = 0, withdrawalAnnuity = 0, withdrawalPension = 0;
-
       // Liquid balance = everything except illiquid RE and education-only 529
       const liquidBalance = bal401k + balRoth + balTaxable + balHSA + balCash + balCrypto + balPension + balAnnuity;
 
-      if (shortfall > 0 && inc.isRetired && liquidBalance > 0) {
-        // Withdrawal order: Cash → Taxable + Crypto → Annuity → 401k + Pension → Roth
-        // (Real estate & 529 excluded — illiquid / education-only)
-        let remaining = shortfall;
+      // Embedded gains in taxable brokerage / crypto grow over time as
+      // appreciation compounds — matches the curve used in WithdrawalStrategy.
+      // Annuities are kept at a separate 30% (exclusion-ratio approximation).
+      const yearsRetired = Math.max(0, age - retireAge);
+      const gainsRatio = Math.min(0.8, 0.3 + yearsRetired * 0.02);
 
-        // 1. Cash/Savings (most liquid, interest taxed as ordinary income)
-        if (remaining > 0 && balCash > 0) {
-          withdrawalCash = Math.min(remaining, balCash);
-          remaining -= withdrawalCash;
+      // Run the withdrawal waterfall at a given marginal rate. Returns the
+      // per-account withdrawals; gross-up only applies to ordinary-income accounts.
+      // Order: Cash → Taxable → Crypto → Annuity → 401k → Pension → HSA → Roth
+      // (Real estate & 529 excluded — illiquid / education-only)
+      const runWaterfall = (marginalRate) => {
+        let w401k = 0, wRoth = 0, wTaxable = 0, wHSA = 0;
+        let wCash = 0, wCrypto = 0, wAnnuity = 0, wPension = 0;
+        if (shortfall > 0 && inc.isRetired && liquidBalance > 0) {
+          let remaining = shortfall;
+          if (remaining > 0 && balCash > 0)    { wCash    = Math.min(remaining, balCash);    remaining -= wCash; }
+          if (remaining > 0 && balTaxable > 0) { wTaxable = Math.min(remaining, balTaxable); remaining -= wTaxable; }
+          if (remaining > 0 && balCrypto > 0)  { wCrypto  = Math.min(remaining, balCrypto);  remaining -= wCrypto; }
+          if (remaining > 0 && balAnnuity > 0) { wAnnuity = Math.min(remaining, balAnnuity); remaining -= wAnnuity; }
+          if (remaining > 0 && bal401k > 0)    {
+            const grossUp = remaining / (1 - marginalRate);
+            w401k = Math.min(grossUp, bal401k);
+            remaining -= w401k * (1 - marginalRate);
+          }
+          if (remaining > 0 && balPension > 0) {
+            const grossUp = remaining / (1 - marginalRate);
+            wPension = Math.min(grossUp, balPension);
+            remaining -= wPension * (1 - marginalRate);
+          }
+          // HSA — assumes withdrawals offset qualified medical expenses (tax-free).
+          // Drawn before Roth: HSAs lose tax-free status for non-spouse heirs.
+          if (remaining > 0 && balHSA > 0)     { wHSA     = Math.min(remaining, balHSA);     remaining -= wHSA; }
+          if (remaining > 0 && balRoth > 0)    { wRoth    = Math.min(remaining, balRoth);    remaining -= wRoth; }
         }
+        return { w401k, wRoth, wTaxable, wHSA, wCash, wCrypto, wAnnuity, wPension };
+      };
 
-        // 2. Taxable brokerage (only gains taxed at ~15% LTCG)
-        if (remaining > 0 && balTaxable > 0) {
-          withdrawalTaxable = Math.min(remaining, balTaxable);
-          remaining -= withdrawalTaxable;
-        }
+      // First pass at Pass-1 marginal rate.
+      let w = runWaterfall(taxPass1.marginalRate || 0.22);
 
-        // 3. Crypto (LTCG treatment)
-        if (remaining > 0 && balCrypto > 0) {
-          withdrawalCrypto = Math.min(remaining, balCrypto);
-          remaining -= withdrawalCrypto;
-        }
-
-        // 4. Annuity (partially taxable — gains portion)
-        if (remaining > 0 && balAnnuity > 0) {
-          withdrawalAnnuity = Math.min(remaining, balAnnuity);
-          remaining -= withdrawalAnnuity;
-        }
-
-        // 5. 401(k) — fully taxable as ordinary income
-        if (remaining > 0 && bal401k > 0) {
-          const marginalRate = taxPass1.marginalRate || 0.22;
-          const grossUp = remaining / (1 - marginalRate);
-          withdrawal401k = Math.min(grossUp, bal401k);
-          remaining -= withdrawal401k * (1 - marginalRate);
-        }
-
-        // 6. Pension pot — taxed as ordinary income like 401k
-        if (remaining > 0 && balPension > 0) {
-          const marginalRate = taxPass1.marginalRate || 0.22;
-          const grossUp = remaining / (1 - marginalRate);
-          withdrawalPension = Math.min(grossUp, balPension);
-          remaining -= withdrawalPension * (1 - marginalRate);
-        }
-
-        // 7. HSA — assumes withdrawals offset qualified medical expenses (tax-free).
-        //    Drawn before Roth: HSAs lose tax-free status for non-spouse heirs.
-        if (remaining > 0 && balHSA > 0) {
-          withdrawalHSA = Math.min(remaining, balHSA);
-          remaining -= withdrawalHSA;
-        }
-
-        // 8. Roth — tax-free (last)
-        if (remaining > 0 && balRoth > 0) {
-          withdrawalRoth = Math.min(remaining, balRoth);
-          remaining -= withdrawalRoth;
-        }
+      // If the gross-up pushes the user into a higher bracket, Pass-1's rate
+      // under-grossed the withdrawal. Re-run once with the actual post-
+      // withdrawal marginal rate so the user gets enough net to cover expenses.
+      const provisionalCapGains = Math.round(w.wTaxable * gainsRatio)
+        + Math.round(w.wCrypto * gainsRatio)
+        + Math.round(w.wAnnuity * 0.3);
+      const provisionalTax = computeTax({
+        filingStatus,
+        ordinaryIncome: baseOrdinaryIncome + w.w401k + w.wPension + w.wCash,
+        socialSecurityBenefit: inc.socialSecurity,
+        capitalGains: provisionalCapGains,
+        stateCode, age,
+      });
+      if ((provisionalTax.marginalRate || 0) > (taxPass1.marginalRate || 0) + 0.005) {
+        w = runWaterfall(provisionalTax.marginalRate);
       }
+
+      let withdrawal401k = w.w401k, withdrawalRoth = w.wRoth, withdrawalTaxable = w.wTaxable, withdrawalHSA = w.wHSA;
+      let withdrawalCash = w.wCash, withdrawalCrypto = w.wCrypto, withdrawalAnnuity = w.wAnnuity, withdrawalPension = w.wPension;
 
       // Ensure RMD is withdrawn even if no shortfall
       if (rmdAmount > 0 && withdrawal401k < rmdAmount) {
@@ -810,9 +807,9 @@ export default function MyPlan() {
 
       // --- Second pass: recompute taxes with withdrawal income ---
       const totalOrdinaryIncome = baseOrdinaryIncome + withdrawal401k + withdrawalPension + withdrawalCash;
-      const capitalGains = (withdrawalTaxable > 0 ? Math.round(withdrawalTaxable * 0.5) : 0)
-        + (withdrawalCrypto > 0 ? Math.round(withdrawalCrypto * 0.5) : 0)
-        + (withdrawalAnnuity > 0 ? Math.round(withdrawalAnnuity * 0.3) : 0); // annuity: ~30% gains portion
+      const capitalGains = Math.round(withdrawalTaxable * gainsRatio)
+        + Math.round(withdrawalCrypto * gainsRatio)
+        + Math.round(withdrawalAnnuity * 0.3); // annuity: ~30% gains portion
 
       const taxResult = computeTax({
         filingStatus, ordinaryIncome: totalOrdinaryIncome,
