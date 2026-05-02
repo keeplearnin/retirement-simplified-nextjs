@@ -15,6 +15,7 @@ export default function Onboarding({ onComplete }) {
   const [age, setAge] = useState(35);
   const [retireAge, setRetireAge] = useState(65);
   const [salary, setSalary] = useState(85000);
+  const [retireReplacementPct, setRetireReplacementPct] = useState(80);
   const [s401k, setS401k] = useState(50000);
   const [sRoth, setSRoth] = useState(10000);
   const [sTaxable, setSTaxable] = useState(5000);
@@ -30,7 +31,7 @@ export default function Onboarding({ onComplete }) {
       savingsTaxable: sTaxable,
       savingsHSA: sHSA,
       annualSpending: spending,
-      retireSpending: Math.round(spending * 0.8 / 1000) * 1000,
+      retireSpending: Math.round(spending * (retireReplacementPct / 100) / 1000) * 1000,
       incomeSources: [
         { id: 1, type: 'salary', label: 'Salary', amount: salary, growthRate: 3 },
         { id: 2, type: 'socialSecurity', label: 'Social Security', monthlyBenefit: 2500, startAge: 67 },
@@ -95,14 +96,15 @@ export default function Onboarding({ onComplete }) {
         {step === 2 && (
           <div>
             <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--serif)', marginBottom: 4 }}>
-              Income
+              Income & Spending
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 24 }}>
-              What's your annual salary before taxes?
+              Your salary today, and how much you expect to spend once retired.
             </div>
             <Slider label="Annual Salary" value={salary} onChange={setSalary} min={20000} max={500000} step={5000} format={fmt} />
+            <Slider label="Retirement Spending (% of today's spending)" value={retireReplacementPct} onChange={setRetireReplacementPct} min={50} max={120} step={5} suffix="%" />
             <div style={{ marginTop: 12, padding: '12px 16px', borderRadius: 10, background: 'var(--bg2)', fontSize: 13, color: 'var(--text-muted)' }}>
-              ~{fmt(Math.round(salary / 12))}/month gross
+              ~{fmt(Math.round(salary / 12))}/mo today &middot; ~{fmt(Math.round(salary * 0.75 * (retireReplacementPct / 100) / 12))}/mo in retirement (most planners use 70–85%).
             </div>
           </div>
         )}

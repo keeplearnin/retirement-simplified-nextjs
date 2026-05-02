@@ -125,10 +125,12 @@ function DebtCard({ debt, onChange, onRemove, currentAge }) {
   // Auto-calculate payoff age
   const monthlyRate = (debt.interestRate || 0) / 100 / 12;
   let payoffMonths = 0;
-  if (debt.monthlyPayment > 0 && debt.remainingBalance > 0) {
+  // If monthly interest >= monthly payment, the balance never shrinks.
+  const cannotPayOff = monthlyRate > 0 && monthlyRate * debt.remainingBalance >= debt.monthlyPayment;
+  if (debt.monthlyPayment > 0 && debt.remainingBalance > 0 && !cannotPayOff) {
     if (monthlyRate > 0) {
       payoffMonths = Math.ceil(-Math.log(1 - monthlyRate * debt.remainingBalance / debt.monthlyPayment) / Math.log(1 + monthlyRate));
-      if (!isFinite(payoffMonths) || payoffMonths < 0) payoffMonths = 999;
+      if (!isFinite(payoffMonths) || payoffMonths < 0) payoffMonths = 0;
     } else {
       payoffMonths = Math.ceil(debt.remainingBalance / debt.monthlyPayment);
     }
@@ -140,8 +142,8 @@ function DebtCard({ debt, onChange, onRemove, currentAge }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{debt.name}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 11, color: payoffAge <= 65 ? 'var(--accent)' : 'var(--warn)' }}>
-            Paid off at {payoffAge}
+          <span style={{ fontSize: 11, color: cannotPayOff ? 'var(--danger)' : payoffAge <= 65 ? 'var(--accent)' : 'var(--warn)' }}>
+            {cannotPayOff ? 'Payment too low to pay off' : `Paid off at ${payoffAge}`}
           </span>
           <button onClick={onRemove} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', fontSize: 18 }} title="Remove">&times;</button>
         </div>
@@ -656,6 +658,10 @@ export default function MyPlan() {
         payoffAge: (() => {
           const mr = (d.interestRate || 0) / 100 / 12;
           if (d.monthlyPayment <= 0 || d.remainingBalance <= 0) return currentAge;
+          // If monthly interest meets or exceeds the payment, the balance never
+          // shrinks — the debt is unpayable at this rate, so it persists for the
+          // entire projection. Don't collapse to currentAge (instant payoff).
+          if (mr > 0 && mr * d.remainingBalance >= d.monthlyPayment) return longevityAge;
           const months = mr > 0
             ? Math.ceil(-Math.log(1 - mr * d.remainingBalance / d.monthlyPayment) / Math.log(1 + mr))
             : Math.ceil(d.remainingBalance / d.monthlyPayment);

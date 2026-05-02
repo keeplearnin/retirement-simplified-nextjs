@@ -9,10 +9,15 @@ import { useState, useEffect } from 'react';
 export function useLocalState<T>(key: string, defaultValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
   const [state, setState] = useState<T>(() => {
     if (typeof window === 'undefined') return defaultValue;
+    const stored = localStorage.getItem(key);
+    if (!stored) return defaultValue;
     try {
-      const stored = localStorage.getItem(key);
-      return stored ? JSON.parse(stored) : defaultValue;
-    } catch {
+      return JSON.parse(stored);
+    } catch (err) {
+      // Corrupted data — clear it so the next mount doesn't fail again,
+      // and warn so the user sees the regression instead of mysterious resets.
+      console.warn(`[useLocalState] Corrupted data for "${key}", clearing.`, err);
+      localStorage.removeItem(key);
       return defaultValue;
     }
   });
@@ -20,8 +25,10 @@ export function useLocalState<T>(key: string, defaultValue: T): [T, React.Dispat
   useEffect(() => {
     try {
       localStorage.setItem(key, JSON.stringify(state));
-    } catch {
-      // localStorage full or unavailable
+    } catch (err) {
+      // Surface quota exceeded / unavailable — silent failure means the user
+      // thinks their plan was saved when it wasn't.
+      console.warn(`[useLocalState] Failed to persist "${key}".`, err);
     }
   }, [key, state]);
 
