@@ -180,13 +180,13 @@ export default function VerdictResult({ output, input, onRestart }) {
       {healthcare && healthcare.preMedicareYears === 0 && (
         <Card style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
-            Lifetime healthcare cost (Medicare era)
+            Lifetime healthcare in retirement
           </div>
           <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
             {fmt(healthcare.lifetimeHealthcareCost)}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-            Part B + Medigap + Part D, baseline (no IRMAA). Fidelity's benchmark for someone in your situation: {fmt(healthcare.fidelityBenchmark)}.
+            What you'll pay out of pocket on Medicare from age 65: Part B + supplemental coverage + drug plan, before any high-income surcharges. Fidelity's average for someone in your situation: {fmt(healthcare.fidelityBenchmark)}.
           </div>
         </Card>
       )}
