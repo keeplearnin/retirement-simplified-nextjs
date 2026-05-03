@@ -10,10 +10,12 @@ const sections = [
     title: 'Tax brackets, deductions, and capital gains',
     body: [
       "Federal income tax brackets, standard deduction, additional standard deduction for age 65+, and long-term capital-gains brackets all use 2026 figures from IRS Rev. Proc. 2025-32.",
+      "OBBBA senior bonus deduction: $6,000 per qualifying individual age 65+, on top of the existing additional standard deduction. Effective tax years 2025–2028 only (expires after 2028 absent congressional extension). Phases out 6¢ per dollar of MAGI over $75K single / $150K MFJ; reaches zero at $175K / $250K. The projection engine applies this deduction year-by-year and stops applying it after 2028.",
       "Marginal rates and bracket thresholds update each January when the IRS publishes new inflation adjustments.",
     ],
     sources: [
       { label: 'IRS Rev. Proc. 2025-32 (2026 inflation adjustments)', url: 'https://www.irs.gov/newsroom/irs-releases-tax-inflation-adjustments-for-tax-year-2026-including-amendments-from-the-one-big-beautiful-bill' },
+      { label: 'IRS — One Big Beautiful Bill Act senior deduction', url: 'https://www.irs.gov/newsroom/one-big-beautiful-bill-act-tax-deductions-for-working-americans-and-seniors' },
       { label: 'Tax Foundation: 2026 federal brackets', url: 'https://taxfoundation.org/data/all/federal/2026-tax-brackets/' },
     ],
   },

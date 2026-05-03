@@ -15,15 +15,42 @@ function promoteVerdictToPlan(input) {
   try {
     const raw = localStorage.getItem('myplan-v1');
     const existing = raw ? JSON.parse(raw) : {};
+
+    // The verdict captures ONE savings total. Park it in 401(k) and zero
+    // every other savings bucket so the displayed planner total matches
+    // what the user typed. Without this, the DEFAULT_PLAN prefills (Roth
+    // $50K + HSA $10K + Taxable $30K = $90K of phantom savings) leak
+    // through the shallow merge and inflate the user's total — the
+    // "$150K verdict → $240K planner" tester report. User can re-allocate
+    // across account types via the My Plan sliders after promotion.
+    //
+    // Couples: verdict collects household total; we put it all on primary
+    // and zero the spouse buckets. The user can split via the spouse
+    // panel after promotion.
     const merged = {
       ...existing,
       currentAge: input.currentAge,
       retireAge: input.retirementAge,
       filingStatus: input.filingStatus,
       monthlyContribution: input.monthlyContribution,
-      // Park current savings in 401(k) by default — user can re-allocate
-      // across account types in the My Plan sliders.
+
+      // Authoritative reset of every savings bucket — see comment above.
       savings401k: input.currentSavings,
+      savingsRoth: 0,
+      savingsHSA: 0,
+      savingsPension: 0,
+      savingsTaxable: 0,
+      savingsRealEstate: 0,
+      savingsCash: 0,
+      savings529: 0,
+      savingsCrypto: 0,
+      savingsAnnuity: 0,
+      spouseSavings401k: 0,
+      spouseSavingsRoth: 0,
+      spouseSavingsHSA: 0,
+      spouseSavingsPension: 0,
+      spouseMonthlyContribution: 0,
+
       incomeSources: [
         ...(existing.incomeSources?.filter(s => s.type !== 'salary') || []),
         { id: 1, type: 'salary', label: 'Salary', amount: input.annualIncome, growthRate: 3 },

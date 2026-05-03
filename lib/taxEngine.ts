@@ -16,6 +16,10 @@ export interface TaxInput {
   stateCode: string;             // 2-letter state code
   age: number;                   // for over-65 deduction
   spouseAge?: number;
+  /** Calendar year this tax year corresponds to. Used to gate temporary
+   *  provisions like the OBBBA senior bonus deduction (effective 2025-2028).
+   *  Defaults to 2026 if absent — matches the rest of the engine's constants. */
+  taxYear?: number;
   deductions?: {
     mortgageInterest?: number;
     propertyTax?: number;
@@ -38,6 +42,9 @@ export interface TaxResult {
   standardDeduction: number;
   itemizedDeduction: number;
   deductionUsed: 'standard' | 'itemized';
+  /** OBBBA senior bonus deduction (2025-2028 only) — separate line so users
+   *  can see the temporary boost vs. the permanent additional 65+ deduction. */
+  obbbaSeniorDeduction: number;
 }
 
 export interface IrmaaCliff {
@@ -120,6 +127,25 @@ const STANDARD_DEDUCTION_SINGLE = 16_100;
 const STANDARD_DEDUCTION_MFJ = 32_200;
 const ADDITIONAL_DEDUCTION_SINGLE_65 = 2_050;
 const ADDITIONAL_DEDUCTION_MFJ_65 = 1_650; // per qualifying spouse
+
+// ---------------------------------------------------------------------------
+// OBBBA Senior Bonus Deduction (One Big Beautiful Bill Act, 2025)
+// ---------------------------------------------------------------------------
+// Temporary $6,000 deduction per qualifying individual age 65+, on top of
+// the existing additional standard deduction. Effective tax years 2025
+// through 2028. Phases out 6¢ per $ of MAGI over the threshold:
+//   Single:  $75,000 → $175,000 MAGI (deduction reaches $0)
+//   MFJ:     $150,000 → $250,000 MAGI (per-spouse phase-out)
+// Per-person: in MFJ where both spouses are 65+, household total can reach
+// $12,000 (each spouse's $6,000 phased independently against household MAGI).
+// Source: IRS — One, Big, Beautiful Bill Act tax deductions for working
+// Americans and seniors fact sheet.
+const OBBBA_SENIOR_BONUS = 6_000;
+const OBBBA_PHASE_OUT_RATE = 0.06;
+const OBBBA_PHASE_OUT_START_SINGLE = 75_000;
+const OBBBA_PHASE_OUT_START_MFJ = 150_000;
+const OBBBA_FIRST_TAX_YEAR = 2025;
+const OBBBA_LAST_TAX_YEAR = 2028;
 
 // ---------------------------------------------------------------------------
 // Capital Gains Brackets (0% / 15% / 20%) — 2026
@@ -346,6 +372,33 @@ function getStandardDeduction(
   return deduction;
 }
 
+/**
+ * OBBBA senior bonus deduction. Returns 0 outside the 2025-2028 window and
+ * for households with no qualifying 65+ filers. Phase-out is applied per
+ * qualifying spouse against household MAGI.
+ */
+function computeOBBBASeniorDeduction(
+  magi: number,
+  filingStatus: 'single' | 'mfj',
+  age: number,
+  spouseAge: number | undefined,
+  taxYear: number,
+): number {
+  if (taxYear < OBBBA_FIRST_TAX_YEAR || taxYear > OBBBA_LAST_TAX_YEAR) return 0;
+
+  const threshold =
+    filingStatus === 'single' ? OBBBA_PHASE_OUT_START_SINGLE : OBBBA_PHASE_OUT_START_MFJ;
+  const reduction = Math.max(0, magi - threshold) * OBBBA_PHASE_OUT_RATE;
+  const perPersonBonus = Math.max(0, OBBBA_SENIOR_BONUS - reduction);
+
+  let total = 0;
+  if (age >= 65) total += perPersonBonus;
+  if (filingStatus === 'mfj' && spouseAge !== undefined && spouseAge >= 65) {
+    total += perPersonBonus;
+  }
+  return total;
+}
+
 function computeIRMAA(magi: number, filingStatus: 'single' | 'mfj'): number {
   const table = filingStatus === 'single' ? IRMAA_SINGLE : IRMAA_MFJ;
   for (const entry of table) {
@@ -418,6 +471,7 @@ export function computeTax(input: TaxInput): TaxResult {
     stateCode,
     age,
     spouseAge,
+    taxYear = 2026,
     deductions,
   } = input;
 
@@ -427,6 +481,11 @@ export function computeTax(input: TaxInput): TaxResult {
 
   // 2. Gross income for federal purposes
   const grossOrdinaryIncome = ordinaryIncome + ssTaxable;
+
+  // MAGI is needed both for the OBBBA senior bonus phase-out below and for
+  // IRMAA / NIIT later. It does not depend on deductions, so we compute it
+  // once here and reuse.
+  const magi = grossOrdinaryIncome + capitalGains;
 
   // 3. Deductions
   const standardDeduction = getStandardDeduction(filingStatus, age, spouseAge);
@@ -444,8 +503,23 @@ export function computeTax(input: TaxInput): TaxResult {
 
   const deductionUsed: 'standard' | 'itemized' =
     itemizedDeduction > standardDeduction ? 'itemized' : 'standard';
-  const deductionAmount =
+  const baseDeduction =
     deductionUsed === 'itemized' ? itemizedDeduction : standardDeduction;
+
+  // OBBBA senior bonus stacks on top of standard OR itemized. Per IRS, this
+  // is "in addition to" the standard deduction (and silently in addition to
+  // itemized too — it's a separate allowance, not part of either). Phased
+  // out by household MAGI. Returns 0 for non-65+ households or outside the
+  // 2025-2028 window. See computeOBBBASeniorDeduction comment for sources.
+  const obbbaSeniorDeduction = computeOBBBASeniorDeduction(
+    magi,
+    filingStatus,
+    age,
+    spouseAge,
+    taxYear,
+  );
+
+  const deductionAmount = baseDeduction + obbbaSeniorDeduction;
 
   // 4. Federal taxable ordinary income
   const federalTaxableOrdinary = Math.max(0, grossOrdinaryIncome - deductionAmount);
@@ -462,8 +536,7 @@ export function computeTax(input: TaxInput): TaxResult {
     filingStatus,
   );
 
-  // 7. NIIT
-  const magi = grossOrdinaryIncome + capitalGains;
+  // 7. NIIT — uses MAGI computed earlier for the OBBBA phase-out
   const niit = computeNIIT(capitalGains, magi, filingStatus);
 
   // 8. State tax (applied to ordinary income + capital gains, simplified)
@@ -498,6 +571,7 @@ export function computeTax(input: TaxInput): TaxResult {
     standardDeduction,
     itemizedDeduction: round2(itemizedDeduction),
     deductionUsed,
+    obbbaSeniorDeduction: round2(obbbaSeniorDeduction),
   };
 }
 

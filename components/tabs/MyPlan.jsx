@@ -841,10 +841,17 @@ export default function MyPlan() {
     const RMD_START = RMD_START_AGE;
     const rmdDivisor = (age) => RMD_TABLE[Math.min(age, 110)] || 8.9;
 
+    // Anchor calendar year to 2026 — matches IRS Rev. Proc. 2025-32 figures
+    // baked into taxEngine.ts. Row i corresponds to taxYear = BASE_TAX_YEAR + i.
+    // Used to gate the OBBBA senior bonus deduction (effective 2025-2028 only).
+    // Mirrors the constant in lib/computeProjection.js — bump in lockstep.
+    const BASE_TAX_YEAR = 2026;
+
     // Combine with taxes + portfolio tracking
     const combined = incomeProjections.map((inc, i) => {
       const exp = expenseProjections[i] || { totalExpense: 0, healthcare: 0 };
       const age = inc.age;
+      const taxYear = BASE_TAX_YEAR + i;
 
       // --- RMD calculation (age 73+ from 401k balance) ---
       // KNOWN LIMITATION (Phase F target): for couples, bal401k is the
@@ -865,7 +872,7 @@ export default function MyPlan() {
       const taxPass1 = computeTax({
         filingStatus, ordinaryIncome: baseOrdinaryIncome,
         socialSecurityBenefit: inc.socialSecurity, capitalGains: 0,
-        stateCode, age,
+        stateCode, age, taxYear,
       });
 
       const netAfterTax1 = baseIncome - taxPass1.totalTax;
@@ -925,7 +932,7 @@ export default function MyPlan() {
         ordinaryIncome: baseOrdinaryIncome + w.w401k + w.wPension + w.wCash,
         socialSecurityBenefit: inc.socialSecurity,
         capitalGains: provisionalCapGains,
-        stateCode, age,
+        stateCode, age, taxYear,
       });
       if ((provisionalTax.marginalRate || 0) > (taxPass1.marginalRate || 0) + 0.005) {
         w = runWaterfall(provisionalTax.marginalRate);
@@ -948,7 +955,7 @@ export default function MyPlan() {
       const taxResult = computeTax({
         filingStatus, ordinaryIncome: totalOrdinaryIncome,
         socialSecurityBenefit: inc.socialSecurity, capitalGains,
-        stateCode, age,
+        stateCode, age, taxYear,
       });
 
       const totalIncome = baseIncome + withdrawal401k + withdrawalRoth + withdrawalTaxable + withdrawalHSA

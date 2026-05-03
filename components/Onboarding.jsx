@@ -31,6 +31,19 @@ export default function Onboarding({ onComplete }) {
   const [spouseS401k, setSpouseS401k] = useState(30000);
   const [spouseSRoth, setSpouseSRoth] = useState(5000);
 
+  // Pension — optional, off by default. Tester feedback flagged that
+  // teachers / govt / military / union-pension users had no clear way to
+  // add a pension; the income-source dropdown on My Plan was discoverable
+  // only to users who scrolled and clicked. Surfacing it here keeps the
+  // 80% who don't have one on a fast path, and the 20% who do never have
+  // to wonder if it's supported.
+  const [hasPension, setHasPension] = useState(false);
+  const [pensionMonthly, setPensionMonthly] = useState(2000);
+  const [pensionStartAge, setPensionStartAge] = useState(65);
+  const [hasSpousePension, setHasSpousePension] = useState(false);
+  const [spousePensionMonthly, setSpousePensionMonthly] = useState(2000);
+  const [spousePensionStartAge, setSpousePensionStartAge] = useState(65);
+
   function finish() {
     const householdSalary = salary + (hasSpouse ? spouseSalary : 0);
     // Spending is anchored to household salary; 75% as default working-years
@@ -47,6 +60,19 @@ export default function Onboarding({ onComplete }) {
         { id: 3, type: 'salary', label: 'Spouse Salary', amount: spouseSalary, growthRate: 3, owner: 'spouse' },
         { id: 4, type: 'socialSecurity', label: 'Spouse Social Security', monthlyBenefit: 2200, startAge: 67, owner: 'spouse' },
       );
+    }
+    let nextId = incomeSources.length + 1;
+    if (hasPension) {
+      incomeSources.push({
+        id: nextId++, type: 'pension', label: 'Pension',
+        monthlyAmount: pensionMonthly, startAge: pensionStartAge, cola: true, owner: 'primary',
+      });
+    }
+    if (hasSpouse && hasSpousePension) {
+      incomeSources.push({
+        id: nextId++, type: 'pension', label: 'Spouse Pension',
+        monthlyAmount: spousePensionMonthly, startAge: spousePensionStartAge, cola: true, owner: 'spouse',
+      });
     }
 
     bulkUpdate({
@@ -184,6 +210,46 @@ export default function Onboarding({ onComplete }) {
               <Slider label="Spouse Annual Salary" value={spouseSalary} onChange={setSpouseSalary} min={0} max={500000} step={5000} format={fmt} />
             )}
             <Slider label="Retirement Spending (% of today's spending)" value={retireReplacementPct} onChange={setRetireReplacementPct} min={50} max={120} step={5} suffix="%" />
+
+            {/* Pension toggle — surfaced for teacher / govt / military / union users.
+                Off by default because most private-sector folks no longer have one;
+                we don't want to clutter the path for the 80% case. */}
+            <div style={{ marginTop: 18, padding: '12px 14px', borderRadius: 10, background: 'var(--bg2)', border: '1px solid var(--border)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, color: 'var(--text)' }}>
+                <input
+                  type="checkbox"
+                  checked={hasPension}
+                  onChange={e => setHasPension(e.target.checked)}
+                  style={{ width: 16, height: 16, cursor: 'pointer' }}
+                />
+                <span style={{ fontWeight: 600 }}>{hasSpouse ? 'I will receive a pension' : 'I will receive a pension'}</span>
+                <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>(teacher, govt, military, union)</span>
+              </label>
+              {hasPension && (
+                <div style={{ marginTop: 10 }}>
+                  <Slider label="Monthly Pension Amount" value={pensionMonthly} onChange={setPensionMonthly} min={0} max={15000} step={100} format={fmt} />
+                  <Slider label="Start Age" value={pensionStartAge} onChange={setPensionStartAge} min={50} max={75} suffix=" yrs" />
+                </div>
+              )}
+              {hasSpouse && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, color: 'var(--text)', marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+                  <input
+                    type="checkbox"
+                    checked={hasSpousePension}
+                    onChange={e => setHasSpousePension(e.target.checked)}
+                    style={{ width: 16, height: 16, cursor: 'pointer' }}
+                  />
+                  <span style={{ fontWeight: 600 }}>My spouse will receive a pension</span>
+                </label>
+              )}
+              {hasSpouse && hasSpousePension && (
+                <div style={{ marginTop: 10 }}>
+                  <Slider label="Spouse Monthly Pension" value={spousePensionMonthly} onChange={setSpousePensionMonthly} min={0} max={15000} step={100} format={fmt} />
+                  <Slider label="Spouse Start Age" value={spousePensionStartAge} onChange={setSpousePensionStartAge} min={50} max={75} suffix=" yrs" />
+                </div>
+              )}
+            </div>
+
             {(() => {
               const householdSalary = salary + (hasSpouse ? spouseSalary : 0);
               return (

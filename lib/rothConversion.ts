@@ -180,6 +180,11 @@ function runScenario(input: RothLadderInput, withLadder: boolean): RothLadderSce
     }
 
     const totalOrdinary = pension + rmd + conversion;
+    // Calendar year = today + (age - currentAge). Anchored to 2026 to match
+    // taxEngine.ts constants. Used to gate the OBBBA senior bonus deduction
+    // (effective 2025-2028 only) — relevant for users who are 65+ during
+    // the conversion window.
+    const taxYear = 2026 + (age - input.currentAge);
     const taxResult = computeTax({
       filingStatus: input.filingStatus,
       ordinaryIncome: totalOrdinary,
@@ -187,6 +192,7 @@ function runScenario(input: RothLadderInput, withLadder: boolean): RothLadderSce
       capitalGains: 0,
       stateCode: input.stateCode,
       age,
+      taxYear,
     });
 
     const totalTax = taxResult.totalTax;

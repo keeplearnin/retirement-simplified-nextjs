@@ -24,11 +24,17 @@ export const DEFAULT_PLAN = {
   spouseLongevityAge: 95,
 
   // ── Savings / portfolio ────────────────────────────────────────────────
-  // Per-person accounts (split when hasSpouse=true). Contribution limits are
-  // per-person, so the household total = primary + spouse.
-  savings401k: 150000,
-  savingsRoth: 50000,
-  savingsHSA: 10000,
+  // All buckets default to 0. Real values arrive via Onboarding (user
+  // typed them), Verdict promotion (one total parked in 401k), or a
+  // returning user's saved localStorage. Earlier defaults of
+  // $150K/$50K/$10K/$30K leaked through the verdict shallow-merge and
+  // the Onboarding "Skip" path, displaying $240K of phantom savings the
+  // user never entered — broke trust visibly (tester report 2026-05-02).
+  // Per-person accounts (split when hasSpouse=true). Contribution limits
+  // are per-person, so the household total = primary + spouse.
+  savings401k: 0,
+  savingsRoth: 0,
+  savingsHSA: 0,
   savingsPension: 0,
   spouseSavings401k: 0,
   spouseSavingsRoth: 0,
@@ -36,7 +42,7 @@ export const DEFAULT_PLAN = {
   spouseSavingsPension: 0,
 
   // Household-pooled accounts (joint ownership common in real life).
-  savingsTaxable: 30000,
+  savingsTaxable: 0,
   savingsRealEstate: 0,
   savingsCash: 0,
   savings529: 0,
