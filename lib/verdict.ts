@@ -50,6 +50,9 @@ export interface VerdictOutput {
    *  pluralize copy ("you're / you both are…") and to scale healthcare for
    *  household size = 2. */
   hasSpouse: boolean;
+  /** Years until the household enters retirement; lets the copy generator
+   *  acknowledge time horizon when softening the verdict for younger users. */
+  yearsToRetirement: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -85,12 +88,25 @@ export function getBenchmarkMultiple(age: number): number {
 // Status thresholds (ratio of current savings to benchmark)
 // ---------------------------------------------------------------------------
 
-export function getGapStatus(currentSavings: number, benchmarkSavings: number): GapStatus {
+export function getGapStatus(
+  currentSavings: number,
+  benchmarkSavings: number,
+  yearsToRetirement: number = 0,
+): GapStatus {
   if (benchmarkSavings <= 0) return 'on-track';
   const ratio = currentSavings / benchmarkSavings;
+
+  // Wider tolerance for users with long time horizons. A 40-year-old at 50%
+  // of benchmark has 25 years to fix it — calling them "significantly behind"
+  // is technically correct but emotionally wrong, and it tanks the conversion
+  // funnel. Older bands stay strict because the user has less runway.
+  const longHorizon = yearsToRetirement >= 20;
+  const moderateHorizon = yearsToRetirement >= 10;
+  const sigBehindCutoff = longHorizon ? 0.40 : moderateHorizon ? 0.50 : 0.60;
+
   if (ratio >= 1.05) return 'ahead';
   if (ratio >= 0.90) return 'on-track';
-  if (ratio >= 0.60) return 'behind';
+  if (ratio >= sigBehindCutoff) return 'behind';
   return 'significantly-behind';
 }
 
@@ -123,15 +139,20 @@ const fmtUSD = (n: number) =>
 
 export function generateVerdictText(out: VerdictOutput): string {
   const gap = Math.abs(out.savingsGap);
+  const longHorizon = out.yearsToRetirement >= 20;
   switch (out.gapStatus) {
     case 'ahead':
       return `You're ${fmtUSD(gap)} ahead of the benchmark for your age and income. Your plan looks solid — but there are still optimizations worth knowing about.`;
     case 'on-track':
       return `You're roughly on track. The benchmark for someone your age and income is ${fmtUSD(out.benchmarkSavings)}, and you're close. Here's how to stay on track and avoid the hidden risks.`;
     case 'behind':
-      return `You're ${fmtUSD(gap)} behind the benchmark for your age and income — but this gap is closeable. Here are the highest-impact moves you can make right now.`;
+      return longHorizon
+        ? `You're ${fmtUSD(gap)} behind the benchmark for your age and income — but with ${out.yearsToRetirement} years until retirement, you have lots of room to catch up. Here are the highest-impact moves you can make right now.`
+        : `You're ${fmtUSD(gap)} behind the benchmark for your age and income — but this gap is closeable. Here are the highest-impact moves you can make right now.`;
     case 'significantly-behind':
-      return `You're ${fmtUSD(gap)} behind where you need to be. Retirement is still achievable with the right moves — the math is harder, but it's not impossible. Here's your catch-up plan.`;
+      return longHorizon
+        ? `You're ${fmtUSD(gap)} below where the benchmark says you should be — but you have ${out.yearsToRetirement} years to fix it, which is on your side. Here's the catch-up plan that gets the most done first.`
+        : `You're ${fmtUSD(gap)} behind where you need to be. Retirement is still achievable with the right moves — the math is harder, but it's not impossible. Here's your catch-up plan.`;
   }
 }
 
@@ -277,7 +298,7 @@ export function computeVerdict(input: VerdictInput): VerdictOutput {
       )
     : Math.round(input.annualIncome * getBenchmarkMultiple(input.currentAge));
   const savingsGap = benchmarkSavings - input.currentSavings;
-  const gapStatus = getGapStatus(input.currentSavings, benchmarkSavings);
+  const gapStatus = getGapStatus(input.currentSavings, benchmarkSavings, yearsToRetirement);
 
   const projectedFromCurrent = futureValueLump(input.currentSavings, yearsToRetirement);
   const projectedFromContrib = futureValueStream(input.monthlyContribution, yearsToRetirement);
@@ -299,6 +320,7 @@ export function computeVerdict(input: VerdictInput): VerdictOutput {
     verdictText: '',
     topActions,
     hasSpouse: !!input.hasSpouse,
+    yearsToRetirement,
   };
   out.verdictText = generateVerdictText(out);
   return out;

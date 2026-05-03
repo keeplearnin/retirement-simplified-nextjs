@@ -64,19 +64,22 @@ function AppContent() {
 
   const categories = [
     { id: 'plan', label: 'My Plan', icon: '📊', tabs: [
-      { id: 'myplan', label: 'My Plan' },
-      { id: 'myplan-v2', label: 'Dashboard (new)' },
+      { id: 'myplan', label: 'Plan' },
+      { id: 'myplan-v2', label: 'Stress Test' },
     ]},
     { id: 'build', label: 'Build', icon: '🎯', tabs: [
       { id: 'portfolio', label: 'Portfolio Builder' },
       { id: 'growth', label: 'Growth Projector' },
       { id: 'goals', label: 'Goal Planner' },
     ]},
+    // Ordered by the user's retirement-planning journey:
+    //   accumulation (Roth vs Trad) → income (SS) → conversion (Roth Ladder)
+    //   → drawdown (Withdrawal) → educational (Torpedo) → sensitivity (MC)
     { id: 'optimize', label: 'Optimize', icon: '⚡', tabs: [
-      { id: 'tax', label: 'Tax Strategy' },
-      { id: 'withdrawal', label: 'Withdrawal' },
+      { id: 'tax', label: 'Roth vs Trad' },
       { id: 'ssa', label: 'Social Security' },
       { id: 'roth-ladder', label: 'Roth Ladder' },
+      { id: 'withdrawal', label: 'Withdrawal' },
       { id: 'torpedo', label: 'Tax Torpedo' },
       { id: 'montecarlo', label: 'Monte Carlo' },
     ]},
