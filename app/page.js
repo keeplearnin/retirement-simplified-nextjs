@@ -6,29 +6,24 @@ import { PlanProvider } from '@/components/PlanProvider';
 import Onboarding from '@/components/Onboarding';
 import Auth, { isConfigured } from '@/lib/auth';
 
-import AccountDashboard from '@/components/tabs/AccountDashboard';
+// Tab imports — only those wired into the nav categories below. Orphan
+// tabs (AccountDashboard, FeeImpact, Rebalance, TaxLossHarvesting,
+// ScenarioComparison, InvestingGuide, MyPlans, Journal, RiskQuiz,
+// LinkedAccounts) were removed from the bundle for launch. Their files
+// remain in components/tabs/ for future revival.
 import GrowthProjector from '@/components/tabs/GrowthProjector';
-import FeeImpact from '@/components/tabs/FeeImpact';
 import PortfolioBuilder from '@/components/tabs/PortfolioBuilder';
-import Rebalance from '@/components/tabs/Rebalance';
-import TaxLossHarvesting from '@/components/tabs/TaxLossHarvesting';
 import WithdrawalStrategy from '@/components/tabs/WithdrawalStrategy';
 import MonteCarlo from '@/components/tabs/MonteCarlo';
 import TaxAware from '@/components/tabs/TaxAware';
-import ScenarioComparison from '@/components/tabs/ScenarioComparison';
 import SocialSecurity from '@/components/tabs/SocialSecurity';
 import TaxTorpedo from '@/components/tabs/TaxTorpedo';
 import RothLadder from '@/components/tabs/RothLadder';
 import GettingStarted from '@/components/tabs/GettingStarted';
-import InvestingGuide from '@/components/tabs/InvestingGuide';
 import AIAdvisor from '@/components/tabs/AIAdvisor';
 import MyPlan from '@/components/tabs/MyPlan';
 import MyPlanV2 from '@/components/tabs/MyPlanV2';
-import MyPlans from '@/components/tabs/MyPlans';
-import Journal from '@/components/tabs/Journal';
-import RiskQuiz from '@/components/tabs/RiskQuiz';
 import GoalPlanner from '@/components/tabs/GoalPlanner';
-import LinkedAccounts from '@/components/tabs/LinkedAccounts';
 
 function AppContent() {
   const [tab, setTab] = useState('myplan');
@@ -200,27 +195,17 @@ function AppContent() {
       <main className="section-pad" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 40px' }}>
         {tab === 'myplan' && <MyPlan />}
         {tab === 'myplan-v2' && <MyPlanV2 />}
-        {tab === 'dashboard' && <AccountDashboard />}
         {tab === 'growth' && <GrowthProjector />}
-        {tab === 'fees' && <FeeImpact />}
         {tab === 'portfolio' && <PortfolioBuilder />}
-        {tab === 'rebalance' && <Rebalance />}
-        {tab === 'taxloss' && <TaxLossHarvesting />}
         {tab === 'withdrawal' && <WithdrawalStrategy />}
         {tab === 'montecarlo' && <MonteCarlo />}
         {tab === 'tax' && <TaxAware />}
-        {tab === 'scenarios' && <ScenarioComparison />}
         {tab === 'ssa' && <SocialSecurity />}
         {tab === 'torpedo' && <TaxTorpedo />}
         {tab === 'roth-ladder' && <RothLadder />}
-        {tab === 'investing' && <InvestingGuide />}
         {tab === 'advisor' && <AIAdvisor />}
-        {tab === 'myplans' && <MyPlans />}
-        {tab === 'journal' && <Journal />}
         {tab === 'guide' && <GettingStarted />}
-        {tab === 'riskquiz' && <RiskQuiz />}
         {tab === 'goals' && <GoalPlanner />}
-        {tab === 'linked' && <LinkedAccounts />}
       </main>
 
       <footer style={{ maxWidth: 700, margin: '0 auto', textAlign: 'center', padding: '28px 24px 40px', borderTop: '1px solid var(--border)' }}>

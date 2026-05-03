@@ -251,26 +251,30 @@ export default function WithdrawalStrategy() {
             </div>
           </Card>
 
-          <Card style={{ marginTop: 14 }}>
-            <SectionLabel>Roth Conversion Ladder</SectionLabel>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: enableRothConversion ? 16 : 0 }}>
-              <input
-                type="checkbox"
-                checked={enableRothConversion}
-                onChange={e => setEnableRothConversion(e.target.checked)}
-                style={{ accentColor: 'var(--accent)', width: 18, height: 18 }}
-              />
-              <span style={{ color: 'var(--text)', fontSize: 13, fontWeight: 500 }}>Enable Roth Conversion Strategy</span>
-            </label>
-
-            {enableRothConversion && (
-              <>
-                <Slider label="Annual Conversion Amount" value={rothConversionAmt} onChange={setRothConversionAmt} min={10000} max={200000} step={5000} format={fmt} />
-                <div style={{ marginTop: 10, padding: '10px 14px', background: 'var(--bg)', borderRadius: 10, fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-                  Convert Traditional → Roth before age 73 to reduce future RMDs and create tax-free income. You&apos;ll pay taxes on conversions now at your {taxBracket}% rate, but withdrawals in retirement will be tax-free.
-                </div>
-              </>
-            )}
+          {/* Roth conversion modeling lives on its own dedicated tab now —
+              dropping the toggle here so users see one canonical surface for
+              the conversion decision (which is a substantial standalone
+              question, not a sub-feature of withdrawal sequencing). */}
+          <Card style={{ marginTop: 14, background: 'var(--bg2)', borderLeft: '3px solid var(--accent)' }}>
+            <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginBottom: 6 }}>
+              Modeling Roth conversions?
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 10 }}>
+              The dedicated <strong>Roth Ladder</strong> tab fills a target tax bracket each gap year, runs the math against the IRS bracket schedule, and flags IRMAA cliffs. More precise than the simple "convert $X/yr" model that used to live here.
+            </div>
+            <a href="?tab=roth-ladder" onClick={(e) => {
+              e.preventDefault();
+              // Find the Optimize > Roth Ladder nav and click it
+              const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === 'Roth Ladder');
+              if (btn) btn.click();
+            }} style={{
+              display: 'inline-block', padding: '6px 12px', borderRadius: 8,
+              background: 'var(--accent-dim)', color: 'var(--accent)',
+              fontSize: 12, fontWeight: 600, fontFamily: 'var(--sans)',
+              textDecoration: 'none', cursor: 'pointer',
+            }}>
+              Open Roth Ladder →
+            </a>
           </Card>
         </div>
 
