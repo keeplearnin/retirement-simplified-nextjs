@@ -288,7 +288,20 @@ function IncomeExpenseChart({ projections, retireAge }) {
 
   const retireX = x(retireAge);
   const lastRow = projections[projections.length - 1];
-  const legacy = lastRow?.portfolioBalance || 0;
+  // Legacy split: total wealth at end-of-life vs. spendable (liquid) wealth.
+  // Total includes real estate + 529 which keep appreciating; liquid is what
+  // heirs would receive without having to sell illiquid assets. Tester
+  // reported confusion where total was $5M while score was 66% — both
+  // technically correct but contradictory. Fixed by surfacing the split
+  // explicitly and flagging the case where spending exhausts liquid early
+  // (the score's "Needs Work" condition).
+  const totalLegacy = lastRow?.portfolioEndBalance ?? lastRow?.portfolioBalance ?? 0;
+  const liquidLegacy = lastRow?.liquidBalance ?? 0;
+  const illiquidLegacy = Math.max(0, totalLegacy - liquidLegacy);
+  // Did the plan run liquid dry at any retired year? (Same condition as
+  // SuccessScore's brokeAge — keeps the two displays consistent.)
+  const liquidExhaustedAtAge = projections.find(p => p.isRetired && p.liquidBalance <= 0 && p.gap < 0)?.age;
+  const legacy = totalLegacy;
 
   return (
     <div>
@@ -331,15 +344,23 @@ function IncomeExpenseChart({ projections, retireAge }) {
             );
           })()}
 
-          {/* Legacy label at end */}
-          {legacy > 0 && (
-            <>
-              <circle cx={x(maxAge)} cy={y(legacy)} r={4} fill="var(--accent)" />
-              <text x={x(maxAge) - 8} y={y(legacy) - 10} textAnchor="end" fill="var(--accent)" fontSize={10} fontWeight={600} fontFamily="var(--sans)">
-                Legacy: {fmt(legacy)}
-              </text>
-            </>
-          )}
+          {/* Legacy label at end. Color follows the same logic as the
+              callout below: green when liquid lasts, amber when liquid
+              ran dry but illiquid (RE / 529) remains. */}
+          {legacy > 0 && (() => {
+            const labelColor = liquidExhaustedAtAge ? '#f59e0b' : 'var(--accent)';
+            const labelText = liquidExhaustedAtAge
+              ? `Legacy: ${fmt(legacy)} (mostly illiquid)`
+              : `Legacy: ${fmt(legacy)}`;
+            return (
+              <>
+                <circle cx={x(maxAge)} cy={y(legacy)} r={4} fill={labelColor} />
+                <text x={x(maxAge) - 8} y={y(legacy) - 10} textAnchor="end" fill={labelColor} fontSize={10} fontWeight={600} fontFamily="var(--sans)">
+                  {labelText}
+                </text>
+              </>
+            );
+          })()}
           {legacy <= 0 && (
             (() => {
               // Use liquidBalance — real estate / 529 can't be drawn down, so
@@ -427,14 +448,39 @@ function IncomeExpenseChart({ projections, retireAge }) {
         </div>
       </details>
 
-      {/* Legacy callout */}
-      {legacy > 0 && (
-        <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: 'var(--accent-dim)', border: '1px solid rgba(52,211,153,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>Estate / Legacy for Family</div>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Projected portfolio remaining at age {maxAge}</div>
+      {/* Legacy callout — three states:
+          1. Liquid lasts through longevity: green, total + breakdown
+          2. Liquid exhausted but illiquid (RE/529) remains: amber warning,
+             "legacy is illiquid — would need to be sold to cover late-life
+             expenses" (matches SuccessScore's "Needs Work" / "At Risk")
+          3. Total = 0: red "savings depleted" */}
+      {legacy > 0 && !liquidExhaustedAtAge && (
+        <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: 'var(--accent-dim)', border: '1px solid rgba(52,211,153,0.2)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>Estate / Legacy for Family</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Projected portfolio remaining at age {maxAge}</div>
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--accent)', fontFamily: 'var(--sans)' }}>{fmt(legacy)}</div>
           </div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--accent)', fontFamily: 'var(--sans)' }}>{fmt(legacy)}</div>
+          {illiquidLegacy > 1000 && (
+            <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(52,211,153,0.15)', fontSize: 11, color: 'var(--text-dim)', display: 'flex', justifyContent: 'space-between' }}>
+              <span>{fmt(liquidLegacy)} liquid · {fmt(illiquidLegacy)} real estate / 529</span>
+            </div>
+          )}
+        </div>
+      )}
+      {legacy > 0 && liquidExhaustedAtAge && (
+        <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: 'rgba(245,158,11,.10)', border: '1px solid rgba(245,158,11,.3)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#f59e0b' }}>Legacy is illiquid — spendable savings exhausted at age {liquidExhaustedAtAge}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5, marginTop: 4 }}>
+                Total of {fmt(legacy)} at age {maxAge} = <strong>{fmt(liquidLegacy)} liquid</strong> + <strong>{fmt(illiquidLegacy)} real estate / 529</strong>. The illiquid portion isn't available for spending without selling the underlying assets — late-life expenses from age {liquidExhaustedAtAge} onward would require selling real estate, taking a reverse mortgage, or reducing spending. The plan score reflects this cash-flow gap, not the total net worth.
+              </div>
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#f59e0b', fontFamily: 'var(--sans)', flexShrink: 0 }}>{fmt(legacy)}</div>
+          </div>
         </div>
       )}
       {legacy <= 0 && (
