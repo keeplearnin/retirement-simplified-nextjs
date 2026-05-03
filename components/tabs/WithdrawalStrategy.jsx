@@ -41,7 +41,12 @@ export default function WithdrawalStrategy() {
       let moneyRunsOutAge = null;
       let totalRMDs = 0;
 
-      const ssCola = Math.max(inflationRate - 0.5, 1) / 100; // SS COLA typically trails personal inflation by ~0.5%
+      // SS COLA historically trails personal inflation by ~0.5 pp (CPI-W vs.
+      // CPI-U). Both inputs are percentage points; floor at 0 because COLA
+      // is never negative even in deflationary years (it's announced as 0%).
+      // Previous formula `Math.max(inflationRate - 0.5, 1) / 100` mixed pp
+      // and decimal units and imposed a confusing 1% floor.
+      const ssCola = Math.max(0, inflationRate - 0.5) / 100;
 
       for (let y = 0; y <= lifeExpectancy - age; y++) {
         const currentAge = age + y;

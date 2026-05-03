@@ -75,15 +75,23 @@ function estimateSS(annualSalary, claimAge) {
     pia = SS_BEND_POINTS[0] * SS_FACTORS[0] + (SS_BEND_POINTS[1] - SS_BEND_POINTS[0]) * SS_FACTORS[1] + (aime - SS_BEND_POINTS[1]) * SS_FACTORS[2];
   }
 
-  // Age adjustment relative to FRA
-  const monthsDiff = (claimAge - SS_FRA) * 12;
+  // IRS two-tier early-claiming reduction (matches lib/incomeEngine.ts and
+  // components/tabs/SocialSecurity.jsx). First 36 months early: 5/9 of 1%
+  // per month (= 0.5556%/mo). Months 37+ early: 5/12 of 1% per month (=
+  // 0.4167%/mo). The earlier flat-0.556% formula overstated the reduction
+  // by ~3.4 pp at age 62 with FRA 67 (33.3% vs the correct 30%).
+  // Delayed retirement credits accrue at 8%/yr (2/3 of 1% per month),
+  // capped at age 70.
   let adjustment = 1.0;
-  if (monthsDiff < 0) {
-    // Early: reduce by 0.556% per month before FRA
-    adjustment = 1 + (monthsDiff * 0.00556);
-  } else if (monthsDiff > 0) {
-    // Delayed: add 0.667% per month after FRA
-    adjustment = 1 + (monthsDiff * 0.00667);
+  if (claimAge < SS_FRA) {
+    const monthsEarly = (SS_FRA - claimAge) * 12;
+    const tier1Months = Math.min(monthsEarly, 36);
+    const tier2Months = Math.max(0, monthsEarly - 36);
+    const reduction = tier1Months * (5 / 900) + tier2Months * (5 / 1200);
+    adjustment = 1 - reduction;
+  } else if (claimAge > SS_FRA) {
+    const monthsLate = Math.min((claimAge - SS_FRA) * 12, (70 - SS_FRA) * 12);
+    adjustment = 1 + monthsLate * (2 / 300);
   }
 
   return Math.round(pia * adjustment);
