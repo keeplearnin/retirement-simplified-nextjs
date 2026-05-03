@@ -853,16 +853,23 @@ export default function MyPlan() {
     const retireEssentialTotal = Math.round(essentialTotal * retireScale);
     const retireDiscretionaryTotal = Math.round(discretionaryTotal * retireScale);
 
-    // Per-person tax-advantaged buckets are summed to a single household pool
-    // for projection purposes. Phase D will likely separate them again so each
-    // spouse's RMD divisor and withdrawal sequence can be tracked individually,
-    // but for now the household-level math is a meaningful improvement over
-    // primary-only.
+    // Phase F: per-spouse 401(k) / Roth / HSA / Pension tracking — required
+    // for correct RMD math when one spouse hits 73 before the other (closes
+    // AUDIT.md known limitation). Also enables spousal rollover on first
+    // death. Mirrors lib/computeProjection.js.
     const spouseFactor = plan.hasSpouse ? 1 : 0;
-    let bal401k = (plan.savings401k || 0) + spouseFactor * (plan.spouseSavings401k || 0);
-    let balRoth = (plan.savingsRoth || 0) + spouseFactor * (plan.spouseSavingsRoth || 0);
-    let balHSA = (plan.savingsHSA || 0) + spouseFactor * (plan.spouseSavingsHSA || 0);
-    let balPension = (plan.savingsPension || 0) + spouseFactor * (plan.spouseSavingsPension || 0);
+    let bal401kPrimary = plan.savings401k || 0;
+    let bal401kSpouse = spouseFactor * (plan.spouseSavings401k || 0);
+    let balRothPrimary = plan.savingsRoth || 0;
+    let balRothSpouse = spouseFactor * (plan.spouseSavingsRoth || 0);
+    let balHSAPrimary = plan.savingsHSA || 0;
+    let balHSASpouse = spouseFactor * (plan.spouseSavingsHSA || 0);
+    let balPensionPrimary = plan.savingsPension || 0;
+    let balPensionSpouse = spouseFactor * (plan.spouseSavingsPension || 0);
+    let bal401k = bal401kPrimary + bal401kSpouse;
+    let balRoth = balRothPrimary + balRothSpouse;
+    let balHSA = balHSAPrimary + balHSASpouse;
+    let balPension = balPensionPrimary + balPensionSpouse;
     // Joint household accounts — already at household level.
     let balTaxable = plan.savingsTaxable || 0;
     let balCash = plan.savingsCash || 0;
@@ -870,8 +877,6 @@ export default function MyPlan() {
     let balAnnuity = plan.savingsAnnuity || 0;
     let balRealEstate = plan.savingsRealEstate || 0;
     let bal529 = plan.savings529 || 0;
-    // Combined monthly contribution while either spouse is still working.
-    const householdMonthlyContrib = monthlyContrib + spouseFactor * (plan.spouseMonthlyContribution || 0);
     let portfolioBalance = bal401k + balRoth + balTaxable + balHSA + balCash + balCrypto + balPension + balAnnuity + balRealEstate + bal529;
     const startingBalance = portfolioBalance;
     const RMD_START = RMD_START_AGE;
@@ -889,16 +894,28 @@ export default function MyPlan() {
       const age = inc.age;
       const taxYear = BASE_TAX_YEAR + i;
 
-      // --- RMD calculation (age 73+ from 401k balance) ---
-      // KNOWN LIMITATION (Phase F target): for couples, bal401k is the
-      // household sum and the divisor uses primary's age. If primary is 73
-      // and spouse is 65 with their own 401k, this over-RMDs because spouse
-      // shouldn't yet be forced to draw. Per-spouse balance tracking + per-
-      // spouse RMD math is a larger refactor — defer to Phase F.
-      let rmdAmount = 0;
-      if (age >= RMD_START && bal401k > 0) {
-        rmdAmount = Math.round(bal401k / rmdDivisor(age));
+      // --- RMD calculation — Phase F: per-spouse, keyed on each spouse's
+      // age and own 401(k) balance. Closes the AUDIT.md known limitation
+      // (combined-pool RMD using primary's age). Mirrors
+      // lib/computeProjection.js. Deceased spouses don't RMD; their
+      // balance rolls into survivor's bucket below. ---
+      const spouseAge = inc.spouseAge;
+      const primaryAlive = inc.primaryAlive !== false; // singles plans = true
+      const spouseAlive = !!inc.spouseAlive;
+      let rmdPrimary = 0;
+      if (primaryAlive && age >= RMD_START && bal401kPrimary > 0) {
+        rmdPrimary = bal401kPrimary / rmdDivisor(age);
       }
+      let rmdSpouse = 0;
+      if (plan.hasSpouse && spouseAlive && spouseAge != null && spouseAge >= RMD_START && bal401kSpouse > 0) {
+        rmdSpouse = bal401kSpouse / rmdDivisor(spouseAge);
+      }
+      const rmdAmount = Math.round(rmdPrimary + rmdSpouse);
+
+      // Per-year filing status — flips MFJ→single in the year AFTER first
+      // spouse death (year-of-death stays MFJ per IRS rule, handled by
+      // incomeEngine.filingStatusHint).
+      const yearFilingStatus = inc.filingStatusHint || filingStatus;
 
       // --- Base income (before withdrawals — RMD excluded here, counted as withdrawal) ---
       const baseOrdinaryIncome = inc.salary + inc.pension + inc.rental + inc.annuity + inc.partTime + inc.otherIncome;
@@ -906,7 +923,7 @@ export default function MyPlan() {
 
       // --- First pass: compute taxes on known income ---
       const taxPass1 = computeTax({
-        filingStatus, ordinaryIncome: baseOrdinaryIncome,
+        filingStatus: yearFilingStatus, ordinaryIncome: baseOrdinaryIncome,
         socialSecurityBenefit: inc.socialSecurity, capitalGains: 0,
         stateCode, age, taxYear,
       });
@@ -964,7 +981,7 @@ export default function MyPlan() {
         + Math.round(w.wCrypto * gainsRatio)
         + Math.round(w.wAnnuity * 0.3);
       const provisionalTax = computeTax({
-        filingStatus,
+        filingStatus: yearFilingStatus,
         ordinaryIncome: baseOrdinaryIncome + w.w401k + w.wPension + w.wCash,
         socialSecurityBenefit: inc.socialSecurity,
         capitalGains: provisionalCapGains,
@@ -989,7 +1006,7 @@ export default function MyPlan() {
         + Math.round(withdrawalAnnuity * 0.3); // annuity: ~30% gains portion
 
       const taxResult = computeTax({
-        filingStatus, ordinaryIncome: totalOrdinaryIncome,
+        filingStatus: yearFilingStatus, ordinaryIncome: totalOrdinaryIncome,
         socialSecurityBenefit: inc.socialSecurity, capitalGains,
         stateCode, age, taxYear,
       });
@@ -1011,30 +1028,71 @@ export default function MyPlan() {
       const annuityRate = (plan.annuityReturn || 3.5) / 100;
       const reRate = (plan.realEstateAppreciation || 3) / 100;
 
-      // Per-spouse contribution gating. Primary's contribution flows while
-      // primary works; spouse's contribution flows while spouse works. This
-      // correctly handles "primary retires at 60, spouse keeps earning to 65"
-      // — the spouse's contributions continue feeding the pool.
-      const primaryWorking = !inc.isRetired;
-      const spouseWorking = plan.hasSpouse && inc.spouseIsRetired === false;
-      const yearContribAnnual =
-        (primaryWorking ? monthlyContrib : 0) * 12 +
-        (spouseWorking ? (plan.spouseMonthlyContribution || 0) : 0) * 12;
+      // Per-spouse contribution gating + Phase F alive gating. Primary's
+      // contribution flows while primary is working AND alive; spouse's
+      // contribution flows while spouse is working AND alive.
+      const primaryWorking = !inc.isRetired && primaryAlive;
+      const spouseWorking = plan.hasSpouse && inc.spouseIsRetired === false && spouseAlive;
+      const primaryYearContrib = (primaryWorking ? monthlyContrib * 12 : 0);
+      const spouseYearContrib = (spouseWorking ? (plan.spouseMonthlyContribution || 0) * 12 : 0);
 
-      // Unified balance update: grow the post-withdrawal balance, then add
-      // the year's contribution. Withdrawals are zero in years where the
-      // shortfall gate didn't fire, so this degenerates to the original
-      // "grow + contribute" form for working years.
-      bal401k = Math.max(0, (bal401k - withdrawal401k) * (1 + yearReturn)) + yearContribAnnual * 0.6;
-      balRoth = Math.max(0, (balRoth - withdrawalRoth) * (1 + yearReturn)) + yearContribAnnual * 0.2;
+      // Allocate per-spouse withdrawals: forced RMD from each spouse's
+      // bucket; any extra from primary first (matches drawdown convention).
+      const allocate = (total, primaryBal, spouseBal, primaryForced, spouseForced) => {
+        let pPart = Math.min(primaryForced, primaryBal);
+        let sPart = Math.min(spouseForced, spouseBal);
+        let extra = Math.max(0, total - pPart - sPart);
+        const fromPrimary = Math.min(extra, primaryBal - pPart);
+        pPart += fromPrimary;
+        extra -= fromPrimary;
+        sPart += Math.min(extra, spouseBal - sPart);
+        return { pPart, sPart };
+      };
+      const w401kAlloc = allocate(withdrawal401k, bal401kPrimary, bal401kSpouse, rmdPrimary, rmdSpouse);
+      const wRothAlloc = allocate(withdrawalRoth, balRothPrimary, balRothSpouse, 0, 0);
+      const wHSAAlloc = allocate(withdrawalHSA, balHSAPrimary, balHSASpouse, 0, 0);
+      const wPensionAlloc = allocate(withdrawalPension, balPensionPrimary, balPensionSpouse, 0, 0);
+
+      // Per-spouse 401(k)/Roth/HSA/Pension balance update.
+      bal401kPrimary = Math.max(0, (bal401kPrimary - w401kAlloc.pPart) * (1 + yearReturn)) + primaryYearContrib * 0.6;
+      bal401kSpouse  = Math.max(0, (bal401kSpouse  - w401kAlloc.sPart) * (1 + yearReturn)) + spouseYearContrib  * 0.6;
+      balRothPrimary = Math.max(0, (balRothPrimary - wRothAlloc.pPart) * (1 + yearReturn)) + primaryYearContrib * 0.2;
+      balRothSpouse  = Math.max(0, (balRothSpouse  - wRothAlloc.sPart) * (1 + yearReturn)) + spouseYearContrib  * 0.2;
+      balHSAPrimary  = Math.max(0, (balHSAPrimary  - wHSAAlloc.pPart)  * (1 + yearReturn * 0.5));
+      balHSASpouse   = Math.max(0, (balHSASpouse   - wHSAAlloc.sPart)  * (1 + yearReturn * 0.5));
+      balPensionPrimary = Math.max(0, (balPensionPrimary - wPensionAlloc.pPart) * (1 + yearReturn * (fullyRetired ? 0.5 : 0.6)));
+      balPensionSpouse  = Math.max(0, (balPensionSpouse  - wPensionAlloc.sPart) * (1 + yearReturn * (fullyRetired ? 0.5 : 0.6)));
+
+      // Phase F: spousal rollover. When one spouse dies, their tax-deferred
+      // and Roth balances roll into the survivor's bucket (no immediate
+      // distribution, preserves tax-deferred status).
+      if (plan.hasSpouse && !primaryAlive && bal401kPrimary > 0) {
+        bal401kSpouse += bal401kPrimary; bal401kPrimary = 0;
+        balRothSpouse += balRothPrimary; balRothPrimary = 0;
+        balHSASpouse += balHSAPrimary; balHSAPrimary = 0;
+        balPensionSpouse += balPensionPrimary; balPensionPrimary = 0;
+      }
+      if (plan.hasSpouse && !spouseAlive && bal401kSpouse > 0) {
+        bal401kPrimary += bal401kSpouse; bal401kSpouse = 0;
+        balRothPrimary += balRothSpouse; balRothSpouse = 0;
+        balHSAPrimary += balHSASpouse; balHSASpouse = 0;
+        balPensionPrimary += balPensionSpouse; balPensionSpouse = 0;
+      }
+
+      // Joint household balances.
+      const yearContribAnnual = primaryYearContrib + spouseYearContrib;
       balTaxable = Math.max(0, (balTaxable - withdrawalTaxable) * (1 + yearReturn)) + yearContribAnnual * 0.2;
-      balHSA = Math.max(0, (balHSA - withdrawalHSA) * (1 + yearReturn * 0.5));
       balCash = Math.max(0, (balCash - withdrawalCash) * (1 + cashRate * (fullyRetired ? 0.8 : 1)));
       balCrypto = Math.max(0, (balCrypto - withdrawalCrypto) * (1 + yearReturn));
-      balPension = Math.max(0, (balPension - withdrawalPension) * (1 + yearReturn * (fullyRetired ? 0.5 : 0.6)));
       balAnnuity = Math.max(0, (balAnnuity - withdrawalAnnuity) * (1 + annuityRate));
       balRealEstate = balRealEstate * (1 + reRate);
       bal529 = bal529 * (1 + yearReturn * (fullyRetired ? 0.6 : 0.8));
+
+      // Sync combined views from per-spouse buckets.
+      bal401k = bal401kPrimary + bal401kSpouse;
+      balRoth = balRothPrimary + balRothSpouse;
+      balHSA = balHSAPrimary + balHSASpouse;
+      balPension = balPensionPrimary + balPensionSpouse;
       portfolioBalance = bal401k + balRoth + balTaxable + balHSA + balCash + balCrypto + balPension + balAnnuity + balRealEstate + bal529;
       if (portfolioBalance < 0) portfolioBalance = 0;
 
@@ -1082,6 +1140,13 @@ export default function MyPlan() {
         liquidBalance: Math.round(liquidBalanceEnd),
         isRetired: inc.isRetired,
         isRetireYear: inc.age === retireAge,
+        // Phase F survivor flags — surfaced for UI banners and the
+        // year-by-year filing-status indicator.
+        primaryAlive,
+        spouseAlive,
+        widowed: inc.widowed,
+        filingStatus: yearFilingStatus,
+        spouseAge: inc.spouseAge,
       };
     });
 
@@ -1698,6 +1763,37 @@ export default function MyPlan() {
             })()}
           </div>
         </div>
+
+        {/* Phase F: Survivor Analysis banner.
+            Fires only when hasSpouse and the projection includes years
+            where one spouse is dead and the other lives on. Shows who
+            dies first, when, and the SS step-up the survivor receives
+            (often a meaningful jump for non-working / lower-earning
+            spouses). The math is honest about what survivor planning
+            actually looks like — most free tools skip this entirely. */}
+        {plan.hasSpouse && (() => {
+          const widowedRows = combined.filter(r => r.widowed);
+          if (widowedRows.length === 0) return null;
+          const firstWidowedRow = combined.find(r => r.widowed);
+          // Who died: in the first-widowed row, the dead one has alive=false.
+          const primaryDied = !firstWidowedRow.primaryAlive;
+          const survivorYears = widowedRows.length;
+          return (
+            <InfoBox
+              icon="🕊️"
+              title={`Survivor analysis: ${primaryDied ? 'spouse outlives you' : 'you outlive spouse'} by ${survivorYears} year${survivorYears === 1 ? '' : 's'}`}
+              color="var(--purple)"
+              bgColor="rgba(139,92,246,0.08)"
+              style={{ marginTop: 16 }}
+            >
+              The plan models {primaryDied ? 'your spouse' : 'you'} as the surviving partner from age {primaryDied ? firstWidowedRow.spouseAge : firstWidowedRow.age} onward.
+              Three things change at that point: (1) <strong>SS step-up</strong> — the survivor automatically claims the higher of the two benefits going forward, often a meaningful jump for the lower-earning spouse;
+              (2) <strong>Filing status flips MFJ → single</strong> in the year after death (we hold MFJ for the calendar year of death itself per IRS rule);
+              (3) <strong>Tax-deferred balances roll over</strong> to the survivor's name (no immediate distribution required).
+              The single-filer brackets compress at the top — survivor years often see a higher effective rate even on the same income.
+            </InfoBox>
+          );
+        })()}
 
         {/* Healthcare in retirement breakdown.
             Surfaces the pre-65 ACA bridge (the #1 surprise cost for early

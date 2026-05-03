@@ -155,6 +155,24 @@ export interface YearlyProjection {
   /** True only when BOTH members have stopped working. Useful for gates that
    *  should fire only after the household stops earning wages. */
   isHouseholdRetired?: boolean;
+
+  // ── Phase F: survivor analysis ──
+  /** Whether each household member is alive at the END of this projection
+   *  year. We treat death as occurring at the end of the row whose age
+   *  equals the member's longevityAge — that row still has the member's
+   *  income; the next row has zero. */
+  primaryAlive?: boolean;
+  spouseAlive?: boolean;
+  /** True for any year where one spouse is dead and the other lives on.
+   *  Drives MFJ→single filing flip in computeProjection (with the year-
+   *  of-death exception: the calendar year of death itself stays MFJ per
+   *  IRS rule; the year after switches to single). */
+  widowed?: boolean;
+  /** Engine's recommended filing status for this year. 'mfj' while both
+   *  alive (or in the year of first death). 'single' once widowed for a
+   *  full calendar year. Singles plans always 'single'. Consumers may
+   *  override (e.g., HoH with dependents, qualifying widow(er)). */
+  filingStatusHint?: 'single' | 'mfj';
 }
 
 // ---------------------------------------------------------------------------
@@ -221,13 +239,16 @@ export function projectIncome(plan: RetirementPlan): YearlyProjection[] {
   const spouseAgeOffset = spouse ? spouse.currentAge - currentAge : 0;
 
   // Project until the longer-lived spouse's longevity (in primary's frame).
-  // This produces phantom primary income beyond primary.longevityAge; Phase F
-  // will add survivor logic to (a) zero out the deceased spouse's salary/SS/
-  // pension and (b) bump survivor SS to the deceased's higher benefit and
-  // flip filing status from MFJ to single in the year after death.
+  const primaryLongevity = longevityAge;
+  const spouseLongevity = spouse?.longevityAge ?? longevityAge;
   const projectionEndAge = spouse
-    ? Math.max(longevityAge, currentAge + ((spouse.longevityAge ?? longevityAge) - spouse.currentAge))
-    : longevityAge;
+    ? Math.max(primaryLongevity, currentAge + (spouseLongevity - spouse.currentAge))
+    : primaryLongevity;
+
+  // Track first-widowed-row index so we can apply IRS year-of-death rule
+  // (calendar year of death = MFJ; year after = single). The first widowed
+  // row stays MFJ; subsequent widowed rows flip to single.
+  let firstWidowedRowIdx: number | null = null;
 
   for (let age = currentAge; age <= projectionEndAge; age++) {
     const year = currentYear + (age - currentAge);
@@ -237,49 +258,88 @@ export function projectIncome(plan: RetirementPlan): YearlyProjection[] {
     const spouseIsRetired = spouse && spouseAge !== null ? spouseAge >= spouse.retireAge : false;
     const isHouseholdRetired = isRetired && (!spouse || spouseIsRetired);
 
-    // ------ Salary (primary) ------
-    let salaryAmt = 0;
-    if (salary && age < (salary.endAge ?? retireAge)) {
-      salaryAmt = salary.annualAmount * Math.pow(1 + salary.growthRate, yearsFromStart);
-    }
-    // ------ Salary (spouse) — keyed off spouse's age and retire age ------
-    let spouseSalaryAmt = 0;
-    if (spouse?.salary && spouseAge !== null && spouseAge < (spouse.salary.endAge ?? spouse.retireAge)) {
-      spouseSalaryAmt = spouse.salary.annualAmount * Math.pow(1 + spouse.salary.growthRate, yearsFromStart);
-    }
+    // ── Phase F: alive flags ──
+    // Death is treated as occurring at the END of the row whose age equals
+    // longevityAge — the row at age = longevityAge still has the member's
+    // income (their final year); the row after has zero.
+    const primaryAlive = age <= primaryLongevity;
+    const spouseAlive = spouse && spouseAge !== null
+      ? spouseAge <= spouseLongevity
+      : false;  // false when there's no spouse (singles plan)
+    const hasSpouse = !!spouse;
+    // "Widowed" = exactly one alive in a couples plan.
+    const widowed = hasSpouse && primaryAlive !== spouseAlive;
 
-    // ------ Social Security (primary) ------
-    let ssAmt = 0;
+    // ------ Salary (primary) — projected as-if-alive, zeroed if dead ------
+    let primaryAliveSalary = 0;
+    if (salary && age < (salary.endAge ?? retireAge)) {
+      primaryAliveSalary = salary.annualAmount * Math.pow(1 + salary.growthRate, yearsFromStart);
+    }
+    let salaryAmt = primaryAlive ? primaryAliveSalary : 0;
+
+    // ------ Salary (spouse) — same pattern ------
+    let spouseAliveSalary = 0;
+    if (spouse?.salary && spouseAge !== null && spouseAge < (spouse.salary.endAge ?? spouse.retireAge)) {
+      spouseAliveSalary = spouse.salary.annualAmount * Math.pow(1 + spouse.salary.growthRate, yearsFromStart);
+    }
+    let spouseSalaryAmt = spouseAlive ? spouseAliveSalary : 0;
+
+    // ------ Social Security (primary, as-if-alive) ------
+    let primaryAliveSs = 0;
     if (socialSecurity && age >= socialSecurity.startAge) {
       const cola = socialSecurity.cola ?? 0.02;
       const factor = ssClaimingFactor(socialSecurity.startAge, SS_FRA);
       const adjustedMonthly = socialSecurity.monthlyBenefitAtFRA * factor;
       const yearsSinceStart = age - socialSecurity.startAge;
-      ssAmt = adjustedMonthly * 12 * Math.pow(1 + cola, yearsSinceStart);
+      primaryAliveSs = adjustedMonthly * 12 * Math.pow(1 + cola, yearsSinceStart);
     }
-    // ------ Social Security (spouse) — keyed off spouse's claim age ------
-    let spouseSsAmt = 0;
+    // ------ Social Security (spouse, as-if-alive) ------
+    let spouseAliveSs = 0;
     if (spouse?.socialSecurity && spouseAge !== null && spouseAge >= spouse.socialSecurity.startAge) {
       const cola = spouse.socialSecurity.cola ?? 0.02;
       const factor = ssClaimingFactor(spouse.socialSecurity.startAge, SS_FRA);
       const adjustedMonthly = spouse.socialSecurity.monthlyBenefitAtFRA * factor;
       const yearsSinceStart = spouseAge - spouse.socialSecurity.startAge;
-      spouseSsAmt = adjustedMonthly * 12 * Math.pow(1 + cola, yearsSinceStart);
+      spouseAliveSs = adjustedMonthly * 12 * Math.pow(1 + cola, yearsSinceStart);
+    }
+    // SS step-up: surviving spouse can claim the higher of (their own) or
+    // (the deceased's would-have-been amount). The deceased's line goes to
+    // zero. This is the single most consequential survivor-analysis rule —
+    // a non-working spouse with a small own-PIA can see SS jump materially.
+    let ssAmt = primaryAlive ? primaryAliveSs : 0;
+    let spouseSsAmt = spouseAlive ? spouseAliveSs : 0;
+    if (primaryAlive && !spouseAlive && hasSpouse) {
+      ssAmt = Math.max(primaryAliveSs, spouseAliveSs);
+    } else if (!primaryAlive && spouseAlive && hasSpouse) {
+      spouseSsAmt = Math.max(spouseAliveSs, primaryAliveSs);
     }
 
-    // ------ Pension (primary) ------
-    let pensionAmt = 0;
+    // ------ Pension (primary, as-if-alive) ------
+    let primaryAlivePension = 0;
     if (pension && age >= pension.startAge) {
       const cola = pension.cola ?? 0;
       const yearsSinceStart = age - pension.startAge;
-      pensionAmt = pension.monthlyAmount * 12 * Math.pow(1 + cola, yearsSinceStart);
+      primaryAlivePension = pension.monthlyAmount * 12 * Math.pow(1 + cola, yearsSinceStart);
     }
-    // ------ Pension (spouse) — keyed off spouse's pension start age ------
-    let spousePensionAmt = 0;
+    // ------ Pension (spouse, as-if-alive) ------
+    let spouseAlivePension = 0;
     if (spouse?.pension && spouseAge !== null && spouseAge >= spouse.pension.startAge) {
       const cola = spouse.pension.cola ?? 0;
       const yearsSinceStart = spouseAge - spouse.pension.startAge;
-      spousePensionAmt = spouse.pension.monthlyAmount * 12 * Math.pow(1 + cola, yearsSinceStart);
+      spouseAlivePension = spouse.pension.monthlyAmount * 12 * Math.pow(1 + cola, yearsSinceStart);
+    }
+    // Pension survivor benefit: when one spouse dies, the other may receive
+    // a fraction (50% / 75% / 100%) of the deceased's pension if elected at
+    // retirement. The PensionIncome interface carries survivorBenefitPct
+    // (default 0 = single-life payout, no benefit to survivor).
+    let pensionAmt = primaryAlive ? primaryAlivePension : 0;
+    let spousePensionAmt = spouseAlive ? spouseAlivePension : 0;
+    if (primaryAlive && !spouseAlive && hasSpouse) {
+      const survivorBenefit = (spouse?.pension?.survivorBenefitPct ?? 0) * spouseAlivePension;
+      pensionAmt = primaryAlivePension + survivorBenefit;
+    } else if (!primaryAlive && spouseAlive && hasSpouse) {
+      const survivorBenefit = (pension?.survivorBenefitPct ?? 0) * primaryAlivePension;
+      spousePensionAmt = spouseAlivePension + survivorBenefit;
     }
 
     // ------ Rental Income ------
@@ -347,6 +407,29 @@ export function projectIncome(plan: RetirementPlan): YearlyProjection[] {
     const totalIncome =
       aggregateSalary + aggregateSs + aggregatePension + rentalAmt + annuityAmt + rmdAmt + partTimeAmt + otherAmt;
 
+    // ── Phase F: filing status hint ──
+    // IRS rule: in the calendar year of a spouse's death, the survivor may
+    // still file MFJ. Year after death → single (or qualifying widow(er) for
+    // 2 more years if dependent children, which we don't model). We track
+    // the FIRST widowed row index — that row stays MFJ; subsequent widowed
+    // rows flip to single.
+    if (widowed && firstWidowedRowIdx === null) {
+      firstWidowedRowIdx = projections.length;
+    }
+    let filingStatusHint: 'mfj' | 'single';
+    if (!hasSpouse) {
+      filingStatusHint = 'single';
+    } else if (!widowed) {
+      // Both alive (or both gone — same MFJ-default treatment for tax math
+      // since "both gone" rows shouldn't be consumed downstream).
+      filingStatusHint = 'mfj';
+    } else if (firstWidowedRowIdx !== null && projections.length === firstWidowedRowIdx) {
+      // Year of first death — still MFJ per IRS rule.
+      filingStatusHint = 'mfj';
+    } else {
+      filingStatusHint = 'single';
+    }
+
     const row: YearlyProjection = {
       age,
       year,
@@ -360,6 +443,7 @@ export function projectIncome(plan: RetirementPlan): YearlyProjection[] {
       otherIncome: round2(otherAmt),
       totalIncome: round2(totalIncome),
       isRetired,
+      filingStatusHint,
     };
     if (spouse) {
       row.spouseAge = spouseAge ?? undefined;
@@ -368,6 +452,9 @@ export function projectIncome(plan: RetirementPlan): YearlyProjection[] {
       row.spousePension = round2(spousePensionAmt);
       row.spouseIsRetired = spouseIsRetired;
       row.isHouseholdRetired = isHouseholdRetired;
+      row.primaryAlive = primaryAlive;
+      row.spouseAlive = spouseAlive;
+      row.widowed = widowed;
     }
     projections.push(row);
   }

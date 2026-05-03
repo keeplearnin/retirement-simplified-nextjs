@@ -26,8 +26,15 @@ Live at **retiresimplified.com**. Methodology and assumptions documented at **/m
 - **Tax Torpedo** — interactive slider showing the marginal-rate spike when each $1 of IRA withdrawal drags $0.85 of SS into the taxable base.
 - **Monte Carlo** — Box-Muller normal-distribution simulation with P10/P25/P50/P75/P90 bands and plain-language interpretation ("Your plan has a 73% probability of lasting through age 90; in the weakest 10% of scenarios, money runs short around age 82").
 
-### Couples mode
+### Couples mode (Phases A–F)
 End-to-end household modeling: per-spouse ages, retirement ages, longevity, 401(k)/Roth/HSA/pension balances, monthly contributions. Income engine projects each spouse's salary, SS, and pension on independent timelines. Per-spouse contribution gating handles "primary retires at 60, spouse keeps earning to 65" correctly. Auto-MFJ filing status with override.
+
+**Phase F — survivor analysis (May 2026):**
+- **Per-spouse RMD divisor.** Each spouse's 401(k) tracked separately so RMD math uses each person's own age and balance — closes a known over-RMD bug for younger spouses with separate 401(k)s.
+- **SS step-up on first death.** Survivor automatically claims the higher of (their own benefit) or (the deceased's), often a meaningful jump for non-working / lower-earning spouses.
+- **MFJ → single filing flip.** Year of death stays MFJ per IRS rule; year after flips to single (the brackets compress at the top, so the survivor's effective rate often rises even on the same income).
+- **Spousal rollover.** Tax-deferred and Roth balances roll into the survivor's bucket on first death — no immediate distribution.
+- **Pension survivor benefit.** When elected at retirement (e.g., 50% / 75% / 100% joint-and-survivor), surviving spouse continues to receive that fraction of the deceased's pension.
 
 ### IRMAA / RMD / Healthcare features
 - **IRMAA cliff detector** flags any year where projected MAGI lands within $5K of a Medicare surcharge tier; quantifies the annual cost of crossing.
@@ -91,7 +98,6 @@ Ordered by user-impact-per-week-of-work, not by ambition.
 - **Healthcare bridge breakdown** — explicit pre-Medicare (60–65) vs. Medicare (65+) cost split on My Plan, with per-year line items. Currently rolled up into one "Lifetime Healthcare" number on the verdict.
 - **PDF / share export** — single-page retirement summary for sharing with spouse, advisor, parent
 - **Email opt-in for the annual update** — "Notify me when 2027 brackets ship"
-- **Couples mode Phase F (survivor analysis)** — SS step-up to higher of two benefits; MFJ→single tax flip year of death + 1; per-spouse RMD divisor; spousal claiming strategies
 - **Numeric input fields alongside sliders** — for users dialing in precise values when the slider step is too coarse
 - **Phased retirement** — model part-time work in transition years (income from a part-time gig at age 60, full retirement at 65). Affects taxes, SS taxability, IRMAA timing.
 - **State-tax brackets for HI, MN, MA, WI** — extend the graduated-bracket model to the remaining graduated states the in-planner warning currently flags.

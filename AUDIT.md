@@ -73,9 +73,9 @@ Re-audit during the couples-mode build and the launch-readiness review. Most iss
 
 These are documented in code and on `/methodology` rather than fixed:
 
-- **Per-spouse RMD divisor** — combined household 401(k) pool keys RMD on primary's age. Over-RMDs when spouse has a separate 401(k) and is younger. Fix requires a multi-bucket projection refactor; deferred to Phase F (survivor analysis), since both touch the same per-spouse balance tracking.
+- ~~**Per-spouse RMD divisor**~~ **CLOSED 2026-05-03** by Phase F (commit pending). `lib/computeProjection.js` and the `MyPlan.jsx` inline mirror now track per-spouse 401(k)/Roth/HSA/Pension balances, compute RMDs from each spouse's own balance using their own age, and roll deceased spouse's balances into the survivor's bucket on first death.
 - **MyPlan.jsx inline projection mirrors `lib/computeProjection.js`** — kept mathematically identical via the audit but is duplicate work for every future change. Consolidating is a multi-hour touch-everything refactor; deferred until post-launch.
-- **State tax** — single effective rate per state. High earners in graduated states (CA, NY, NJ, MA, OR) pay more than the estimator shows. Caveat surfaced in the State picker tooltip.
+- **State tax** — CA/NY/NJ/OR now use full graduated brackets (closed 2026-05-02). HI, MN, MA, WI still on flat rates with in-planner warning for high earners; on roadmap.
 
 ---
 
@@ -87,3 +87,23 @@ _Add observations here as you use the app and spot issues._
 - Expenses at age 90-95 show spikes — possibly healthcare LTC costs kicking in without proper cap scaling.
 - **Pattern across both audits: duplicate math drifts.** Items #4/#21 (SS reduction in two places), #16-#17 (`portfolioBalance` vs `liquidBalance` in four sites), #15/#19 (growth-vs-withdrawal ordering different across tabs), and the still-open MyPlan inline projection mirror all have the same shape — the same calculation gets copied into a UI tab, then the canonical version in `lib/` gets fixed and the copy doesn't. Rule of thumb going forward: any tab that does more than render numbers should call into `lib/computeProjection.js` or `lib/incomeEngine.ts`, not roll its own.
 - **Pattern: "balance" is ambiguous.** `portfolioBalance` (everything, including illiquid RE/529) vs `liquidBalance` (spendable). Whenever a UI question is "did the user run out of money?", the answer is `liquidBalance`; whenever it's "what is the user worth?", it's `portfolioBalance`. The dual-line chart (`3776696`) makes this visible to users; code should pick the right field deliberately.
+
+---
+
+## Phase F — survivor analysis (2026-05-03)
+
+Closed three open items in one pass:
+
+1. **Per-spouse RMD divisor** (Audit #2 known limitation). Each spouse's 401(k) now lives in its own bucket; RMD = `bal_x / divisor(spouse_x.age)`. Withdrawals draw forced RMDs from each bucket, then any remaining shortfall comes primary-first. End-of-year balances grow per-bucket with each spouse's contribution gated by their own working+alive status.
+
+2. **SS step-up on first death.** When one spouse dies (modeled at their `longevityAge`), the survivor's SS jumps to `max(theirOwn, deceased's would-have-been amount)`. Implemented in `lib/incomeEngine.ts` by computing each spouse's SS as-if-alive, then applying death zeroing + step-up logic. The deceased's line goes to zero; the survivor's line absorbs the higher of the two.
+
+3. **MFJ → single filing flip.** `incomeEngine` now emits `filingStatusHint` per row. Year of first death stays `mfj` per IRS rule (a survivor may file MFJ in the calendar year of death). Year after flips to `single`. `computeProjection.js` and the `MyPlan.jsx` inline mirror both consume `filingStatusHint` instead of the static plan-level `filingStatus` for tax math.
+
+Bonus: pension survivor benefit was already in the data model (`PensionIncome.survivorBenefitPct`) and now actually affects the projection — when one spouse dies, the surviving spouse's pension gets `deceased.pension * survivorBenefitPct` added. Default is 0 (single-life payout, no benefit).
+
+### Phase F open items
+- **Inherited IRA 10-year rule (SECURE Act).** When spouse rolls deceased spouse's IRA into their own, no 10-year rule applies. We model this case correctly. Non-spouse heirs get the 10-year rule, which we don't model (out of scope — survivor planning is the spouse case).
+- **Qualifying widow(er) status.** Surviving spouse with dependent children may file QW(er) for 2 years after death (effectively MFJ brackets). We assume no dependents and flip straight to single. Caveat noted on `/methodology`.
+- **Step-up in cost basis at death.** Taxable brokerage assets get a basis step-up at the deceased's death — the survivor's embedded gains effectively reset. Our `gainsRatio` curve doesn't account for this, so survivor years slightly overstate capital-gains tax on taxable withdrawals. Listed in methodology limitations.
+- **Pension survivor benefit defaults to 0.** Most users won't realize the field exists; we don't yet expose a UI input. Power users can edit `incomeSources[].survivorBenefitPct` via localStorage. UI input is on the roadmap.

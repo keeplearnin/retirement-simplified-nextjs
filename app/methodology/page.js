@@ -110,6 +110,19 @@ const sections = [
     ],
   },
   {
+    title: 'Survivor analysis (couples mode)',
+    body: [
+      "When one spouse dies (modeled at their longevity age), the projection applies three IRS rules going forward: (1) Social Security step-up — the survivor automatically claims the higher of their own benefit or the deceased's; the deceased's line drops to zero. (2) Filing status flip: the year of death itself stays MFJ per IRS rule; the year after flips to single. Single brackets compress at the top, so the survivor's effective tax rate often rises even on the same income. (3) Spousal rollover: the deceased's tax-deferred and Roth balances roll into the survivor's name (no immediate distribution required, preserves tax-deferred status).",
+      "RMDs are computed per-spouse, using each spouse's own age and own 401(k) balance — the previous combined-pool approach over-RMD'd younger spouses with separate accounts.",
+      "Pension survivor benefit: if a joint-and-survivor option was elected at retirement (50% / 75% / 100%), the surviving spouse continues receiving that fraction of the deceased's pension. Default is 0% (single-life payout) since most users don't elect survivor benefits.",
+      "What survivor analysis does not yet model: qualifying widow(er) tax filing for 2 years post-death (assumes no dependent children — survivor flips straight to single); cost-basis step-up on inherited taxable brokerage assets (we use the same gains-ratio curve, which slightly overstates capital-gains tax in survivor years); inherited IRAs for non-spouse heirs (the 10-year rule applies to children but not surviving spouses, who roll over).",
+    ],
+    sources: [
+      { label: 'IRS Pub 559 — Survivors, Executors, and Administrators', url: 'https://www.irs.gov/pub/irs-pdf/p559.pdf' },
+      { label: 'SSA — Survivors Benefits', url: 'https://www.ssa.gov/benefits/survivors/' },
+    ],
+  },
+  {
     title: 'Monte Carlo',
     body: [
       "Box-Muller normal distribution. Default 1,000 runs (configurable). Reports P10 / P25 / P50 / P75 / P90 percentiles plus success rate.",
