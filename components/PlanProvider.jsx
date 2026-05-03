@@ -60,6 +60,12 @@ export const DEFAULT_PLAN = {
   // Rate assumptions
   inflationRate: 2.5,
   healthcareInflation: 3.5,
+  // 1.0 = average healthy retiree (the baseline matching Fidelity's lifetime
+  // healthcare benchmark). Tester reviewer flagged that someone with chronic
+  // conditions has no way to bump the auto-estimate. Slider on My Plan
+  // surfaces this at 0.5x to 3.0x. Applied uniformly to ACA premiums and
+  // Medicare baseline costs in the expense projection.
+  healthcareMultiplier: 1.0,
   retiredReturnPct: 60,
   cashReturn: 3.0,
   realEstateAppreciation: 3.0,

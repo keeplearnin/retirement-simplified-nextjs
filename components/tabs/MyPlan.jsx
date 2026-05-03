@@ -822,6 +822,18 @@ export default function MyPlan() {
     retireExpensePlan.inflationRate = inflationRate;
     retireExpensePlan.healthcareInflation = (plan.healthcareInflation || 3.5) / 100;
 
+    // Apply user's healthcare multiplier (mirrors lib/computeProjection.js).
+    // 1.0 = average; 1.5+ = chronic conditions; <1.0 = unusually healthy.
+    const healthcareMultiplier = plan.healthcareMultiplier || 1.0;
+    if (healthcareMultiplier !== 1.0) {
+      [workingExpensePlan, retireExpensePlan].forEach(p => {
+        p.healthcare = p.healthcare.map(hc => ({
+          ...hc,
+          monthlyPremium: hc.monthlyPremium * healthcareMultiplier,
+        }));
+      });
+    }
+
     const workingProjections = projectExpenses(workingExpensePlan);
     const retireProjections = projectExpenses(retireExpensePlan);
 
@@ -1469,6 +1481,15 @@ export default function MyPlan() {
         <Collapsible title="Assumptions" defaultOpen={false} badge={`${plan.inflationRate || 2.5}% infl`}>
           <Slider label="General Inflation" value={plan.inflationRate || 2.5} onChange={v => updatePlan('inflationRate', v)} min={1} max={5} step={0.25} suffix="%" />
           <Slider label="Healthcare Inflation" value={plan.healthcareInflation || 3.5} onChange={v => updatePlan('healthcareInflation', v)} min={2} max={7} step={0.25} suffix="%" />
+          <Slider
+            label="Healthcare cost multiplier"
+            value={plan.healthcareMultiplier || 1.0}
+            onChange={v => updatePlan('healthcareMultiplier', v)}
+            min={0.5} max={3.0} step={0.1} suffix="x"
+          />
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -16, marginBottom: 8, lineHeight: 1.5 }}>
+            1.0× = average healthy retiree (Fidelity benchmark). 1.5× = chronic conditions. 2.0×+ = significant ongoing care needs. Applies to ACA premiums and Medicare baseline costs.
+          </div>
           <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
             <Slider label="Retirement Return (% of working)" value={plan.retiredReturnPct || 60} onChange={v => updatePlan('retiredReturnPct', v)} min={40} max={100} step={5} suffix="%" />
             <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -16, marginBottom: 8 }}>
@@ -1677,26 +1698,25 @@ export default function MyPlan() {
           </div>
         </div>
 
-        {/* State Tax Warning — graduated states + high earners.
-            The tax engine uses a single effective rate per state; for steeply
-            graduated states like CA (top bracket 13.3%) and NY (10.9%), high
-            earners owe meaningfully more than the flat estimate shows. The
-            /methodology disclaimer was buried — surfacing it here on the
-            actual planner per tester feedback. Threshold = household income
-            high enough to plausibly cross past the flat-rate estimate. */}
+        {/* State Tax Warning — fires only for states still on flat-rate
+            modeling. CA, NY, NJ, OR now use proper graduated brackets in
+            taxEngine.ts (the four states with the steepest top brackets and
+            the largest user-impact). The remaining high-graduated states
+            (HI, MN, MA, WI) still flat — warning preserved for those until
+            we add bracket math. */}
         {(() => {
-          const GRADUATED_HIGH_BRACKET_STATES = ['CA', 'NY', 'NJ', 'OR', 'MN', 'HI', 'MA', 'WI'];
-          if (!GRADUATED_HIGH_BRACKET_STATES.includes(plan.stateCode)) return null;
+          const FLAT_RATE_GRADUATED_STATES = ['HI', 'MN', 'MA', 'WI'];
+          if (!FLAT_RATE_GRADUATED_STATES.includes(plan.stateCode)) return null;
           const isMFJ = plan.filingStatus === 'mfj';
           const highIncomeThreshold = isMFJ ? 250000 : 150000;
           // Trigger if any working year hits the threshold. baseIncome on
           // working years ≈ salary; this catches high earners pre-retirement.
           const hasHighIncomeYear = combined.some(r => !r.isRetired && (r.salary || 0) > highIncomeThreshold);
           if (!hasHighIncomeYear) return null;
-          const stateNames = { CA: 'California', NY: 'New York', NJ: 'New Jersey', OR: 'Oregon', MN: 'Minnesota', HI: 'Hawaii', MA: 'Massachusetts', WI: 'Wisconsin' };
+          const stateNames = { HI: 'Hawaii', MN: 'Minnesota', MA: 'Massachusetts', WI: 'Wisconsin' };
           return (
             <InfoBox icon="🏛️" title={`${stateNames[plan.stateCode]} state tax is likely understated`} color="var(--warn)" bgColor="rgba(251,191,36,.08)">
-              At your income level, your state's graduated brackets push the marginal rate above the single effective rate this tool uses. Real {stateNames[plan.stateCode]} liability is likely higher than the projection shows — possibly several thousand dollars per year. Conservative-on-the-spending side, but worth knowing when you're stress-testing the plan. Graduated-bracket modeling is on the roadmap.
+              At your income level, your state's graduated brackets push the marginal rate above the single effective rate this tool uses. Real {stateNames[plan.stateCode]} liability is likely higher than the projection shows — possibly several thousand dollars per year. Graduated-bracket modeling for {stateNames[plan.stateCode]} is on the roadmap; CA, NY, NJ, and OR are already on full graduated brackets.
             </InfoBox>
           );
         })()}

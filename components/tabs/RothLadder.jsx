@@ -37,7 +37,9 @@ export default function RothLadder() {
   // Default end at 72 (year before RMD start).
   const [conversionEndAge, setConversionEndAge] = useState(Math.min(72, (plan.longevityAge || 95) - 1));
 
-  const result = useMemo(() => modelRothLadder({
+  // Build the input once — the active result reuses it, the optimizer sweeps
+  // the targetBracket value across BRACKETS to find the highest-savings option.
+  const baseInput = useMemo(() => ({
     currentAge: plan.currentAge,
     retireAge: plan.retireAge,
     longevityAge: plan.longevityAge,
@@ -51,10 +53,33 @@ export default function RothLadder() {
     ssStartAge: ssSource?.startAge || 67,
     pensionMonthlyAmount: pensionSource?.monthlyAmount,
     pensionStartAge: pensionSource?.startAge,
-    targetBracket,
     conversionStartAge,
     conversionEndAge,
-  }), [plan, filingStatus, tradBalance, rothBalance, ssSource, pensionSource, targetBracket, conversionStartAge, conversionEndAge]);
+  }), [plan, filingStatus, tradBalance, rothBalance, ssSource, pensionSource, conversionStartAge, conversionEndAge]);
+
+  const result = useMemo(() =>
+    modelRothLadder({ ...baseInput, targetBracket }),
+    [baseInput, targetBracket],
+  );
+
+  // Optimizer: run every conversion target bracket and surface the winner.
+  // Reviewer feedback: "Tax Torpedo shows you the problem but doesn't help
+  // you solve it." The recommendation closes that loop — instead of asking
+  // the user which bracket to fill, we tell them.
+  const optimizer = useMemo(() => {
+    const candidates = BRACKETS.filter(b => b.value > 0).map(b => {
+      const r = modelRothLadder({ ...baseInput, targetBracket: b.value });
+      return { value: b.value, label: b.label, taxSaved: r.taxSaved, irmaaTrippedYears: r.irmaaTrippedAges?.length || 0 };
+    });
+    candidates.sort((a, b) => b.taxSaved - a.taxSaved);
+    const best = candidates[0];
+    // Recommend "Off" if even the best bracket loses money — the user is
+    // already in a low-enough future bracket that conversions don't help.
+    if (!best || best.taxSaved <= 0) {
+      return { recommended: 0, label: 'Off', taxSaved: 0, candidates };
+    }
+    return { recommended: best.value, label: best.label, taxSaved: best.taxSaved, irmaaTrippedYears: best.irmaaTrippedYears, candidates };
+  }, [baseInput]);
 
   const taxSavedColor = result.taxSaved > 1000 ? 'var(--accent)'
     : result.taxSaved < -1000 ? 'var(--danger)'
@@ -66,6 +91,49 @@ export default function RothLadder() {
       <InfoBox icon="🪜" title="Roth Conversion Ladder" color="var(--purple)" bgColor="rgba(139,92,246,0.08)">
         Between retirement and age 73 (when RMDs begin), you can convert traditional 401(k)/IRA dollars to Roth — paying tax now to avoid forced withdrawals at higher rates later. This planner shows whether filling a target bracket each year actually saves money over a lifetime.
       </InfoBox>
+
+      {/* Optimizer recommendation — runs every bracket, recommends the winner.
+          Closes the loop the Tax Torpedo / Roth Ladder pair otherwise leaves
+          open ("you've shown me the problem; what's the optimal answer?"). */}
+      {optimizer.recommended === 0 ? (
+        <InfoBox icon="🤖" title="Optimizer: skip conversions for your situation" color="var(--text-muted)" bgColor="var(--bg2)" style={{ marginTop: 14 }}>
+          We ran every target bracket (12%, 22%, 24%, 32%) against your numbers and none of them save money over the baseline. Your projected retirement income is modest enough that future RMDs stay in the 10–12% bracket — paying 22%+ today to convert is a net loss. The math is doing you a favor here: keep the dollars in the traditional account and let them compound.
+        </InfoBox>
+      ) : (
+        <InfoBox icon="🤖" title={`Optimizer recommends filling the ${optimizer.label} bracket — saves ${fmt(optimizer.taxSaved)} lifetime`} color="var(--purple)" bgColor="rgba(139,92,246,0.10)" style={{ marginTop: 14 }}>
+          <div style={{ marginBottom: 8 }}>
+            We ran your numbers against every target bracket. Filling the <strong>{optimizer.label}</strong> bracket each year between ages {conversionStartAge} and {conversionEndAge} produces the largest lifetime tax saving.
+            {optimizer.irmaaTrippedYears > 0 && (
+              <> Note: this strategy crosses an IRMAA threshold in {optimizer.irmaaTrippedYears} year{optimizer.irmaaTrippedYears === 1 ? '' : 's'} — surfaced in the IRMAA banner below.</>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', fontSize: 11, color: 'var(--text-muted)' }}>
+            {optimizer.candidates.map(c => (
+              <span key={c.value} style={{
+                padding: '4px 8px', borderRadius: 6,
+                background: c.value === optimizer.recommended ? 'var(--purple)' : 'var(--bg)',
+                color: c.value === optimizer.recommended ? '#fff' : c.taxSaved > 0 ? 'var(--accent)' : 'var(--text-dim)',
+                fontWeight: c.value === optimizer.recommended ? 700 : 500,
+              }}>
+                {c.label}: {c.taxSaved >= 0 ? '+' : ''}{fmt(c.taxSaved)}
+              </span>
+            ))}
+            {targetBracket !== optimizer.recommended && (
+              <button
+                onClick={() => setTargetBracket(optimizer.recommended)}
+                style={{
+                  padding: '4px 12px', borderRadius: 6, border: 'none',
+                  background: 'var(--purple)', color: '#fff',
+                  fontSize: 11, fontWeight: 600, fontFamily: 'var(--sans)', cursor: 'pointer',
+                  marginLeft: 'auto',
+                }}
+              >
+                Apply ({optimizer.label})
+              </button>
+            )}
+          </div>
+        </InfoBox>
+      )}
 
       <Card style={{ marginTop: 16 }}>
         <SectionLabel>Strategy</SectionLabel>

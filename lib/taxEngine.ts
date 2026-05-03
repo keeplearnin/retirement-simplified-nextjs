@@ -271,6 +271,110 @@ const STATE_TAX_RATES: Record<string, number> = {
 const DEFAULT_STATE_TAX_RATE = 0.05; // fallback
 
 // ---------------------------------------------------------------------------
+// Graduated state tax brackets (top high-graduated states)
+// ---------------------------------------------------------------------------
+// For states where the top bracket is materially above the flat effective
+// rate, run proper bracket math. Threshold for inclusion: top marginal rate
+// at least 2 pp above the flat estimate AND a population large enough that
+// the inaccuracy hits a meaningful number of users. Source: state revenue
+// department 2025 published brackets (used for tax year 2026 — minor index
+// shifts only). Re-verify each January when states publish updated tables.
+//
+// For users not in this table, computeStateTax falls through to the flat
+// rate above, which is accurate for non-graduated / lower-income states.
+const STATE_GRADUATED_BRACKETS: Record<
+  string,
+  { single: BracketEntry[]; mfj: BracketEntry[] }
+> = {
+  CA: {
+    single: [
+      { min: 0,         max: 10_756,    rate: 0.010 },
+      { min: 10_756,    max: 25_499,    rate: 0.020 },
+      { min: 25_499,    max: 40_245,    rate: 0.040 },
+      { min: 40_245,    max: 55_866,    rate: 0.060 },
+      { min: 55_866,    max: 70_606,    rate: 0.080 },
+      { min: 70_606,    max: 360_659,   rate: 0.093 },
+      { min: 360_659,   max: 432_787,   rate: 0.103 },
+      { min: 432_787,   max: 721_314,   rate: 0.113 },
+      { min: 721_314,   max: Infinity,  rate: 0.123 },
+    ],
+    mfj: [
+      { min: 0,         max: 21_512,    rate: 0.010 },
+      { min: 21_512,    max: 50_998,    rate: 0.020 },
+      { min: 50_998,    max: 80_490,    rate: 0.040 },
+      { min: 80_490,    max: 111_732,   rate: 0.060 },
+      { min: 111_732,   max: 141_212,   rate: 0.080 },
+      { min: 141_212,   max: 721_318,   rate: 0.093 },
+      { min: 721_318,   max: 865_574,   rate: 0.103 },
+      { min: 865_574,   max: 1_442_628, rate: 0.113 },
+      { min: 1_442_628, max: Infinity,  rate: 0.123 },
+    ],
+  },
+  NY: {
+    single: [
+      { min: 0,           max: 8_500,      rate: 0.0400 },
+      { min: 8_500,       max: 11_700,     rate: 0.0450 },
+      { min: 11_700,      max: 13_900,     rate: 0.0525 },
+      { min: 13_900,      max: 80_650,     rate: 0.0550 },
+      { min: 80_650,      max: 215_400,    rate: 0.0600 },
+      { min: 215_400,     max: 1_077_550,  rate: 0.0685 },
+      { min: 1_077_550,   max: 5_000_000,  rate: 0.0965 },
+      { min: 5_000_000,   max: 25_000_000, rate: 0.1030 },
+      { min: 25_000_000,  max: Infinity,   rate: 0.1090 },
+    ],
+    mfj: [
+      { min: 0,           max: 17_150,     rate: 0.0400 },
+      { min: 17_150,      max: 23_600,     rate: 0.0450 },
+      { min: 23_600,      max: 27_900,     rate: 0.0525 },
+      { min: 27_900,      max: 161_550,    rate: 0.0550 },
+      { min: 161_550,     max: 323_200,    rate: 0.0600 },
+      { min: 323_200,     max: 2_155_350,  rate: 0.0685 },
+      { min: 2_155_350,   max: 5_000_000,  rate: 0.0965 },
+      { min: 5_000_000,   max: 25_000_000, rate: 0.1030 },
+      { min: 25_000_000,  max: Infinity,   rate: 0.1090 },
+    ],
+  },
+  NJ: {
+    single: [
+      { min: 0,           max: 20_000,     rate: 0.01400 },
+      { min: 20_000,      max: 35_000,     rate: 0.01750 },
+      { min: 35_000,      max: 40_000,     rate: 0.03500 },
+      { min: 40_000,      max: 75_000,     rate: 0.05525 },
+      { min: 75_000,      max: 500_000,    rate: 0.06370 },
+      { min: 500_000,     max: 1_000_000,  rate: 0.08970 },
+      { min: 1_000_000,   max: Infinity,   rate: 0.10750 },
+    ],
+    mfj: [
+      { min: 0,           max: 20_000,     rate: 0.01400 },
+      { min: 20_000,      max: 50_000,     rate: 0.01750 },
+      { min: 50_000,      max: 70_000,     rate: 0.02450 },
+      { min: 70_000,      max: 80_000,     rate: 0.03500 },
+      { min: 80_000,      max: 150_000,    rate: 0.05525 },
+      { min: 150_000,     max: 500_000,    rate: 0.06370 },
+      { min: 500_000,     max: 1_000_000,  rate: 0.08970 },
+      { min: 1_000_000,   max: Infinity,   rate: 0.10750 },
+    ],
+  },
+  OR: {
+    // Oregon's top bracket is 9.9% over $125K single / $250K MFJ (no further
+    // tiers). Including because the gap from the flat 8.8% to actual 9.9%
+    // matters for Portland-area earners.
+    single: [
+      { min: 0,         max: 4_300,     rate: 0.0475 },
+      { min: 4_300,     max: 10_750,    rate: 0.0675 },
+      { min: 10_750,    max: 125_000,   rate: 0.0875 },
+      { min: 125_000,   max: Infinity,  rate: 0.0990 },
+    ],
+    mfj: [
+      { min: 0,         max: 8_600,     rate: 0.0475 },
+      { min: 8_600,     max: 21_500,    rate: 0.0675 },
+      { min: 21_500,    max: 250_000,   rate: 0.0875 },
+      { min: 250_000,   max: Infinity,  rate: 0.0990 },
+    ],
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Social Security Taxability
 // ---------------------------------------------------------------------------
 
@@ -410,8 +514,21 @@ function computeIRMAA(magi: number, filingStatus: 'single' | 'mfj'): number {
   return table[table.length - 1].monthlyPartBSurcharge;
 }
 
-function computeStateTax(taxableIncome: number, stateCode: string): number {
+function computeStateTax(
+  taxableIncome: number,
+  stateCode: string,
+  filingStatus: 'single' | 'mfj',
+): number {
   const code = stateCode.toUpperCase();
+  // Prefer graduated bracket math for the high-graduated states (CA, NY, NJ,
+  // OR) — closes the $5K-$15K/yr undershoot for high earners that the flat
+  // estimator showed (tester report from Fisherman Investments review).
+  const graduated = STATE_GRADUATED_BRACKETS[code];
+  if (graduated) {
+    const brackets = filingStatus === 'mfj' ? graduated.mfj : graduated.single;
+    return Math.max(0, applyBrackets(Math.max(0, taxableIncome), brackets));
+  }
+  // Fallback: flat effective rate for non-graduated / less-impactful states.
   const rate = STATE_TAX_RATES[code] ?? DEFAULT_STATE_TAX_RATE;
   return Math.max(0, taxableIncome * rate);
 }
@@ -544,7 +661,7 @@ export function computeTax(input: TaxInput): TaxResult {
     0,
     grossOrdinaryIncome + capitalGains - deductionAmount,
   );
-  const stateTax = computeStateTax(stateTaxableIncome, stateCode);
+  const stateTax = computeStateTax(stateTaxableIncome, stateCode, filingStatus);
 
   // 9. IRMAA (monthly Part B surcharge)
   const irmaa = computeIRMAA(magi, filingStatus);

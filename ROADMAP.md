@@ -21,7 +21,7 @@ Live at **retiresimplified.com**. Methodology and assumptions documented at **/m
 ### Optimize tabs (six tools, ordered by user journey)
 - **Roth vs Trad** — accumulation-phase comparison; inputs both bracket-now and bracket-in-retirement.
 - **Social Security** — PIA estimator with the IRS two-tier early-claiming formula; capped delayed-credit at age 70.
-- **Roth Ladder** — fills a target tax bracket each gap year between retirement and age 73. Reports lifetime tax saved, total converted, RMD reduction at 73, and flags every year the ladder pushes MAGI over an IRMAA threshold.
+- **Roth Ladder** — fills a target tax bracket each gap year between retirement and age 73. Reports lifetime tax saved, total converted, RMD reduction at 73, and flags every year the ladder pushes MAGI over an IRMAA threshold. **Optimizer** runs every target bracket and recommends the winner (or recommends skipping conversions if your future bracket is already lower).
 - **Withdrawal** — drawdown sequence (Cash → Taxable → 401k → Roth) with proper tax gross-up that iterates when withdrawals cross brackets.
 - **Tax Torpedo** — interactive slider showing the marginal-rate spike when each $1 of IRA withdrawal drags $0.85 of SS into the taxable base.
 - **Monte Carlo** — Box-Muller normal-distribution simulation with P10/P25/P50/P75/P90 bands and plain-language interpretation ("Your plan has a 73% probability of lasting through age 90; in the weakest 10% of scenarios, money runs short around age 82").
@@ -33,6 +33,13 @@ End-to-end household modeling: per-spouse ages, retirement ages, longevity, 401(
 - **IRMAA cliff detector** flags any year where projected MAGI lands within $5K of a Medicare surcharge tier; quantifies the annual cost of crossing.
 - **RMD projection table** shows year-by-year forced 401(k) withdrawals from age 73 with bracket bumps and SS-taxability flags.
 - **Healthcare bridge** estimates ACA marketplace premiums + subsidy for retire-before-65 users; Medicare Part B + Medigap + Part D baseline for 65+. Compared against Fidelity's lifetime healthcare benchmark ($172.5K individual / $345K couple).
+- **Healthcare cost multiplier** (0.5×–3.0×) lets users with chronic conditions or unusually healthy histories scale the auto-estimate to their actual situation.
+
+### State and federal tax
+- **Graduated state-tax brackets** for CA, NY, NJ, OR — full multi-tier math matching the state revenue department's 2025 published brackets. Closes the $5K–$15K/yr undershoot the flat-rate model produced for high earners. HI, MN, MA, WI still flat-rate (warning surfaced in the planner) and on the roadmap.
+- **OBBBA senior bonus deduction** ($6K/person 65+, 2025–2028) modeled with full phase-out math. Year-gated so projections beyond 2028 correctly drop the bonus.
+- **NIIT** (3.8% on investment income above $200K single / $250K MFJ) modeled in the projection engine.
+- **SECURE 2.0 mandatory Roth catch-up** flagged on Roth vs Traditional for users 50+ earning over the $150K FICA-wages threshold.
 
 ### Trust signals
 - **`/methodology` page** documents every assumption with citations to IRS Rev. Proc. 2025-32, IRS Notice 2025-67, SSA POMS HI 01101.020, CMS Medicare premium fact sheets, and HHS poverty guidelines. Includes an explicit "what this tool intentionally does not model" section (estate tax, AMT, NUA, K-1 income).
@@ -80,19 +87,20 @@ Ordered by user-impact-per-week-of-work, not by ambition.
 - **Tab hover tooltips** for nav orientation
 
 ### Soon (next 1–2 months)
-- **Roth conversion optimizer** — surface the recommended target bracket given the user's projected RMD load + IRMAA cliffs (Roth Ladder already runs the math; the gap is the "convert $X this year" recommendation). Per-spouse bracket fill for couples.
 - **Roth conversion ladder v2** — model ACA subsidy clawback for pre-65 conversions
 - **Healthcare bridge breakdown** — explicit pre-Medicare (60–65) vs. Medicare (65+) cost split on My Plan, with per-year line items. Currently rolled up into one "Lifetime Healthcare" number on the verdict.
 - **PDF / share export** — single-page retirement summary for sharing with spouse, advisor, parent
 - **Email opt-in for the annual update** — "Notify me when 2027 brackets ship"
 - **Couples mode Phase F (survivor analysis)** — SS step-up to higher of two benefits; MFJ→single tax flip year of death + 1; per-spouse RMD divisor; spousal claiming strategies
 - **Numeric input fields alongside sliders** — for users dialing in precise values when the slider step is too coarse
+- **Phased retirement** — model part-time work in transition years (income from a part-time gig at age 60, full retirement at 65). Affects taxes, SS taxability, IRMAA timing.
+- **State-tax brackets for HI, MN, MA, WI** — extend the graduated-bracket model to the remaining graduated states the in-planner warning currently flags.
+- **State comparison tool** — side-by-side projection: "what if you retire in TX vs. stay in CA?" Surfaces multi-decade tax-savings of state moves.
 
 ### Later (next quarter+)
 - **Plaid aggregation (read-only)** — auto-populate balances from Schwab/Fidelity/Vanguard. Reduces the activation cost to seconds.
 - **Plus tier ($8/mo)** — saved scenarios, scenario comparison, advanced Monte Carlo (regime-aware, bootstrap), email support. Core tool stays free.
 - **RIA partnership tier ($199/firm/mo)** — co-branded methodology page, lead-share, white-labeled PDF reports
-- **State tax v2** — proper graduated brackets for the top 10 income states (CA, NY, NJ, MA, OR, MN, HI, WI, OH, GA) — covers ~60% of US population accurately. High earners ($300K+) currently see understated state tax in graduated states; in-planner warning surfaces this until v2 ships.
 - **Inflation-adjusted dollar toggle** — switch chart and table values between nominal and real dollars. Helps users grok purchasing power on long projections (a "$2.4M at retirement" 25 years out is ~$1.3M in today's dollars at 2.5% inflation).
 - **Historical sequence-of-returns stress test** — replay actual 1929/1966/1973/2000/2008 sequences against the user's plan. Captures fat-tail risk that the normal-distribution Monte Carlo misses.
 - **QCDs (Qualified Charitable Distributions)** — for 70½+ retirees with charitable intent: $108K/yr (2026 indexed) of RMDs sent direct to charity, satisfies RMD without raising AGI. Powerful IRMAA / SS-taxability avoidance.
