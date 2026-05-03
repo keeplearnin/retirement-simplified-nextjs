@@ -180,6 +180,7 @@ input[type=range]::-moz-range-thumb {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 12px 24px;
   border-bottom: 1px solid var(--border);
   background: var(--glass);
@@ -188,6 +189,22 @@ input[type=range]::-moz-range-thumb {
   position: sticky;
   top: 0;
   z-index: 20;
+}
+/* Header brand — shrinks the logotype at narrow widths instead of letting it
+   truncate. The "FREE" pill is decorative; hide it before the brand mark. */
+.app-header .brand-name { font-size: 20px; white-space: nowrap; }
+.app-header .brand-free { display: inline; }
+.app-header .quick-verdict-text { display: inline; }
+.app-header .quick-verdict-icon-only { display: none; }
+@media (max-width: 720px) {
+  .app-header { padding: 10px 14px; gap: 8px; }
+  .app-header .brand-name { font-size: 17px; }
+  .app-header .brand-free { display: none; }
+}
+@media (max-width: 480px) {
+  .app-header .brand-name { font-size: 14px; }
+  .app-header .quick-verdict-text { display: none; }
+  .app-header .quick-verdict-icon-only { display: inline; padding: 6px 10px !important; }
 }
 [data-theme="light"] .app-header {
   background: rgba(248,250,252,0.85);
@@ -245,13 +262,25 @@ input[type=range]::-moz-range-thumb {
 /* Onboarding overlay */
 .onboarding-overlay {
   position: fixed; inset: 0; z-index: 100;
-  background: var(--bg);
+  /* Subtle radial gradient to give the card visual presence at desktop sizes
+     instead of floating in a vast dark void. */
+  background:
+    radial-gradient(circle at 30% 20%, rgba(52,211,153,0.06), transparent 50%),
+    radial-gradient(circle at 70% 80%, rgba(96,165,250,0.05), transparent 50%),
+    var(--bg);
   display: flex; align-items: center; justify-content: center;
+  padding: 24px;
 }
 .onboarding-card {
-  width: 100%; max-width: 480px; padding: 40px 32px;
+  width: 100%; max-width: 560px; padding: 44px 40px;
   background: var(--card); border: 1px solid var(--border);
-  border-radius: var(--radius); margin: 16px;
+  border-radius: var(--radius);
+  box-shadow: 0 8px 60px rgba(0,0,0,0.4);
+  position: relative;
+}
+@media (max-width: 480px) {
+  .onboarding-overlay { padding: 12px; }
+  .onboarding-card { padding: 32px 22px; }
 }
 .onboarding-dots {
   display: flex; gap: 8px; justify-content: center; margin-bottom: 32px;
@@ -267,8 +296,29 @@ input[type=range]::-moz-range-thumb {
 .nav-scroll {
   overflow-x: auto; -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  position: relative;
 }
 .nav-scroll::-webkit-scrollbar { display: none; }
+/* Wrapper provides the fade gradient affordance so users on narrow screens
+   know there's more to swipe. Sits behind the right edge of the nav. */
+.nav-scroll-wrapper {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.nav-scroll-wrapper::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 28px;
+  pointer-events: none;
+  background: linear-gradient(to right, transparent, var(--bg) 80%);
+  opacity: 0;
+  transition: opacity .2s;
+}
+@media (max-width: 720px) {
+  .nav-scroll-wrapper::after { opacity: 1; }
+}
 
 @media(max-width:900px){
   .grid-2{grid-template-columns:1fr!important}

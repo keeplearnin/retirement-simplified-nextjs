@@ -100,40 +100,43 @@ function AppContent() {
       {/* Compact header — logo + nav + actions in one row */}
       <header className="app-header">
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flexShrink: 1, minWidth: 0, overflow: 'hidden' }} onClick={() => setTab('myplan')}>
-          <span style={{ fontSize: 20, fontWeight: 700, fontFamily: 'var(--sans)', color: 'var(--text)', letterSpacing: '-0.02em' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flexShrink: 0 }} onClick={() => setTab('myplan')}>
+          <span className="brand-name" style={{ fontWeight: 700, fontFamily: 'var(--sans)', color: 'var(--text)', letterSpacing: '-0.02em' }}>
             Retire<span style={{ color: 'var(--accent)' }}>.</span>Simplified
           </span>
-          <span style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 2, opacity: 0.7 }}>Free</span>
+          <span className="brand-free" style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 2, opacity: 0.7 }}>Free</span>
         </div>
 
-        {/* Nav pills */}
-        <nav className="nav-scroll" style={{ display: 'flex', gap: 2, background: 'var(--bg2)', borderRadius: 28, padding: 3, flex: '1 1 auto', minWidth: 0 }}>
-          {categories.map(c => {
-            const isActive = c.id === activeCategory.id;
-            return (
-              <button
-                key={c.id}
-                onClick={() => setTab(c.tabs[0].id)}
-                style={{
-                  padding: '8px 16px', border: 'none', cursor: 'pointer', borderRadius: 24,
-                  background: isActive ? 'var(--accent)' : 'transparent',
-                  color: isActive ? '#fff' : 'var(--text-muted)',
-                  fontWeight: isActive ? 600 : 400, fontSize: 13,
-                  transition: 'all .2s', fontFamily: 'var(--sans)',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {c.label}
-              </button>
-            );
-          })}
-        </nav>
+        {/* Nav pills — wrapper provides the fade-gradient scroll affordance on mobile */}
+        <div className="nav-scroll-wrapper">
+          <nav className="nav-scroll" style={{ display: 'flex', gap: 2, background: 'var(--bg2)', borderRadius: 28, padding: 3, minWidth: 0 }}>
+            {categories.map(c => {
+              const isActive = c.id === activeCategory.id;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setTab(c.tabs[0].id)}
+                  style={{
+                    padding: '8px 16px', border: 'none', cursor: 'pointer', borderRadius: 24,
+                    background: isActive ? 'var(--accent)' : 'transparent',
+                    color: isActive ? '#fff' : 'var(--text-muted)',
+                    fontWeight: isActive ? 600 : 400, fontSize: 13,
+                    transition: 'all .2s', fontFamily: 'var(--sans)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {c.label}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
 
         {/* Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <a
             href="/verdict"
+            title="Quick Verdict — see where you stand in 90 seconds"
             style={{
               padding: '6px 12px', borderRadius: 16, textDecoration: 'none',
               border: '1px solid var(--accent)', background: 'var(--accent-dim)',
@@ -141,7 +144,8 @@ function AppContent() {
               whiteSpace: 'nowrap',
             }}
           >
-            ⚡ Quick Verdict
+            <span className="quick-verdict-text">⚡ Quick Verdict</span>
+            <span className="quick-verdict-icon-only" aria-label="Quick Verdict">⚡</span>
           </a>
           {authLoading ? null : user ? (
             <>

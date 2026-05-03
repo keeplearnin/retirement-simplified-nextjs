@@ -51,13 +51,16 @@ function Collapsible({ title, defaultOpen = true, children, badge }) {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           width: '100%', background: 'none', border: 'none', cursor: 'pointer',
           padding: 0, color: 'var(--text)', fontFamily: 'var(--sans)',
+          gap: 8,
         }}
       >
-        <span style={{ fontFamily: 'var(--serif)', fontSize: 18, fontWeight: 500 }}>
-          {title}
-          {badge && <span style={{ marginLeft: 10, fontSize: 12, color: 'var(--accent)', fontFamily: 'var(--sans)', fontWeight: 600 }}>{badge}</span>}
+        {/* Title + badge wrap as a flex group so the badge sits below the title
+            on narrow screens instead of orphaning to the next line mid-word. */}
+        <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 10, rowGap: 2, textAlign: 'left' }}>
+          <span style={{ fontFamily: 'var(--serif)', fontSize: 18, fontWeight: 500 }}>{title}</span>
+          {badge && <span style={{ fontSize: 12, color: 'var(--accent)', fontFamily: 'var(--sans)', fontWeight: 600, whiteSpace: 'nowrap' }}>{badge}</span>}
         </span>
-        <span style={{ fontSize: 14, color: 'var(--text-dim)', transition: 'transform .2s', transform: open ? 'rotate(180deg)' : 'rotate(0)' }}>
+        <span style={{ fontSize: 14, color: 'var(--text-dim)', transition: 'transform .2s', transform: open ? 'rotate(180deg)' : 'rotate(0)', flexShrink: 0 }}>
           &#9660;
         </span>
       </button>
