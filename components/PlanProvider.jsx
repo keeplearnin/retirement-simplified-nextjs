@@ -66,6 +66,12 @@ export const DEFAULT_PLAN = {
   // surfaces this at 0.5x to 3.0x. Applied uniformly to ACA premiums and
   // Medicare baseline costs in the expense projection.
   healthcareMultiplier: 1.0,
+  // When true, treat real estate as a fallback retirement income source —
+  // selling / downsizing / reverse-mortgaging in late retirement is part
+  // of the plan, not a last-resort surprise. Counts RE toward liquid for
+  // the broke-age detection so the plan score doesn't penalize users who
+  // intend to draw from RE. Default false (conservative).
+  useRealEstateInRetirement: false,
   retiredReturnPct: 60,
   cashReturn: 3.0,
   realEstateAppreciation: 3.0,

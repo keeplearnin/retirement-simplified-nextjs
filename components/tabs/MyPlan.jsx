@@ -12,6 +12,7 @@ import { projectExpenses, createDefaultExpensePlan } from '@/lib/expenseEngine';
 import { computeTax, computeSSTaxable, detectIrmaaCliff } from '@/lib/taxEngine';
 import { RMD_TABLE, RMD_START_AGE } from '@/lib/constants';
 import HealthcareBreakdown from '@/components/HealthcareBreakdown';
+import BridgeOptionsCard from '@/components/BridgeOptionsCard';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -300,7 +301,7 @@ function IncomeExpenseChart({ projections, retireAge }) {
   const illiquidLegacy = Math.max(0, totalLegacy - liquidLegacy);
   // Did the plan run liquid dry at any retired year? (Same condition as
   // SuccessScore's brokeAge — keeps the two displays consistent.)
-  const liquidExhaustedAtAge = projections.find(p => p.isRetired && p.liquidBalance <= 0 && p.gap < 0)?.age;
+  const liquidExhaustedAtAge = projections.find(p => p.isRetired && p.availableBalance <= 0 && p.gap < 0)?.age;
   const legacy = totalLegacy;
 
   return (
@@ -365,7 +366,7 @@ function IncomeExpenseChart({ projections, retireAge }) {
             (() => {
               // Use liquidBalance — real estate / 529 can't be drawn down, so
               // "depletion" should fire when the spendable buckets hit zero.
-              const brokeRow = projections.find(p => p.isRetired && p.liquidBalance <= 0);
+              const brokeRow = projections.find(p => p.isRetired && p.availableBalance <= 0);
               if (!brokeRow) return null;
               return (
                 <>
@@ -514,7 +515,7 @@ function SuccessScore({ projections }) {
   // Bug history: previously used portfolioBalance, which kept growing forever
   // for users with real estate even after liquid hit zero — producing a 100%
   // "Fully Funded" score that contradicted the year-by-year Status column.
-  const brokeAge = projections.find(p => p.isRetired && p.liquidBalance <= 0 && p.gap < 0)?.age;
+  const brokeAge = projections.find(p => p.isRetired && p.availableBalance <= 0 && p.gap < 0)?.age;
   let score, color, label;
 
   if (brokeAge === undefined) {
@@ -1207,6 +1208,18 @@ export default function MyPlan() {
         // beginning-of-year withdrawals, this equals (end - (start - withdrawn)).
         portfolioReturn: Math.round(portfolioBalance - balanceStart + totalWithdrawals),
         liquidBalance: Math.round(liquidBalanceEnd),
+        // Real estate balance and "available wealth" — when the user has
+        // opted to draw from RE in retirement (plan.useRealEstateInRetirement),
+        // RE counts as part of spendable wealth for broke-age detection.
+        // The score, legacy callout, and money-lasts age all read
+        // availableBalance so they stay consistent. The chart's Liquid
+        // (spendable) line still uses liquidBalance — true cash today.
+        // 529 is intentionally excluded from "available" — education-
+        // restricted and penalty for non-qualified withdrawal.
+        realEstateBalance: Math.round(balRealEstate),
+        availableBalance: Math.round(
+          liquidBalanceEnd + (plan.useRealEstateInRetirement ? balRealEstate : 0)
+        ),
         isRetired: inc.isRetired,
         isRetireYear: inc.age === retireAge,
         // Phase F survivor flags — surfaced for UI banners and the
@@ -1234,7 +1247,7 @@ export default function MyPlan() {
     // Uses liquidBalance (excludes illiquid RE and 529) since those can't be withdrawn
     let moneyLastsAge = longevityAge;
     for (const r of combined) {
-      if (r.isRetired && r.liquidBalance <= 0 && r.gap < 0) {
+      if (r.isRetired && r.availableBalance <= 0 && r.gap < 0) {
         moneyLastsAge = r.age;
         break;
       }
@@ -1250,7 +1263,7 @@ export default function MyPlan() {
     }).length;
 
     // Use liquidBalance — illiquid RE and 529 can't be drawn, matches moneyLastsAge logic.
-    const firstGapAge = combined.find(r => r.gap < 0 && r.liquidBalance <= 0)?.age;
+    const firstGapAge = combined.find(r => r.gap < 0 && r.availableBalance <= 0)?.age;
 
     return {
       combined,
@@ -1636,6 +1649,25 @@ export default function MyPlan() {
             <Slider label="Cash / Savings" value={plan.cashReturn || 3} onChange={v => updatePlan('cashReturn', v)} min={1} max={5} step={0.25} suffix="%" />
             <Slider label="Real Estate Appreciation" value={plan.realEstateAppreciation || 3} onChange={v => updatePlan('realEstateAppreciation', v)} min={1} max={6} step={0.25} suffix="%" />
             <Slider label="Annuity Return" value={plan.annuityReturn || 3.5} onChange={v => updatePlan('annuityReturn', v)} min={2} max={5} step={0.25} suffix="%" />
+            {/* Real-estate-as-retirement-asset toggle. When on, RE counts
+                toward "available wealth" for the broke-age detection — the
+                plan score, legacy callout, and money-lasts-to age all
+                acknowledge the user's intent to sell or downsize in late
+                retirement. Default off (conservative). */}
+            <label style={{ marginTop: 14, padding: '10px 12px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={!!plan.useRealEstateInRetirement}
+                onChange={e => updatePlan('useRealEstateInRetirement', e.target.checked)}
+                style={{ width: 16, height: 16, cursor: 'pointer', marginTop: 2, flexShrink: 0 }}
+              />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Plan to draw from real estate</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5, marginTop: 2 }}>
+                  Counts RE toward spendable wealth for the plan score and money-lasts age. Applies to users who plan to sell, downsize, or take a reverse mortgage in late retirement. The chart's blue &quot;Liquid&quot; line still shows true cash today.
+                </div>
+              </div>
+            </label>
           </div>
         </Collapsible>
       </div>
@@ -1861,6 +1893,35 @@ export default function MyPlan() {
               (3) <strong>Tax-deferred balances roll over</strong> to the survivor's name (no immediate distribution required).
               The single-filer brackets compress at the top — survivor years often see a higher effective rate even on the same income.
             </InfoBox>
+          );
+        })()}
+
+        {/* Bridge Options card — shows 4 explicit alternatives when liquid
+            CASH is exhausted before longevity. Uses raw liquidBalance (not
+            availableBalance) so the card stays visible even after the user
+            flips on "include RE in retirement plan" — option 1 then shows
+            as "active" so the strategy state is obvious. Without this, the
+            whole card would disappear the instant the user clicked the
+            toggle, which is confusing. */}
+        {(() => {
+          const liquidExhaustedAtAge = combined.find(p => p.isRetired && p.liquidBalance <= 0 && p.gap < 0)?.age;
+          if (!liquidExhaustedAtAge) return null;
+          const lastRow = combined[combined.length - 1];
+          const realEstateBalance = lastRow?.realEstateBalance || 0;
+          // Approximate annual gap = retirement spending (today's $).
+          // Engine has more nuanced numbers but spend is the right magnitude
+          // for the bridge-options copy.
+          const retireSpending = plan.retireSpending || Math.round((plan.annualSpending || 60000) * 0.8);
+          return (
+            <BridgeOptionsCard
+              plan={plan}
+              liquidExhaustedAtAge={liquidExhaustedAtAge}
+              longevityAge={plan.longevityAge || 95}
+              retireAge={plan.retireAge}
+              realEstateBalance={realEstateBalance}
+              retireSpending={retireSpending}
+              onToggleRealEstate={(v) => updatePlan('useRealEstateInRetirement', v)}
+            />
           );
         })()}
 
