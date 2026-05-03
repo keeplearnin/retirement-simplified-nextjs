@@ -107,6 +107,9 @@ export interface SpouseMember {
   salary?: SalaryIncome;
   socialSecurity?: SocialSecurityIncome;
   pension?: PensionIncome;
+  /** Phased retirement: spouse-side part-time / consulting income that
+   *  covers the gap between full-time salary ending and full retirement. */
+  partTime?: PartTimeIncome;
 }
 
 export interface RetirementPlan {
@@ -381,11 +384,26 @@ export function projectIncome(plan: RetirementPlan): YearlyProjection[] {
       taxDeferredBalance = taxDeferredBalance * (1 + rmdGrowthRate);
     }
 
-    // ------ Part-Time / Side Income ------
-    let partTimeAmt = 0;
+    // ------ Part-Time / Consulting / Phased Retirement ------
+    // Primary's part-time, alive-gated. The age range is independent of
+    // retireAge — common pattern is salary endAge == partTime startAge for
+    // a clean phased transition (e.g., full-time → 60, part-time 60 → 65,
+    // full retirement 65+). Income flows whether or not the user is "retired"
+    // since phased retirement deliberately straddles the boundary.
+    let primaryAlivePartTime = 0;
     if (partTime && age >= partTime.startAge && age <= partTime.endAge) {
-      partTimeAmt = partTime.annualAmount;
+      primaryAlivePartTime = partTime.annualAmount;
     }
+    let partTimeAmt = primaryAlive ? primaryAlivePartTime : 0;
+
+    // Spouse part-time, keyed on spouse's age and alive flag.
+    let spouseAlivePartTime = 0;
+    if (spouse?.partTime && spouseAge !== null
+        && spouseAge >= spouse.partTime.startAge
+        && spouseAge <= spouse.partTime.endAge) {
+      spouseAlivePartTime = spouse.partTime.annualAmount;
+    }
+    const spousePartTimeAmt = spouseAlive ? spouseAlivePartTime : 0;
 
     // ------ Other Income ------
     let otherAmt = 0;
@@ -404,8 +422,9 @@ export function projectIncome(plan: RetirementPlan): YearlyProjection[] {
     const aggregateSalary = salaryAmt + spouseSalaryAmt;
     const aggregateSs = ssAmt + spouseSsAmt;
     const aggregatePension = pensionAmt + spousePensionAmt;
+    const aggregatePartTime = partTimeAmt + spousePartTimeAmt;
     const totalIncome =
-      aggregateSalary + aggregateSs + aggregatePension + rentalAmt + annuityAmt + rmdAmt + partTimeAmt + otherAmt;
+      aggregateSalary + aggregateSs + aggregatePension + rentalAmt + annuityAmt + rmdAmt + aggregatePartTime + otherAmt;
 
     // ── Phase F: filing status hint ──
     // IRS rule: in the calendar year of a spouse's death, the survivor may
@@ -439,7 +458,7 @@ export function projectIncome(plan: RetirementPlan): YearlyProjection[] {
       rental: round2(rentalAmt),
       annuity: round2(annuityAmt),
       rmd: round2(rmdAmt),
-      partTime: round2(partTimeAmt),
+      partTime: round2(aggregatePartTime),
       otherIncome: round2(otherAmt),
       totalIncome: round2(totalIncome),
       isRetired,

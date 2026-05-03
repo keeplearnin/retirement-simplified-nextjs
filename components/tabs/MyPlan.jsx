@@ -88,7 +88,26 @@ function IncomeSourceCard({ source, onChange, onRemove, retireAge }) {
         <>
           <Slider label="Annual Salary" value={source.amount} onChange={v => update('amount', v)} min={20000} max={500000} step={5000} prefix="$" format={v => (v/1000).toFixed(0) + 'K'} />
           <Slider label="Annual Growth" value={source.growthRate} onChange={v => update('growthRate', v)} min={0} max={8} step={0.5} suffix="%" />
-          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Stops at retirement age ({retireAge})</div>
+          <Slider
+            label="Salary stops at age"
+            value={source.endAge ?? retireAge}
+            onChange={v => update('endAge', v)}
+            min={40} max={80} step={1}
+          />
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+            Default is your retirement age ({retireAge}). For phased retirement (full-time → part-time → full retirement), set this earlier and add a Part-time / consulting income source below.
+          </div>
+        </>
+      )}
+
+      {source.type === 'partTime' && (
+        <>
+          <Slider label="Annual Amount" value={source.annualAmount} onChange={v => update('annualAmount', v)} min={5000} max={200000} step={1000} prefix="$" format={v => (v/1000).toFixed(0) + 'K'} />
+          <Slider label="Start Age" value={source.startAge} onChange={v => update('startAge', v)} min={40} max={75} step={1} />
+          <Slider label="End Age" value={source.endAge} onChange={v => update('endAge', Math.max(v, source.startAge + 1))} min={Math.max(source.startAge + 1, 41)} max={80} step={1} />
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+            Phased retirement: covers the gap between full-time salary ending and full retirement. Pair this with a salary source whose &quot;stops at age&quot; matches this start age.
+          </div>
         </>
       )}
 
@@ -755,28 +774,32 @@ export default function MyPlan() {
     const salarySource = incomeSources.find(s => s.type === 'salary' && isPrimaryOwner(s));
     const ssSource = incomeSources.find(s => s.type === 'socialSecurity' && isPrimaryOwner(s));
     const pensionSource = incomeSources.find(s => s.type === 'pension' && isPrimaryOwner(s));
+    const partTimeSource = incomeSources.find(s => s.type === 'partTime' && isPrimaryOwner(s));
     const rentalSource = incomeSources.find(s => s.type === 'rental');
 
     // Spouse income lookups (Phase C). Only consulted when hasSpouse is true.
     const spouseSalarySource = plan.hasSpouse ? incomeSources.find(s => s.type === 'salary' && s.owner === 'spouse') : undefined;
     const spouseSsSource = plan.hasSpouse ? incomeSources.find(s => s.type === 'socialSecurity' && s.owner === 'spouse') : undefined;
     const spousePensionSource = plan.hasSpouse ? incomeSources.find(s => s.type === 'pension' && s.owner === 'spouse') : undefined;
+    const spousePartTimeSource = plan.hasSpouse ? incomeSources.find(s => s.type === 'partTime' && s.owner === 'spouse') : undefined;
 
     const incomePlan = {
       currentAge,
       retireAge,
       longevityAge,
-      salary: salarySource ? { annualAmount: salarySource.amount, growthRate: salarySource.growthRate / 100 } : undefined,
+      salary: salarySource ? { annualAmount: salarySource.amount, growthRate: salarySource.growthRate / 100, endAge: salarySource.endAge } : undefined,
       socialSecurity: ssSource ? { monthlyBenefitAtFRA: ssSource.monthlyBenefit, startAge: ssSource.startAge, cola: 0.02 } : undefined,
       pension: pensionSource ? { monthlyAmount: pensionSource.monthlyAmount, startAge: pensionSource.startAge, cola: pensionSource.cola ? 0.02 : 0 } : undefined,
+      partTime: partTimeSource ? { annualAmount: partTimeSource.annualAmount, startAge: partTimeSource.startAge, endAge: partTimeSource.endAge } : undefined,
       rental: rentalSource ? { monthlyNetIncome: rentalSource.monthlyNet, annualAppreciation: rentalSource.appreciation / 100 } : undefined,
       spouse: plan.hasSpouse ? {
         currentAge: plan.spouseCurrentAge ?? currentAge,
         retireAge: plan.spouseRetireAge ?? retireAge,
         longevityAge: plan.spouseLongevityAge ?? longevityAge,
-        salary: spouseSalarySource ? { annualAmount: spouseSalarySource.amount, growthRate: spouseSalarySource.growthRate / 100 } : undefined,
+        salary: spouseSalarySource ? { annualAmount: spouseSalarySource.amount, growthRate: spouseSalarySource.growthRate / 100, endAge: spouseSalarySource.endAge } : undefined,
         socialSecurity: spouseSsSource ? { monthlyBenefitAtFRA: spouseSsSource.monthlyBenefit, startAge: spouseSsSource.startAge, cola: 0.02 } : undefined,
         pension: spousePensionSource ? { monthlyAmount: spousePensionSource.monthlyAmount, startAge: spousePensionSource.startAge, cola: spousePensionSource.cola ? 0.02 : 0 } : undefined,
+        partTime: spousePartTimeSource ? { annualAmount: spousePartTimeSource.annualAmount, startAge: spousePartTimeSource.startAge, endAge: spousePartTimeSource.endAge } : undefined,
       } : undefined,
     };
 

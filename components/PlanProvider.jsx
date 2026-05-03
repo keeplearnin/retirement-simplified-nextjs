@@ -96,6 +96,12 @@ export const INCOME_TEMPLATES = {
   salary: { type: 'salary', label: 'Salary', amount: 100000, growthRate: 3, owner: 'primary' },
   socialSecurity: { type: 'socialSecurity', label: 'Social Security', monthlyBenefit: 2500, startAge: 67, owner: 'primary' },
   pension: { type: 'pension', label: 'Pension', monthlyAmount: 1500, startAge: 65, cola: true, owner: 'primary' },
+  // Phased retirement: part-time / consulting income covering the gap
+  // between full-time salary ending and full retirement. Common pattern
+  // in mass-affluent transitions ("I'll work part-time at 60 until 65").
+  // Pair this with a salary source whose endAge matches partTime startAge
+  // for a clean phased-retirement configuration.
+  partTime: { type: 'partTime', label: 'Part-time / consulting', annualAmount: 40000, startAge: 60, endAge: 65, owner: 'primary' },
   rental: { type: 'rental', label: 'Rental Income', monthlyNet: 1500, appreciation: 3 },
 };
 

@@ -18,6 +18,9 @@ Live at **retiresimplified.com**. Methodology and assumptions documented at **/m
 - **Stress Test tab** (formerly "Dashboard new") — return-shock sensitivity. "Money lasts to age X" with a sensitivity slider that finds the smallest return shock that breaks the plan.
 - **Liquid vs. total net worth** — both shown on the projection chart so users with real estate / 529 holdings can see when their *spendable* portfolio is exhausted, even while total net worth keeps appreciating.
 
+### Phased retirement
+Salary income carries an editable "stops at age" field; pair with a Part-time / consulting income source covering the gap until full retirement. Common pattern: full-time → 60, part-time $40K/yr 60–65, full retirement 65+. Per-spouse for couples mode. Income flows into ordinary tax (correctly affects SS taxability tier and IRMAA timing in those bridge years).
+
 ### Optimize tabs (six tools, ordered by user journey)
 - **Roth vs Trad** — accumulation-phase comparison; inputs both bracket-now and bracket-in-retirement.
 - **Social Security** — PIA estimator with the IRS two-tier early-claiming formula; capped delayed-credit at age 70.
@@ -99,7 +102,6 @@ Ordered by user-impact-per-week-of-work, not by ambition.
 - **PDF / share export** — single-page retirement summary for sharing with spouse, advisor, parent
 - **Email opt-in for the annual update** — "Notify me when 2027 brackets ship"
 - **Numeric input fields alongside sliders** — for users dialing in precise values when the slider step is too coarse
-- **Phased retirement** — model part-time work in transition years (income from a part-time gig at age 60, full retirement at 65). Affects taxes, SS taxability, IRMAA timing.
 - **State-tax brackets for HI, MN, MA, WI** — extend the graduated-bracket model to the remaining graduated states the in-planner warning currently flags.
 - **State comparison tool** — side-by-side projection: "what if you retire in TX vs. stay in CA?" Surfaces multi-decade tax-savings of state moves.
 
