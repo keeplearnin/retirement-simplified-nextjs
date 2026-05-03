@@ -1,191 +1,119 @@
-# Retirement.Simplified — Executive Summary & Roadmap
+# Retirement.Simplified — Product & Roadmap
 
-## Executive Summary
+## What it is
 
-### What We Are
-A **free, open-source retirement planning platform** built with Next.js that gives everyday people the same tools financial advisors charge 1% annually for — growth projections, Monte Carlo simulations, portfolio recommendations, tax strategy comparisons, and AI-powered financial education.
+A free, open-source retirement planning tool for the mass-affluent ($100K–$1M households). Three questions on `/verdict` produce a specific dollar gap vs. the Fidelity benchmark in 90 seconds, no account required. From there, a full plan editor exposes the math the paid tools hide: RMD avalanche, IRMAA cliffs, the Social Security tax torpedo, Roth conversion ladders, the pre-Medicare healthcare bridge.
 
-### Current Features (v1.0)
-
-| Module | What It Does |
-|--------|-------------|
-| **Growth Projector** | Projects portfolio growth with configurable age, savings, contributions, and return rate. Shows inflation-adjusted values. |
-| **Fee Impact Calculator** | Visualizes the compounding cost of advisor fees (1%+) vs index funds (0.03-0.05%) over decades. Shows exact dollar loss. |
-| **Portfolio Builder** | Recommends a 3-fund portfolio (US stocks, international, bonds) based on age and risk tolerance. Shows specific tickers (VTI, VXUS, BND) across Vanguard/Fidelity/Schwab. |
-| **Monte Carlo Simulation** | Runs 100-5,000 randomized market simulations (Box-Muller normal distribution, 7% avg, 15% std dev). Shows success rate, percentile bands, and configurable retirement end age (75-100). |
-| **Roth vs Traditional** | Compares after-tax retirement outcomes for Roth vs Traditional IRA/401k, factoring in current vs retirement tax brackets and reinvested tax savings. |
-| **Scenario Comparison** | Side-by-side modeling of two retirement strategies (e.g., retire at 60 aggressive vs 65 conservative) with lifetime wealth curves. |
-| **Social Security Estimator** | Estimates monthly/annual benefits using PIA formula with bend points. Shows claiming age comparison (62/64/67/70) and cumulative breakeven chart. |
-| **Investing 101 Guide** | 6-section educational module: priority order, pre-invest checklist, risk tolerance quiz, fund recommendations, DCA calculator, and 8 common mistakes. |
-| **AI Financial Educator** | Claude-powered chat for personalized Q&A. Server-side API proxy (no exposed keys). Educational only — explicitly not financial advice. |
-| **My Plans** | Authenticated users can save/load multiple retirement plans and view Monte Carlo simulation history. |
-| **Progress Journal** | Monthly balance tracking with account breakdown. Net worth chart over time. |
-| **Get Started** | 5-step actionable guide: open account → pick strategy → buy funds → automate → when to get an advisor. |
-
-### Tech Stack
-- **Frontend**: Next.js 16 (App Router), React 19, SSR
-- **Backend**: AWS Lambda (Python), DynamoDB (single-table design), API Gateway
-- **Auth**: AWS Cognito + Google OAuth
-- **AI**: Claude API via server-side proxy
-- **Hosting**: AWS Amplify (auto-deploy from GitHub)
-- **Cost to run**: ~$0/month on free tier for moderate usage
+Live at **retiresimplified.com**. Methodology and assumptions documented at **/methodology**. Source on GitHub.
 
 ---
 
-## Competitive Landscape
+## What's shipped
 
-| Feature | Fidelity Go ($0-0.35%) | Betterment (0.25%) | Wealthfront (0.25%) | **Retirement.Simplified (Free)** |
-|---------|----------------------|-------------------|--------------------|---------------------------------|
-| Portfolio management | Auto-rebalanced | Auto-rebalanced | Auto-rebalanced | DIY with recommendations |
-| Tax-loss harvesting | $25K+ accounts | All accounts | All accounts | Not yet |
-| Human advisor access | $25K+ (30-min calls) | $100K+ (premium) | None | AI educator (free) |
-| Financial planning tools | Basic | Goal-based | Robust | 8 calculator tools |
-| Monte Carlo simulation | Hidden | Hidden | Yes | Yes (transparent, configurable) |
-| Roth vs Traditional analysis | No | No | No | Yes |
-| Social Security planning | No | No | No | Yes |
-| Education/guides | Articles | Articles | Articles | Interactive tools + AI chat |
-| Fee transparency | Good | Good | Good | Core mission — shows fee impact |
-| Open source | No | No | No | **Yes — MIT License** |
-| Minimum balance | $10 | $10 | $500 | **$0** |
-| Annual cost on $100K | $350 | $250 | $250 | **$0** |
+### Top-of-funnel
+- **Verdict screen** (`/verdict`) — three inputs, ninety seconds, one specific dollar gap vs. the Fidelity age-based benchmark. Gap status is calibrated to the user's time horizon (a 40-year-old at 50% of benchmark sees "behind" with a 25-year catch-up message, not "significantly behind"). Result includes the household-aware healthcare bridge cost and three quantified actions ranked by 10-year dollar impact.
 
-### Our Edge
-1. **$0 forever** — no AUM fees, no premium tier, no hidden costs
-2. **Transparent** — every calculation is visible, every assumption adjustable
-3. **Educational** — we teach you to fish instead of managing your fish
-4. **Open source** — community-driven, auditable, forkable
+### Plan editor (full app)
+- **Plan tab** — inputs for ages, income, savings (10 account types), debts, expenses, assumptions. Year-by-year projection with retirement-detail and RMD-avalanche tables.
+- **Stress Test tab** (formerly "Dashboard new") — return-shock sensitivity. "Money lasts to age X" with a sensitivity slider that finds the smallest return shock that breaks the plan.
+- **Liquid vs. total net worth** — both shown on the projection chart so users with real estate / 529 holdings can see when their *spendable* portfolio is exhausted, even while total net worth keeps appreciating.
 
----
+### Optimize tabs (six tools, ordered by user journey)
+- **Roth vs Trad** — accumulation-phase comparison; inputs both bracket-now and bracket-in-retirement.
+- **Social Security** — PIA estimator with the IRS two-tier early-claiming formula; capped delayed-credit at age 70.
+- **Roth Ladder** — fills a target tax bracket each gap year between retirement and age 73. Reports lifetime tax saved, total converted, RMD reduction at 73, and flags every year the ladder pushes MAGI over an IRMAA threshold.
+- **Withdrawal** — drawdown sequence (Cash → Taxable → 401k → Roth) with proper tax gross-up that iterates when withdrawals cross brackets.
+- **Tax Torpedo** — interactive slider showing the marginal-rate spike when each $1 of IRA withdrawal drags $0.85 of SS into the taxable base.
+- **Monte Carlo** — Box-Muller normal-distribution simulation with P10/P25/P50/P75/P90 bands and plain-language interpretation ("Your plan has a 73% probability of lasting through age 90; in the weakest 10% of scenarios, money runs short around age 82").
 
-## Roadmap: What to Build Next
+### Couples mode
+End-to-end household modeling: per-spouse ages, retirement ages, longevity, 401(k)/Roth/HSA/pension balances, monthly contributions. Income engine projects each spouse's salary, SS, and pension on independent timelines. Per-spouse contribution gating handles "primary retires at 60, spouse keeps earning to 65" correctly. Auto-MFJ filing status with override.
 
-### Phase 1: Core Parity (1-2 months)
-Features needed to be taken seriously as a Fidelity Go alternative.
+### IRMAA / RMD / Healthcare features
+- **IRMAA cliff detector** flags any year where projected MAGI lands within $5K of a Medicare surcharge tier; quantifies the annual cost of crossing.
+- **RMD projection table** shows year-by-year forced 401(k) withdrawals from age 73 with bracket bumps and SS-taxability flags.
+- **Healthcare bridge** estimates ACA marketplace premiums + subsidy for retire-before-65 users; Medicare Part B + Medigap + Part D baseline for 65+. Compared against Fidelity's lifetime healthcare benchmark ($172.5K individual / $345K couple).
 
-#### 1. Automated Portfolio Rebalancing Recommendations
-- Connect to brokerage via Plaid or manual input
-- Show current allocation vs target allocation
-- Generate specific trade recommendations ("Sell $2,400 of VTI, buy $2,400 of BND")
-- Rebalancing frequency: quarterly/annually/threshold-based (5% drift)
-
-#### 2. Tax-Loss Harvesting Calculator
-- Input: current holdings with cost basis
-- Identify positions with unrealized losses
-- Calculate tax savings from harvesting
-- Warn about wash sale rules (30-day window)
-- Suggest replacement funds (e.g., swap VTI → ITOT during harvest)
-
-#### 3. Retirement Income / Withdrawal Strategy
-- Model the decumulation phase (currently only accumulation)
-- Bucket strategy visualization (cash / bonds / stocks)
-- Required Minimum Distribution (RMD) calculator
-- Roth conversion ladder planner
-- Social Security optimization integrated with withdrawal order
-
-#### 4. Account Aggregation Dashboard
-- Manual entry of all accounts (401k, IRA, Roth, taxable, HSA, 529)
-- Net worth tracker with historical chart
-- Asset allocation across ALL accounts (not just one)
-- Identify overlap and gaps
-
-### Phase 2: Differentiation (2-4 months)
-Features the paid robo-advisors don't offer well.
-
-#### 5. Tax-Aware Asset Location Optimizer
-- Which funds belong in which account type?
-- Put bonds in Traditional (tax-deferred), growth stocks in Roth (tax-free)
-- Calculate the tax drag savings of proper location
-- This is a $10K+ value that most advisors don't do well
-
-#### 6. FIRE (Financial Independence) Calculator
-- "Coast FIRE" — when can you stop saving and coast to retirement?
-- "Lean FIRE" vs "Fat FIRE" scenarios
-- Required savings rate calculator
-- Geographic arbitrage modeling (retire somewhere cheaper)
-- This captures the massive FIRE community (r/financialindependence: 2.3M members)
-
-#### 7. Employer Benefits Optimizer
-- 401k match calculator (show true return of match)
-- HSA triple tax advantage explainer + calculator
-- ESPP discount analysis (is the 15% discount worth the concentration risk?)
-- Mega backdoor Roth eligibility checker
-- Compare job offers by total comp including benefits
-
-#### 8. Couple / Family Planning Mode
-- Joint retirement planning for couples
-- Spousal Social Security benefits
-- Survivor benefit analysis
-- Combined tax bracket optimization (file jointly vs separately impact)
-
-### Phase 3: Moat (4-6 months)
-Features that create long-term competitive advantage.
-
-#### 9. AI-Powered Plan Review
-- Upload current 401k fund lineup → AI identifies high-fee funds and suggests alternatives
-- Analyze IPS (Investment Policy Statement) compliance
-- Annual financial checkup: "Here's what changed, here's what to do"
-- Personalized action items based on journal history
-
-#### 10. Community & Social Features
-- Anonymous plan sharing ("Rate my portfolio")
-- Community benchmarks ("How does my savings rate compare to my age group?")
-- Success stories / case studies
-- Accountability partners
-
-#### 11. Brokerage Integration (Plaid)
-- Read-only connection to Fidelity, Vanguard, Schwab accounts
-- Auto-populate portfolio data
-- Real-time net worth tracking
-- Automatic rebalance alerts
-
-#### 12. Mobile App (React Native)
-- Push notifications for rebalancing alerts
-- Monthly journal reminders
-- Quick net worth check
-- Widget for home screen
-
-### Phase 4: Revenue Without Fees (6+ months)
-Sustainable business model that keeps the core tool free.
-
-#### 13. Affiliate Revenue (Ethical)
-- "Open an account" links to Vanguard/Fidelity/Schwab (referral programs)
-- High-yield savings account comparisons
-- Only recommend products we'd use ourselves
-- Full disclosure of any affiliate relationships
-
-#### 14. Premium AI Features
-- Unlimited AI conversations (free tier: 10/day)
-- Document analysis (upload 401k statements, tax returns)
-- Personalized annual review report (PDF)
-- Price: $5-10/month — still 50x cheaper than 0.25% AUM on $100K
-
-#### 15. White-Label / API
-- License the calculators to financial blogs, credit unions, HR platforms
-- Embeddable widgets ("Add our Monte Carlo simulator to your site")
-- API access for fintech developers
+### Trust signals
+- **`/methodology` page** documents every assumption with citations to IRS Rev. Proc. 2025-32, IRS Notice 2025-67, SSA POMS HI 01101.020, CMS Medicare premium fact sheets, and HHS poverty guidelines. Includes an explicit "what this tool intentionally does not model" section (estate tax, AMT, NUA, K-1 income).
+- **Constants are 2026** throughout: federal brackets, std deduction, 401(k) limit ($24,500), SS wage base ($184,500), SS bend points ($1,286 / $7,749), HSA limits, IRMAA tiers, FPL.
 
 ---
 
-## Key Technical Priorities
+## Tech stack
 
-1. **Plaid Integration** — biggest unlock for user experience
-2. **PWA / Mobile** — most users check finances on their phone
-3. **Data Export** — CSV/PDF export of all plans and journal data
-4. **Accessibility** — WCAG 2.1 AA compliance (currently no ARIA labels)
-5. **Testing** — unit tests for financial calculations (these MUST be correct)
-6. **Performance** — move Monte Carlo to Web Worker (blocks main thread at 5000 runs)
-7. **SEO** — individual pages for each tool (not tab-based SPA) for organic search traffic
-
----
-
-## The Pitch
-
-> **"Fidelity Go charges 0.35% to put your money in index funds. Betterment charges 0.25%. We show you exactly which funds to buy, run the same simulations, and teach you why — for free.**
->
-> **On $500K, that saves you $1,250-$1,750 every year. Over 30 years, that's $100K+ back in your pocket."**
-
-The robo-advisor market is $2.5T+ in AUM. We don't need to capture AUM — we need to capture attention. Every person who learns they can do this themselves is a person who stops paying advisory fees.
+- **Frontend**: Next.js 16 (App Router), React 19
+- **Backend**: AWS Lambda (Python), DynamoDB, API Gateway (used only for the AI Advisor proxy and authenticated plan saving)
+- **Auth**: AWS Cognito + Google OAuth (optional — the app fully works without an account)
+- **AI**: Anthropic Claude API via server-side proxy
+- **Hosting**: AWS Amplify, auto-deploy from `main`
+- **Persistence**: localStorage by default; Cognito-backed plan saving when signed in
 
 ---
 
-*Last updated: March 2026*
+## Where it differs from the field
+
+| | Boldin | Empower | Fidelity Go | **Retire.Simplified** |
+|---|---|---|---|---|
+| Price | $120/yr | Free, AUM | 0.35% AUM ($350/yr on $100K) | **$0** |
+| No-signup entry point | No | No | No | **`/verdict` — 90 seconds, no email** |
+| RMD avalanche year-by-year | Hidden | No | No | Yes |
+| IRMAA cliff detector | No | No | No | Yes |
+| Tax torpedo visualizer | No | No | No | Yes |
+| Roth conversion ladder | Paid tier | No | No | Yes |
+| Healthcare bridge math | Light | No | No | Yes |
+| Couples gap-year retirement | Paid tier | No | No | Yes |
+| Methodology fully documented | No | No | No | Yes (`/methodology`) |
+| Open source | No | No | No | **MIT License** |
+
+The thesis: Boldin/Empower/Fidelity Go all hide the educational layer behind a paywall or behind UX that smooths over the hard parts. We surface the hard parts up front and give them away.
+
+---
+
+## What's next
+
+Ordered by user-impact-per-week-of-work, not by ambition.
+
+### Now (next two weeks)
+- **Tester feedback loop** — five-to-ten qualitative sessions before broader launch
+- **Smart "next step" card on My Plan** — adapts to user's situation (high 401k → suggest Roth Ladder; retire age < 65 → suggest healthcare bridge; etc.)
+- **Tab hover tooltips** for nav orientation
+
+### Soon (next 1–2 months)
+- **Roth conversion ladder v2** — model ACA subsidy clawback for pre-65 conversions; add per-spouse bracket fill
+- **PDF / share export** — single-page retirement summary for sharing with spouse, advisor, parent
+- **Email opt-in for the annual update** — "Notify me when 2027 brackets ship"
+- **Couples mode Phase F (survivor analysis)** — SS step-up to higher of two benefits; MFJ→single tax flip year of death + 1; per-spouse RMD divisor
+
+### Later (next quarter+)
+- **Plaid aggregation (read-only)** — auto-populate balances from Schwab/Fidelity/Vanguard. Reduces the activation cost to seconds.
+- **Plus tier ($8/mo)** — saved scenarios, scenario comparison, advanced Monte Carlo (regime-aware, bootstrap), email support. Core tool stays free.
+- **RIA partnership tier ($199/firm/mo)** — co-branded methodology page, lead-share, white-labeled PDF reports
+- **State tax v2** — proper graduated brackets for the top 10 income states (CA, NY, NJ, MA, OR, MN, HI, WI, OH, GA) — covers ~60% of US population accurately
+
+### Known debt
+- The inline projection in `components/tabs/MyPlan.jsx` mirrors `lib/computeProjection.js`. Both are kept mathematically identical but consolidating is a multi-hour refactor; deferred until post-launch.
+- For couples with separate 401(k)s and an age gap, the RMD divisor uses primary's age on the combined household pool. Over-RMDs when spouse is younger and not yet 73. Per-spouse balance tracking is on the survivor-analysis (Phase F) work.
+- State tax uses a single effective rate per state; high earners in graduated states owe more than the estimator shows. Caveat surfaced in the State picker tooltip.
+
+### Explicitly not on the roadmap
+
+These are **out of scope** by design — surfacing them would push the tool out of mass-affluent into HNW territory and dilute the focus.
+
+- Estate tax planning (federal exemption is $13.99M+; relevant only above mass-affluent)
+- AMT, NUA on company stock, K-1 / RSU / deferred comp modeling
+- Concentrated single-stock risk, private-equity holdings
+- Long-term care insurance product comparisons
+- Active brokerage management or rebalancing trades
+
+---
+
+## Pitch
+
+> Free retirement calculators tell you what you want to hear ("you have a 96% chance of success!"). Paid ones charge $120/yr to surface what should be the educational baseline. We built the third option: free, honest about its assumptions, with the math that paid tools hide. Three questions, no signup, your numbers stay in your browser. Source on GitHub.
+
+The retirement-planning software market is roughly $20B/yr in retail TAM. There's no clear free leader. Boldin is the closest comp and charges where the educational layer should be free.
+
+---
+
+*Last updated: May 2026*
