@@ -131,6 +131,33 @@ export default function RothLadder() {
         />
       </div>
 
+      {/* Plain-English interpretation of the headline result. The stat block
+          above shows the raw dollar number, but a negative value with no
+          context (tester report: "-$27,833 with zero context") reads as
+          either a bug or a scam. This banner translates the math. */}
+      {targetBracket > 0 && (() => {
+        const saved = result.taxSaved;
+        if (saved > 1000) {
+          return (
+            <InfoBox icon="✅" title={`This ladder saves you ${fmt(saved)} over your lifetime`} color="var(--accent)" bgColor="var(--accent-dim)" style={{ marginTop: 14 }}>
+              Converting Traditional dollars to Roth at today's {result.targetBracketLabel || `${targetBracket}%`} bracket beats paying tax on those dollars later — your projection has them taxed at a higher rate down the road (RMDs stacked with Social Security, possibly with IRMAA). Locking in the lower rate now is the win.
+            </InfoBox>
+          );
+        }
+        if (saved < -1000) {
+          return (
+            <InfoBox icon="⚠️" title={`This ladder costs you ${fmt(Math.abs(saved))} — skip it or lower the target bracket`} color="var(--warn)" bgColor="var(--warn-dim)" style={{ marginTop: 14 }}>
+              The ladder is paying tax now at the {result.targetBracketLabel || `${targetBracket}%`} bracket on dollars that would have been taxed at a <em>lower</em> rate later. That happens when your retirement income is modest enough to keep you in the 10–12% bracket without conversions, so paying 22%+ today to convert is a net loss. Try a lower target bracket (12% or "no conversions"), or accept that conversions don't help your situation. This isn't a bug — it's the math telling you the strategy doesn't fit.
+            </InfoBox>
+          );
+        }
+        return (
+          <InfoBox icon="ℹ️" title="Ladder is roughly tax-neutral for your situation" color="var(--blue)" bgColor="var(--blue-dim)" style={{ marginTop: 14 }}>
+            Converting at today's bracket and paying that tax later land in roughly the same place for your projection. Conversions can still help for non-tax reasons (no RMDs at 73, more flexibility for heirs), but the headline lifetime-tax number is close to zero either way.
+          </InfoBox>
+        );
+      })()}
+
       {/* Side-by-side scenario summary */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 14 }}>
         <ScenarioCard

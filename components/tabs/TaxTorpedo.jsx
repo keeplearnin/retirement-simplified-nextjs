@@ -62,8 +62,8 @@ export default function TaxTorpedo() {
 
   return (
     <div>
-      <InfoBox icon="🚀" title="Social Security Tax Torpedo" color="var(--purple)" bgColor="rgba(139,92,246,0.08)">
-        Each $1 you draw from a tax-deferred account in retirement may also drag $0.50–$0.85 of Social Security into the taxable base. In that "torpedo zone," your effective marginal rate can spike to 40%+ even while you're in the 22% bracket. Move the slider to see it.
+      <InfoBox icon="🚀" title="When pulling from your IRA spikes your tax rate" color="var(--purple)" bgColor="rgba(139,92,246,0.08)">
+        <strong>The short version:</strong> in retirement, every $1 you withdraw from a 401(k) or traditional IRA can drag $0.50–$0.85 of your Social Security check into taxable income too. In that zone, your <em>effective</em> marginal rate spikes to 40%+ even while you're nominally in the 22% federal bracket. The industry calls it the <strong>Social Security Tax Torpedo</strong>. Move the slider below to see where your numbers fall.
       </InfoBox>
 
       <Card style={{ marginTop: 16 }}>

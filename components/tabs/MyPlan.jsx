@@ -384,6 +384,29 @@ function IncomeExpenseChart({ projections, retireAge }) {
         </div>
       </div>
 
+      {/* "Why doesn't this match my mental math?" disclosure.
+          Tester reported the projection came in ~7% below their
+          back-of-napkin compounding. The math is honest, but the gap is
+          invisible — this small expandable lays out what's in the model
+          beyond simple compounding. Copy is static (this sub-component
+          doesn't take `plan` as a prop) — references the user-editable
+          assumptions by name so they can find them on the inputs panel. */}
+      <details style={{ marginTop: 14, padding: '10px 14px', borderRadius: 8, background: 'var(--bg2)', border: '1px solid var(--border)', fontSize: 12, color: 'var(--text-muted)' }}>
+        <summary style={{ cursor: 'pointer', color: 'var(--text)', fontWeight: 600, fontFamily: 'var(--sans)', userSelect: 'none' }}>
+          Why does this differ from a simple compound-interest calculator?
+        </summary>
+        <div style={{ marginTop: 10, lineHeight: 1.6 }}>
+          A back-of-napkin <code>balance × (1 + r)<sup>n</sup></code> assumes you earn the same rate every year on the entire portfolio with no drag. Our projection is more conservative on purpose:
+          <ul style={{ marginTop: 6, paddingLeft: 18, lineHeight: 1.7 }}>
+            <li><strong>Retirement allocation drag.</strong> Your expected return drops in retirement (default: 60% of working-years return — set by the &quot;Retirement return %&quot; assumption on the inputs panel). Most retirees shift to a bond-heavier mix, lowering expected return.</li>
+            <li><strong>Cash drag.</strong> Cash holdings earn ~3% (working) / 2.5% (retired), not the equity return.</li>
+            <li><strong>Tax gross-up on withdrawals.</strong> To net $80K of spending from a 401(k), you withdraw ~$100K and pay tax on the difference. Simple compounding ignores this — we model it iteratively across brackets.</li>
+            <li><strong>Real estate &amp; 529 are shown but excluded from spendable.</strong> The blue dashed line (&quot;Liquid&quot;) is what you can actually draw from; the green line includes appreciating illiquid assets.</li>
+          </ul>
+          Numbers on the chart are <strong>nominal</strong> (not inflation-adjusted). Spending grows with your set inflation rate so the &quot;money lasts to age X&quot; comparison stays apples-to-apples.
+        </div>
+      </details>
+
       {/* Legacy callout */}
       {legacy > 0 && (
         <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: 'var(--accent-dim)', border: '1px solid rgba(52,211,153,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1653,6 +1676,30 @@ export default function MyPlan() {
             })()}
           </div>
         </div>
+
+        {/* State Tax Warning — graduated states + high earners.
+            The tax engine uses a single effective rate per state; for steeply
+            graduated states like CA (top bracket 13.3%) and NY (10.9%), high
+            earners owe meaningfully more than the flat estimate shows. The
+            /methodology disclaimer was buried — surfacing it here on the
+            actual planner per tester feedback. Threshold = household income
+            high enough to plausibly cross past the flat-rate estimate. */}
+        {(() => {
+          const GRADUATED_HIGH_BRACKET_STATES = ['CA', 'NY', 'NJ', 'OR', 'MN', 'HI', 'MA', 'WI'];
+          if (!GRADUATED_HIGH_BRACKET_STATES.includes(plan.stateCode)) return null;
+          const isMFJ = plan.filingStatus === 'mfj';
+          const highIncomeThreshold = isMFJ ? 250000 : 150000;
+          // Trigger if any working year hits the threshold. baseIncome on
+          // working years ≈ salary; this catches high earners pre-retirement.
+          const hasHighIncomeYear = combined.some(r => !r.isRetired && (r.salary || 0) > highIncomeThreshold);
+          if (!hasHighIncomeYear) return null;
+          const stateNames = { CA: 'California', NY: 'New York', NJ: 'New Jersey', OR: 'Oregon', MN: 'Minnesota', HI: 'Hawaii', MA: 'Massachusetts', WI: 'Wisconsin' };
+          return (
+            <InfoBox icon="🏛️" title={`${stateNames[plan.stateCode]} state tax is likely understated`} color="var(--warn)" bgColor="rgba(251,191,36,.08)">
+              At your income level, your state's graduated brackets push the marginal rate above the single effective rate this tool uses. Real {stateNames[plan.stateCode]} liability is likely higher than the projection shows — possibly several thousand dollars per year. Conservative-on-the-spending side, but worth knowing when you're stress-testing the plan. Graduated-bracket modeling is on the roadmap.
+            </InfoBox>
+          );
+        })()}
 
         {/* IRMAA Warning */}
         {combined.some(r => r.irmaa > 0) && (
