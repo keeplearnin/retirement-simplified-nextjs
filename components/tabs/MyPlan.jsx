@@ -11,6 +11,7 @@ import { projectIncome } from '@/lib/incomeEngine';
 import { projectExpenses, createDefaultExpensePlan } from '@/lib/expenseEngine';
 import { computeTax, computeSSTaxable, detectIrmaaCliff } from '@/lib/taxEngine';
 import { RMD_TABLE, RMD_START_AGE } from '@/lib/constants';
+import HealthcareBreakdown from '@/components/HealthcareBreakdown';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -1696,6 +1697,15 @@ export default function MyPlan() {
               );
             })()}
           </div>
+        </div>
+
+        {/* Healthcare in retirement breakdown.
+            Surfaces the pre-65 ACA bridge (the #1 surprise cost for early
+            retirees per tester feedback) separately from Medicare-era cost.
+            Includes year-by-year ACA premiums + subsidy, contrasts the
+            household lifetime total against Fidelity's benchmark. */}
+        <div style={{ marginTop: 16 }}>
+          <HealthcareBreakdown plan={plan} />
         </div>
 
         {/* State Tax Warning — fires only for states still on flat-rate

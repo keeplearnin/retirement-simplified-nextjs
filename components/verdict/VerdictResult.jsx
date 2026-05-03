@@ -187,7 +187,7 @@ export default function VerdictResult({ output, input, onRestart }) {
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
                 Estimated ACA marketplace premium of {fmt(healthcare.annualAcaNetPremium)}/yr{input?.hasSpouse ? ' for the household' : ''}, after a {fmt(healthcare.annualAcaSubsidy)}/yr subsidy at your income level.
-                Most planners ignore this — it's often the largest line item in early retirement.
+                Most planners ignore this — it's often the largest line item in early retirement. Year-by-year ACA premiums (they rise sharply at ages 60–64) show on the My Plan tab.
               </div>
             </div>
             <div style={{ flexShrink: 0, textAlign: 'right' }}>
