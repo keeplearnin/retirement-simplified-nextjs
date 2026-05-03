@@ -10,8 +10,30 @@ import MiniChart from '@/components/ui/MiniChart';
 import BracketButtons from '@/components/ui/BracketButtons';
 import ValidationWarning from '@/components/ui/ValidationWarning';
 import { fmt, fmtFull } from '@/lib/format';
-import { RMD_TABLE, TAX_BRACKETS } from '@/lib/constants';
+import { RMD_TABLE, TAX_BRACKETS, SS_WAGE_CAP, SS_BEND_POINTS, SS_FACTORS, SS_FRA } from '@/lib/constants';
 import { usePlan } from '@/components/PlanProvider';
+
+// Quick PIA estimate from current salary — used as a fallback when the user
+// hasn't configured a Social Security income source on the main plan.
+// Mirrors the simplified two-tier formula in lib/incomeEngine.ts and the
+// dedicated Social Security tab. Assumes claiming at FRA (the cleanest
+// neutral default — early/delayed shifts are explored on the SS tab).
+function estimateMonthlySSFromSalary(annualSalary) {
+  if (!annualSalary || annualSalary <= 0) return 0;
+  const aime = Math.min(annualSalary, SS_WAGE_CAP) / 12;
+  let pia;
+  if (aime <= SS_BEND_POINTS[0]) {
+    pia = aime * SS_FACTORS[0];
+  } else if (aime <= SS_BEND_POINTS[1]) {
+    pia = SS_BEND_POINTS[0] * SS_FACTORS[0]
+      + (aime - SS_BEND_POINTS[0]) * SS_FACTORS[1];
+  } else {
+    pia = SS_BEND_POINTS[0] * SS_FACTORS[0]
+      + (SS_BEND_POINTS[1] - SS_BEND_POINTS[0]) * SS_FACTORS[1]
+      + (aime - SS_BEND_POINTS[1]) * SS_FACTORS[2];
+  }
+  return Math.round(pia);
+}
 
 export default function WithdrawalStrategy() {
   const { plan } = usePlan();
@@ -23,10 +45,29 @@ export default function WithdrawalStrategy() {
   const [traditional, setTraditional] = useState(() => plan.savings401k || 500000);
   const [roth, setRoth] = useState(() => plan.savingsRoth || 200000);
   const [taxable, setTaxable] = useState(() => plan.savingsTaxable || 100000);
-  const [socialSecurity, setSocialSecurity] = useState(() => {
+  // SS: prefer a configured plan source; fall back to a PIA estimate from
+  // salary so users who arrived from Verdict (which doesn't capture SS)
+  // see a calibrated number rather than a $2K/mo default that produces
+  // misleading "26% withdrawal rate, HIGH RISK" warnings (reviewer report).
+  const ssDefault = useMemo(() => {
     const ss = plan.incomeSources?.find(s => s.type === 'socialSecurity');
-    return ss?.monthlyBenefit || 2000;
-  });
+    if (ss?.monthlyBenefit) return { value: ss.monthlyBenefit, autoEstimated: false };
+    const salarySource = plan.incomeSources?.find(s => s.type === 'salary' && (s.owner || 'primary') === 'primary');
+    const estimate = estimateMonthlySSFromSalary(salarySource?.amount || 0);
+    if (estimate > 0) return { value: estimate, autoEstimated: true };
+    return { value: 2000, autoEstimated: false };
+    // We only consult plan once at mount — the user can edit the slider
+    // freely after that. Re-running this on every plan change would
+    // clobber their edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const [socialSecurity, setSocialSecurity] = useState(ssDefault.value);
+  const [ssAutoEstimated, setSsAutoEstimated] = useState(ssDefault.autoEstimated);
+  // Once user nudges the slider, drop the "auto-estimated" badge.
+  const handleSocialSecurityChange = (v) => {
+    setSocialSecurity(v);
+    if (ssAutoEstimated) setSsAutoEstimated(false);
+  };
   const [taxBracket, setTaxBracket] = useState(22);
   // Note: Roth conversion modeling lives on the dedicated Roth Ladder tab
   // (more accurate bracket-fill math + IRMAA cliff detection). The
@@ -206,7 +247,12 @@ export default function WithdrawalStrategy() {
             <Slider label="Traditional (401k/IRA)" value={traditional} onChange={setTraditional} min={0} max={3000000} step={10000} format={fmt} />
             <Slider label="Roth Balance" value={roth} onChange={setRoth} min={0} max={2000000} step={10000} format={fmt} />
             <Slider label="Taxable Balance" value={taxable} onChange={setTaxable} min={0} max={2000000} step={10000} format={fmt} />
-            <Slider label="Social Security (monthly)" value={socialSecurity} onChange={setSocialSecurity} min={0} max={5000} step={100} prefix="$" suffix="/mo" />
+            <Slider label="Social Security (monthly)" value={socialSecurity} onChange={handleSocialSecurityChange} min={0} max={5000} step={100} prefix="$" suffix="/mo" />
+            {ssAutoEstimated && (
+              <div style={{ marginTop: -6, marginBottom: 10, padding: '6px 10px', borderRadius: 6, background: 'var(--blue-dim)', border: '1px solid var(--blue)', fontSize: 11, color: 'var(--blue)', lineHeight: 1.5 }}>
+                ℹ️ Auto-estimated from your salary at FRA (age 67) using the 2026 SSA PIA formula. For early/delayed claiming or per-spouse benefits, refine on the <strong>Social Security</strong> tab.
+              </div>
+            )}
             <div style={{ marginTop: 14, padding: '10px 14px', background: 'var(--bg)', borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Total Nest Egg</span>
               <span style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 18 }}>{fmtFull(totalAccount)}</span>

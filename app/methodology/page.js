@@ -63,6 +63,16 @@ const sections = [
     ],
   },
   {
+    title: 'Net Investment Income Tax (NIIT)',
+    body: [
+      "The 3.8% NIIT applies to the lesser of (a) net investment income, or (b) MAGI over $200,000 (single) / $250,000 (MFJ). The projection engine applies this on top of regular capital-gains tax in years where MAGI crosses the threshold.",
+      "These thresholds are statutory (Affordable Care Act, 2013) and have never been indexed for inflation, so more taxpayers cross into NIIT territory each year via wage growth and cumulative inflation.",
+    ],
+    sources: [
+      { label: 'IRS Topic No. 559 — Net Investment Income Tax', url: 'https://www.irs.gov/taxtopics/tc559' },
+    ],
+  },
+  {
     title: 'State income tax',
     body: [
       "State tax uses one effective rate per state — a flat rate for flat-tax states, a representative effective rate for graduated states (CA, NY, OR, etc.). For households earning under $300K this approximation is within a few hundred dollars of the true bill.",
@@ -103,7 +113,7 @@ const sections = [
   {
     title: 'What this tool intentionally does NOT model',
     body: [
-      "Estate tax (federal exemption is $13.99M+ in 2025, sunsetting in 2026 to ~$15M post-OBBBA — relevant only to households well above mass-affluent).",
+      "Estate tax (federal exemption is $15,000,000 in 2026 — made permanent by the One Big Beautiful Bill Act, which removed the 2026 TCJA sunset. Relevant only to households well above mass-affluent).",
       "Alternative Minimum Tax (AMT) — relevant to ISO exercises and high-SALT states.",
       "Net Unrealized Appreciation (NUA) on company stock in employer 401(k)s.",
       "K-1 income, deferred compensation, RSU vesting schedules — relevant to executives and business owners.",

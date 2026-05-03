@@ -12,6 +12,14 @@ import { fmt } from '@/lib/format';
 import { TAX_BRACKETS } from '@/lib/constants';
 import { usePlan } from '@/components/PlanProvider';
 
+// SECURE 2.0 mandatory Roth catch-up: starting 2026, employees age 50+ whose
+// prior-year FICA wages exceed the indexed threshold ($150,000 for 2026 plan
+// year, indexed annually from a $145,000 statutory base) must make age-50+
+// catch-up contributions to a Roth account, not pre-tax. Applies to 401(k),
+// 403(b), and governmental 457(b) plans. Source: IRS final regulations on
+// SECURE 2.0 Act, Treas. Reg. § 1.414(v)-2.
+const SECURE_2_ROTH_CATCHUP_THRESHOLD_2026 = 150_000;
+
 export default function TaxAware() {
   const { plan } = usePlan();
   const age = plan.currentAge;
@@ -20,6 +28,19 @@ export default function TaxAware() {
   const [annualContrib, setAnnualContrib] = useState(7000);
   const [currentBracket, setCurrentBracket] = useState(24);
   const [retireBracket, setRetireBracket] = useState(22);
+
+  // Detect SECURE 2.0 mandatory-Roth-catch-up applicability for this household.
+  // Trigger: age 50+ AND salary > $150K (2026 threshold). Couples-aware: any
+  // spouse 50+ earning over the threshold flips the banner on, with copy
+  // adjusted to identify which earner.
+  const salarySource = plan.incomeSources?.find(s => s.type === 'salary' && (s.owner || 'primary') === 'primary');
+  const spouseSalarySource = plan.hasSpouse
+    ? plan.incomeSources?.find(s => s.type === 'salary' && s.owner === 'spouse')
+    : null;
+  const primaryHighEarner50 = age >= 50 && (salarySource?.amount || 0) > SECURE_2_ROTH_CATCHUP_THRESHOLD_2026;
+  const spouseAge = plan.spouseCurrentAge || 0;
+  const spouseHighEarner50 = plan.hasSpouse && spouseAge >= 50 && (spouseSalarySource?.amount || 0) > SECURE_2_ROTH_CATCHUP_THRESHOLD_2026;
+  const showSecure2Banner = primaryHighEarner50 || spouseHighEarner50;
 
   const data = useMemo(() => {
     const years = retireAge - age;
@@ -52,6 +73,16 @@ export default function TaxAware() {
 
   return (
     <div className="fade-up">
+      {showSecure2Banner && (
+        <InfoBox icon="📌" title="SECURE 2.0: your catch-up contribution must be Roth" color="var(--warn)" bgColor="rgba(251,191,36,.08)">
+          {primaryHighEarner50 && spouseHighEarner50
+            ? "Both of you are over 50 with FICA wages above $150K, so under SECURE 2.0 (effective 2026) every age-50+ catch-up dollar you contribute to a 401(k) / 403(b) / 457(b) must go to the Roth side, not pre-tax. The Traditional side of this comparison is for the regular contribution; the catch-up portion ($8,000/yr at 50+, or $11,250/yr at 60–63) is Roth-only by law."
+            : (primaryHighEarner50
+                ? "You're over 50 with FICA wages above $150K, so under SECURE 2.0 (effective 2026) every age-50+ catch-up dollar you contribute to a 401(k) / 403(b) / 457(b) must go to the Roth side, not pre-tax. The Traditional side of this comparison is for the regular contribution; the catch-up portion ($8,000/yr at 50+, or $11,250/yr at 60–63) is Roth-only by law."
+                : "Your spouse is over 50 with FICA wages above $150K, so under SECURE 2.0 (effective 2026) their age-50+ catch-up contributions must go to the Roth side. Your own contributions are still your choice if you're under the threshold or under age 50.")}
+        </InfoBox>
+      )}
+
       <InfoBox icon="⚖️" title="Roth vs Traditional: Which Wins?" color="var(--info)" bgColor="var(--info-dim)">
         {rothWins ? (
           <>The <strong style={{ color: 'var(--accent)' }}>Roth IRA</strong> comes out ahead by <strong style={{ color: 'var(--accent)' }}>{fmt(diff)}</strong> after taxes. With a lower tax bracket in retirement, the gap narrows — but tax-free withdrawals still win here.</>

@@ -80,16 +80,25 @@ Ordered by user-impact-per-week-of-work, not by ambition.
 - **Tab hover tooltips** for nav orientation
 
 ### Soon (next 1–2 months)
-- **Roth conversion ladder v2** — model ACA subsidy clawback for pre-65 conversions; add per-spouse bracket fill
+- **Roth conversion optimizer** — surface the recommended target bracket given the user's projected RMD load + IRMAA cliffs (Roth Ladder already runs the math; the gap is the "convert $X this year" recommendation). Per-spouse bracket fill for couples.
+- **Roth conversion ladder v2** — model ACA subsidy clawback for pre-65 conversions
+- **Healthcare bridge breakdown** — explicit pre-Medicare (60–65) vs. Medicare (65+) cost split on My Plan, with per-year line items. Currently rolled up into one "Lifetime Healthcare" number on the verdict.
 - **PDF / share export** — single-page retirement summary for sharing with spouse, advisor, parent
 - **Email opt-in for the annual update** — "Notify me when 2027 brackets ship"
-- **Couples mode Phase F (survivor analysis)** — SS step-up to higher of two benefits; MFJ→single tax flip year of death + 1; per-spouse RMD divisor
+- **Couples mode Phase F (survivor analysis)** — SS step-up to higher of two benefits; MFJ→single tax flip year of death + 1; per-spouse RMD divisor; spousal claiming strategies
+- **Numeric input fields alongside sliders** — for users dialing in precise values when the slider step is too coarse
 
 ### Later (next quarter+)
 - **Plaid aggregation (read-only)** — auto-populate balances from Schwab/Fidelity/Vanguard. Reduces the activation cost to seconds.
 - **Plus tier ($8/mo)** — saved scenarios, scenario comparison, advanced Monte Carlo (regime-aware, bootstrap), email support. Core tool stays free.
 - **RIA partnership tier ($199/firm/mo)** — co-branded methodology page, lead-share, white-labeled PDF reports
-- **State tax v2** — proper graduated brackets for the top 10 income states (CA, NY, NJ, MA, OR, MN, HI, WI, OH, GA) — covers ~60% of US population accurately
+- **State tax v2** — proper graduated brackets for the top 10 income states (CA, NY, NJ, MA, OR, MN, HI, WI, OH, GA) — covers ~60% of US population accurately. High earners ($300K+) currently see understated state tax in graduated states; in-planner warning surfaces this until v2 ships.
+- **Inflation-adjusted dollar toggle** — switch chart and table values between nominal and real dollars. Helps users grok purchasing power on long projections (a "$2.4M at retirement" 25 years out is ~$1.3M in today's dollars at 2.5% inflation).
+- **Historical sequence-of-returns stress test** — replay actual 1929/1966/1973/2000/2008 sequences against the user's plan. Captures fat-tail risk that the normal-distribution Monte Carlo misses.
+- **QCDs (Qualified Charitable Distributions)** — for 70½+ retirees with charitable intent: $108K/yr (2026 indexed) of RMDs sent direct to charity, satisfies RMD without raising AGI. Powerful IRMAA / SS-taxability avoidance.
+- **Tax-loss harvesting estimator** — annualized tax savings estimate based on taxable account size + portfolio volatility.
+- **Backdoor Roth / Mega Backdoor Roth flag** — when user is above the Roth IRA income phase-out ($168K single / $252K MFJ in 2026), surface the strategy with mechanics.
+- **Provisional-income threshold detector on main planner** — same UX as the IRMAA cliff detector but for the SS taxability tiers ($25K/$34K single, $32K/$44K MFJ, statutory and never indexed).
 
 ### Known debt
 - The inline projection in `components/tabs/MyPlan.jsx` mirrors `lib/computeProjection.js`. Both are kept mathematically identical but consolidating is a multi-hour refactor; deferred until post-launch.
@@ -100,7 +109,7 @@ Ordered by user-impact-per-week-of-work, not by ambition.
 
 These are **out of scope** by design — surfacing them would push the tool out of mass-affluent into HNW territory and dilute the focus.
 
-- Estate tax planning (federal exemption is $13.99M+; relevant only above mass-affluent)
+- Estate tax planning (federal exemption is $15M, made permanent by OBBBA; relevant only above mass-affluent)
 - AMT, NUA on company stock, K-1 / RSU / deferred comp modeling
 - Concentrated single-stock risk, private-equity holdings
 - Long-term care insurance product comparisons
@@ -116,4 +125,4 @@ The retirement-planning software market is roughly $20B/yr in retail TAM. There'
 
 ---
 
-*Last updated: May 2026*
+*Last updated: May 2026 — incorporates feedback from two tester rounds (consumer + Fisherman Investments tax consulting team).*
