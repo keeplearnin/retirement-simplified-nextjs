@@ -28,18 +28,18 @@ export default function WithdrawalStrategy() {
     return ss?.monthlyBenefit || 2000;
   });
   const [taxBracket, setTaxBracket] = useState(22);
-  const [enableRothConversion, setEnableRothConversion] = useState(false);
-  const [rothConversionAmt, setRothConversionAmt] = useState(40000);
+  // Note: Roth conversion modeling lives on the dedicated Roth Ladder tab
+  // (more accurate bracket-fill math + IRMAA cliff detection). The
+  // projection here intentionally does not run conversions.
 
   const results = useMemo(() => {
-    function runProjection(conversionEnabled) {
+    function runProjection() {
       let tradBal = traditional;
       let rothBal = roth;
       let taxableBal = taxable;
       const projection = [];
       let moneyRunsOutAge = null;
       let totalRMDs = 0;
-      let totalConversions = 0;
 
       const ssCola = Math.max(inflationRate - 0.5, 1) / 100; // SS COLA typically trails personal inflation by ~0.5%
 
@@ -50,14 +50,6 @@ export default function WithdrawalStrategy() {
         const ssIncome = socialSecurity * 12 * ssInflation;
         const spending = annualSpend * spendInflation;
         const gap = Math.max(0, spending - ssIncome);
-
-        // Roth conversion FIRST (before RMD age, reduces future RMDs)
-        let conversion = 0;
-        if (conversionEnabled && currentAge < 73 && tradBal > 0) {
-          conversion = Math.min(rothConversionAmt, tradBal);
-          tradBal -= conversion;
-          rothBal += conversion;
-        }
 
         // RMD check (starts at 73 per SECURE Act 2.0)
         let rmd = 0;
@@ -100,10 +92,9 @@ export default function WithdrawalStrategy() {
 
         const total = taxableBal + tradBal + rothBal;
         totalRMDs += rmd;
-        totalConversions += conversion;
 
         // Tax impact — estimate effective bracket based on total taxable income this year
-        const ordinaryIncome = fromTraditional + conversion;
+        const ordinaryIncome = fromTraditional;
         // SS taxation: 2-tier formula (single filer thresholds: $25K / $34K)
         const combinedIncome = ordinaryIncome + ssIncome * 0.5;
         let ssTaxable = 0;
@@ -126,9 +117,8 @@ export default function WithdrawalStrategy() {
         const gainsRatio = Math.min(0.8, 0.3 + y * 0.02); // Starts ~30%, grows ~2%/yr to max 80%
         const taxOnTraditional = fromTraditional * (effectiveBracket / 100);
         const taxOnTaxable = fromTaxable * ltcgRate * gainsRatio;
-        const taxOnConversion = conversion * (effectiveBracket / 100);
         const taxOnSS = ssTaxable * (effectiveBracket / 100);
-        const totalTax = taxOnTraditional + taxOnTaxable + taxOnConversion + taxOnSS;
+        const totalTax = taxOnTraditional + taxOnTaxable + taxOnSS;
         const afterTaxIncome = (fromTaxable + fromTraditional + fromRoth + ssIncome) - totalTax;
 
         projection.push({
@@ -144,7 +134,6 @@ export default function WithdrawalStrategy() {
           fromTaxable,
           fromTraditional,
           fromRoth,
-          conversion,
           totalTax,
           afterTaxIncome,
         });
@@ -155,42 +144,25 @@ export default function WithdrawalStrategy() {
         }
       }
 
-      return { projection, moneyRunsOutAge, totalRMDs, totalConversions };
+      return { projection, moneyRunsOutAge, totalRMDs };
     }
 
-    const withConversion = runProjection(enableRothConversion);
-    const withoutConversion = runProjection(false);
-
+    const result = runProjection();
     const totalNestEgg = traditional + roth + taxable;
     const withdrawalRate = totalNestEgg > 0 ? (annualSpend / totalNestEgg) * 100 : 0;
-    const yearsOfRetirement = withConversion.moneyRunsOutAge
-      ? withConversion.moneyRunsOutAge - age
+    const yearsOfRetirement = result.moneyRunsOutAge
+      ? result.moneyRunsOutAge - age
       : lifeExpectancy - age;
-    // Sum actual tax from projection rather than flat-rate estimate
-    const conversionTaxCost = withConversion.projection.reduce((s, d) => s + (d.conversion || 0) * (taxBracket / 100), 0);
-
-    const noConvYears = withoutConversion.moneyRunsOutAge
-      ? withoutConversion.moneyRunsOutAge - age
-      : lifeExpectancy - age;
-
-    const lastWith = withConversion.projection[withConversion.projection.length - 1] || {};
-    const lastWithout = withoutConversion.projection[withoutConversion.projection.length - 1] || {};
 
     return {
-      projectionData: withConversion.projection,
-      moneyRunsOutAge: withConversion.moneyRunsOutAge,
+      projectionData: result.projection,
+      moneyRunsOutAge: result.moneyRunsOutAge,
       totalNestEgg,
       withdrawalRate,
       yearsOfRetirement,
-      totalRMDs: withConversion.totalRMDs,
-      totalConversions: withConversion.totalConversions,
-      conversionTaxCost,
-      noConvYears,
-      endingWithConversion: lastWith.total || 0,
-      endingWithoutConversion: lastWithout.total || 0,
-      noConvMoneyRunsOutAge: withoutConversion.moneyRunsOutAge,
+      totalRMDs: result.totalRMDs,
     };
-  }, [age, lifeExpectancy, annualSpend, returnRate, inflationRate, traditional, roth, taxable, socialSecurity, taxBracket, enableRothConversion, rothConversionAmt]);
+  }, [age, lifeExpectancy, annualSpend, returnRate, inflationRate, traditional, roth, taxable, socialSecurity, taxBracket]);
 
   const withdrawalColor = results.withdrawalRate < 4 ? 'var(--accent)' : results.withdrawalRate <= 5 ? 'var(--warn)' : 'var(--danger)';
   const yearsColor = results.moneyRunsOutAge ? 'var(--danger)' : 'var(--accent)';
@@ -202,9 +174,8 @@ export default function WithdrawalStrategy() {
     if (results.withdrawalRate > 5) w.push(`Withdrawal rate of ${results.withdrawalRate.toFixed(1)}% exceeds safe limits — consider reducing spending or saving more.`);
     if (age < 59.5 && traditional > 0) w.push('Withdrawals from Traditional IRA/401(k) before age 59½ incur a 10% early withdrawal penalty (not shown).');
     if (results.moneyRunsOutAge) w.push(`Money runs out at age ${results.moneyRunsOutAge} — ${lifeExpectancy - results.moneyRunsOutAge} years short of your plan.`);
-    if (enableRothConversion && rothConversionAmt > traditional * 0.1) w.push('Large Roth conversions may push you into a higher tax bracket or trigger Medicare IRMAA surcharges.');
     return w;
-  }, [totalAccount, results, age, traditional, lifeExpectancy, enableRothConversion, rothConversionAmt]);
+  }, [totalAccount, results, age, traditional, lifeExpectancy]);
 
   // RMD rows for the table
   const rmdRows = results.projectionData.filter(d => d.age >= 73 && d.rmd > 0).slice(0, 15);
@@ -387,46 +358,8 @@ export default function WithdrawalStrategy() {
             </div>
           </Card>
 
-          {/* Roth Conversion Comparison */}
-          {enableRothConversion && (
-            <Card style={{ marginTop: 14 }}>
-              <SectionLabel>Roth Conversion Impact</SectionLabel>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div style={{ padding: '16px', background: 'var(--bg)', borderRadius: 10, border: '1px solid var(--accent)', borderColor: 'var(--accent)' }}>
-                  <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>With Roth Conversion</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>{fmtFull(results.endingWithConversion)}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Ending balance at age {age + results.yearsOfRetirement}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 6 }}>
-                    Converted: <strong style={{ color: 'var(--accent)' }}>{fmtFull(results.totalConversions)}</strong>
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
-                    Tax cost: <strong style={{ color: 'var(--warn)' }}>{fmtFull(results.conversionTaxCost)}</strong>
-                  </div>
-                </div>
-                <div style={{ padding: '16px', background: 'var(--bg)', borderRadius: 10, border: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>Without Conversion</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>{fmtFull(results.endingWithoutConversion)}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Ending balance at age {age + results.noConvYears}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 6 }}>
-                    More in Traditional → higher RMDs
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
-                    Lasts until: <strong>Age {results.noConvMoneyRunsOutAge || age + results.noConvYears}</strong>
-                  </div>
-                </div>
-              </div>
-              {results.endingWithConversion > results.endingWithoutConversion && (
-                <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(16, 185, 129, 0.08)', borderRadius: 8, fontSize: 12, color: 'var(--accent)' }}>
-                  Roth conversion strategy leaves you with <strong>{fmtFull(results.endingWithConversion - results.endingWithoutConversion)}</strong> more at the end — and more of it is tax-free.
-                </div>
-              )}
-              {results.endingWithConversion <= results.endingWithoutConversion && (
-                <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(245, 158, 11, 0.08)', borderRadius: 8, fontSize: 12, color: 'var(--warn)' }}>
-                  In this scenario, the tax cost of conversions outweighs the benefit. Consider a smaller conversion amount or check if your tax bracket will be lower in retirement.
-                </div>
-              )}
-            </Card>
-          )}
+          {/* Roth conversion modeling lives on the dedicated Roth Ladder tab — that
+              card linked from the inputs above is the canonical surface. */}
 
           {/* Key Rules */}
           <Card style={{ marginTop: 14 }}>

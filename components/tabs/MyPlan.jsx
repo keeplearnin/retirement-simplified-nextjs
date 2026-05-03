@@ -10,7 +10,7 @@ import { usePlan, INCOME_TEMPLATES, DEBT_TEMPLATES } from '@/components/PlanProv
 import { projectIncome } from '@/lib/incomeEngine';
 import { projectExpenses, createDefaultExpensePlan } from '@/lib/expenseEngine';
 import { computeTax, computeSSTaxable, detectIrmaaCliff } from '@/lib/taxEngine';
-import { RMD_TABLE } from '@/lib/constants';
+import { RMD_TABLE, RMD_START_AGE } from '@/lib/constants';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -838,7 +838,7 @@ export default function MyPlan() {
     const householdMonthlyContrib = monthlyContrib + spouseFactor * (plan.spouseMonthlyContribution || 0);
     let portfolioBalance = bal401k + balRoth + balTaxable + balHSA + balCash + balCrypto + balPension + balAnnuity + balRealEstate + bal529;
     const startingBalance = portfolioBalance;
-    const RMD_START = 73;
+    const RMD_START = RMD_START_AGE;
     const rmdDivisor = (age) => RMD_TABLE[Math.min(age, 110)] || 8.9;
 
     // Combine with taxes + portfolio tracking

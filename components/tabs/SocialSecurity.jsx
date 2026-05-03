@@ -22,12 +22,24 @@ function estimateBenefit(currentIncome, startAge, workYears) {
     pia = SS_BEND_POINTS[0] * SS_FACTORS[0] + (SS_BEND_POINTS[1] - SS_BEND_POINTS[0]) * SS_FACTORS[1] + (aime - SS_BEND_POINTS[1]) * SS_FACTORS[2];
   }
 
+  // IRS two-tier early-claiming reduction. First 36 months early: 5/9 of 1%
+  // per month (= 0.5556%/mo). Months 37+ early: 5/12 of 1% per month (=
+  // 0.4167%/mo). The earlier flat-0.5556% formula was wrong for anyone
+  // claiming more than 36 months before FRA — at age 62 with FRA 67 it
+  // overstated the reduction by ~3.4 pp (33.3% vs the correct 30%).
+  // Delayed retirement credits accrue at 8%/yr (0.6667%/mo) past FRA,
+  // capped at age 70.
   const fra = SS_FRA;
   let ageAdj;
   if (startAge < fra) {
-    ageAdj = 1 - ((fra - startAge) * 12 * 0.00556);
+    const monthsEarly = (fra - startAge) * 12;
+    const tier1Months = Math.min(monthsEarly, 36);
+    const tier2Months = Math.max(0, monthsEarly - 36);
+    const reduction = tier1Months * (5 / 900) + tier2Months * (5 / 1200);
+    ageAdj = 1 - reduction;
   } else {
-    ageAdj = 1 + ((startAge - fra) * 12 * 0.00667);
+    const monthsLate = Math.min((startAge - fra) * 12, (70 - fra) * 12);
+    ageAdj = 1 + monthsLate * (2 / 300);
   }
 
   const workFactor = Math.min(workYears / 35, 1);

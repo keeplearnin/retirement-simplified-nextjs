@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import Auth, { isConfigured } from '@/lib/auth';
 
 const AuthContext = createContext({ user: null, isConfigured: false });
@@ -24,11 +24,18 @@ export default function AuthProvider({ children }) {
     })();
   }, [configured]);
 
-  const signIn = () => Auth.signIn();
-  const signOut = () => { Auth.signOut(); setUser(null); };
+  const signIn = useCallback(() => Auth.signIn(), []);
+  const signOut = useCallback(() => { Auth.signOut(); setUser(null); }, []);
+
+  // Stable identity prevents every useAuth() consumer from re-rendering on
+  // unrelated AuthProvider renders. Mirrors the PlanProvider pattern.
+  const value = useMemo(
+    () => ({ user, isConfigured: configured, authLoading, signIn, signOut }),
+    [user, configured, authLoading, signIn, signOut],
+  );
 
   return (
-    <AuthContext.Provider value={{ user, isConfigured: configured, authLoading, signIn, signOut }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
