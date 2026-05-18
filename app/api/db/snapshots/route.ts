@@ -13,7 +13,7 @@ import { verifyAuth, checkRateLimit, getClientIp } from '@/lib/apiAuth';
 import { getSnapshots, upsertSnapshot, isDbConfigured } from '@/lib/db';
 
 export async function GET(request: Request) {
-  const authResult = verifyAuth(request);
+  const authResult = await verifyAuth(request);
   if (authResult instanceof NextResponse) return authResult;
 
   const ip = getClientIp(request);
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const authResult = verifyAuth(request);
+  const authResult = await verifyAuth(request);
   if (authResult instanceof NextResponse) return authResult;
 
   const ip = getClientIp(request);

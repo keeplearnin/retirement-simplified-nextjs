@@ -1,72 +1,112 @@
 import { NextResponse } from 'next/server';
+import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
 
 // ---------------------------------------------------------------------------
-// Lightweight Cognito JWT validation for Next.js API routes
-// Verifies token structure, expiry, and issuer (no external deps).
-// For full signature verification, add `jwks-rsa` and `jsonwebtoken`.
+// Cognito JWT validation with full signature verification.
+//
+// Verifies: signature (via JWKS), expiry, issuer, token_use, audience (when
+// the App Client ID is configured). All checks are mandatory — if env vars
+// are not set, every request is rejected with 503.
 // ---------------------------------------------------------------------------
 
-const COGNITO_REGION = process.env.NEXT_PUBLIC_AWS_REGION || '';
-const USER_POOL_ID = process.env.NEXT_PUBLIC_USER_POOL_ID || '';
+const COGNITO_REGION = process.env.NEXT_PUBLIC_AWS_REGION ?? '';
+const USER_POOL_ID = process.env.NEXT_PUBLIC_USER_POOL_ID ?? '';
+const APP_CLIENT_ID = process.env.NEXT_PUBLIC_USER_POOL_CLIENT_ID ?? '';
 
-function getExpectedIssuer(): string {
-  return `https://cognito-idp.${COGNITO_REGION}.amazonaws.com/${USER_POOL_ID}`;
+const ISSUER = COGNITO_REGION && USER_POOL_ID
+  ? `https://cognito-idp.${COGNITO_REGION}.amazonaws.com/${USER_POOL_ID}`
+  : '';
+
+// createRemoteJWKSet handles caching, rotation, and cooldown automatically.
+// One instance shared across requests; jose internally caches keys per kid.
+let jwksCache: ReturnType<typeof createRemoteJWKSet> | null = null;
+
+function getJwks() {
+  if (!ISSUER) return null;
+  if (!jwksCache) {
+    jwksCache = createRemoteJWKSet(new URL(`${ISSUER}/.well-known/jwks.json`));
+  }
+  return jwksCache;
 }
 
-interface TokenPayload {
+export interface TokenPayload extends JWTPayload {
   sub: string;
   email?: string;
-  iss: string;
-  exp: number;
-  token_use: string;
-  [key: string]: unknown;
-}
-
-function decodeJwtPayload(token: string): TokenPayload | null {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const payload = JSON.parse(atob(parts[1]));
-    return payload;
-  } catch {
-    return null;
-  }
+  token_use?: string;
+  client_id?: string;
+  aud?: string | string[];
 }
 
 /**
- * Validates Authorization header and returns the user's token payload.
- * Returns a NextResponse error if auth fails, or the decoded payload on success.
+ * Validates the Authorization header and returns the verified token payload.
+ * Returns a NextResponse error on any failure — never throws.
+ *
+ * Async: signature verification fetches the JWKS (cached after first call).
  */
-export function verifyAuth(request: Request): TokenPayload | NextResponse {
+export async function verifyAuth(request: Request): Promise<TokenPayload | NextResponse> {
+  if (!ISSUER) {
+    console.error('Cognito env vars not configured — auth disabled');
+    return NextResponse.json({ error: 'Auth not configured' }, { status: 503 });
+  }
+
   const authHeader = request.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  const token = authHeader.slice(7).trim();
+  if (!token) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
-  const token = authHeader.slice(7);
-  const payload = decodeJwtPayload(token);
-  if (!payload) {
+  const jwks = getJwks();
+  if (!jwks) {
+    return NextResponse.json({ error: 'Auth not configured' }, { status: 503 });
+  }
+
+  try {
+    const { payload } = await jwtVerify(token, jwks, {
+      issuer: ISSUER,
+    });
+
+    const tp = payload as TokenPayload;
+
+    // token_use must be 'access' or 'id'. Cognito sets this on every token.
+    if (tp.token_use !== 'access' && tp.token_use !== 'id') {
+      return NextResponse.json({ error: 'Invalid token use' }, { status: 401 });
+    }
+
+    // When the App Client ID is configured, verify audience:
+    //  - id tokens: aud === APP_CLIENT_ID
+    //  - access tokens: client_id === APP_CLIENT_ID (no aud claim)
+    if (APP_CLIENT_ID) {
+      const matchesAud = tp.token_use === 'id'
+        ? (Array.isArray(tp.aud) ? tp.aud.includes(APP_CLIENT_ID) : tp.aud === APP_CLIENT_ID)
+        : tp.client_id === APP_CLIENT_ID;
+
+      if (!matchesAud) {
+        return NextResponse.json({ error: 'Invalid token audience' }, { status: 401 });
+      }
+    }
+
+    if (!tp.sub) {
+      return NextResponse.json({ error: 'Token missing subject' }, { status: 401 });
+    }
+
+    return tp;
+  } catch (err) {
+    // jose throws specific error codes. Map expiry to a clearer message;
+    // collapse everything else to a generic 401 to avoid leaking which
+    // check failed (signature vs. issuer vs. structure).
+    const code = (err as { code?: string })?.code;
+    if (code === 'ERR_JWT_EXPIRED') {
+      return NextResponse.json({ error: 'Token expired' }, { status: 401 });
+    }
     return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
   }
-
-  // Check expiry
-  if (payload.exp * 1000 < Date.now()) {
-    return NextResponse.json({ error: 'Token expired' }, { status: 401 });
-  }
-
-  // Check issuer matches our Cognito User Pool
-  const expectedIssuer = getExpectedIssuer();
-  if (expectedIssuer && payload.iss !== expectedIssuer) {
-    return NextResponse.json({ error: 'Invalid token issuer' }, { status: 401 });
-  }
-
-  return payload;
 }
 
 // ---------------------------------------------------------------------------
-// In-memory IP-based rate limiter (no external deps)
-// Resets per window. Safe for single-instance deployments.
-// For multi-instance, use Redis or Upstash.
+// In-memory IP-based rate limiter (unchanged from previous implementation)
 // ---------------------------------------------------------------------------
 
 interface RateLimitEntry {
@@ -76,8 +116,7 @@ interface RateLimitEntry {
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
-// Clean up expired entries periodically to prevent memory leaks
-const CLEANUP_INTERVAL = 60_000; // 1 minute
+const CLEANUP_INTERVAL = 60_000;
 let lastCleanup = Date.now();
 
 function cleanupExpiredEntries() {
@@ -91,10 +130,6 @@ function cleanupExpiredEntries() {
   }
 }
 
-/**
- * Check rate limit for a given key (typically IP or user ID).
- * Returns null if within limit, or a NextResponse 429 if exceeded.
- */
 export function checkRateLimit(
   key: string,
   maxRequests: number = 20,
@@ -122,9 +157,6 @@ export function checkRateLimit(
   return null;
 }
 
-/**
- * Extract client IP from request headers (works behind proxies).
- */
 export function getClientIp(request: Request): string {
   return (
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||

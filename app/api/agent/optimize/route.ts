@@ -57,7 +57,7 @@ Return ONLY a valid JSON object — no markdown, no explanation, just raw JSON:
 
 export async function POST(request: Request) {
   try {
-    const authResult = verifyAuth(request);
+    const authResult = await verifyAuth(request);
     if (authResult instanceof NextResponse) return authResult;
 
     const ip = getClientIp(request);

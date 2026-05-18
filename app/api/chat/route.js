@@ -7,7 +7,7 @@ const MAX_TOOL_ITERATIONS = 5;
 
 export async function POST(request) {
   try {
-    const authResult = verifyAuth(request);
+    const authResult = await verifyAuth(request);
     if (authResult instanceof NextResponse) return authResult;
 
     const ip = getClientIp(request);

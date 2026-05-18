@@ -33,7 +33,7 @@ import { verifyAuth, checkRateLimit, getClientIp } from '@/lib/apiAuth';
 export async function POST(request) {
   try {
     // --- Auth: require a valid Cognito token ---
-    const authResult = verifyAuth(request);
+    const authResult = await verifyAuth(request);
     if (authResult instanceof NextResponse) return authResult;
 
     // --- Rate limit: 10 requests per minute per IP ---

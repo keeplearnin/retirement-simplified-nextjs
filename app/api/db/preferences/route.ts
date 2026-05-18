@@ -10,7 +10,7 @@ import { verifyAuth, checkRateLimit, getClientIp } from '@/lib/apiAuth';
 import { getUserPreferences, upsertUserPreferences, isDbConfigured } from '@/lib/db';
 
 export async function GET(request: Request) {
-  const authResult = verifyAuth(request);
+  const authResult = await verifyAuth(request);
   if (authResult instanceof NextResponse) return authResult;
 
   if (!isDbConfigured()) {
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const authResult = verifyAuth(request);
+  const authResult = await verifyAuth(request);
   if (authResult instanceof NextResponse) return authResult;
 
   if (!isDbConfigured()) {
