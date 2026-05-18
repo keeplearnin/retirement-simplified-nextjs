@@ -135,7 +135,7 @@ The most ambitious agent — chains multi-step reasoning across SS timing, Roth 
 ### 3.4 `/api/cron/weekly-check` — Batch Email Pipeline
 
 **File:** [app/api/cron/weekly-check/route.ts](app/api/cron/weekly-check/route.ts)
-**Model:** `claude-haiku-4-5-20251001` ⚠️ *see Known Issues*
+**Model:** `claude-haiku-4-5`
 **Max iterations:** 8
 **Triggered by:** GitHub Actions (`weekly-check.yml`) every Monday 08:00 UTC
 **Auth:** `Authorization: Bearer ${CRON_SECRET}` (not Cognito)
@@ -318,8 +318,8 @@ See [.env.local.example](.env.local.example).
 | Severity | Location | Issue |
 |---|---|---|
 | **CRITICAL** | `agentTools.ts:690` — `analyze_withdrawal_order` | "Roth-first" approximation swaps 401k ↔ Roth balances. Engine taxes 401k as ordinary income and applies RMDs — swap inverts both. Output is nonsense. |
-| **CRITICAL** | `weekly-check/route.ts:65` | Model ID `claude-haiku-4-5-20251001` doesn't exist. Cron will 404 every Monday. Use `claude-haiku-4-5`. |
-| **CRITICAL** | `weekly-check/route.ts` | No cost cap. ~8 Claude calls/user/week, no quota check. |
+| ~~CRITICAL~~ ✅ fixed | `weekly-check/route.ts` | Model ID corrected to `claude-haiku-4-5`. |
+| ~~CRITICAL~~ ✅ fixed | `weekly-check/route.ts` | Cost cap: `WEEKLY_CHECK_BATCH_SIZE` (default 50, hard ceiling 200), kill switch `WEEKLY_CHECK_DISABLED`, timing-safe `CRON_SECRET` compare. |
 | **CRITICAL** | `001_plan_snapshots.sql` | RLS disabled + service-role keys = single auth bypass → full DB read. |
 | SIGNIFICANT | `agentTools.ts:512` | SS lifetime benefit formula uses FV-of-annuity, not PV. Overstates by ~1.5×, biases "claim at 70" recommendation. |
 | SIGNIFICANT | `weekly-check/route.ts` | Processes first 10 users only, no cursor/resumption. Users 11+ never get emailed. |
