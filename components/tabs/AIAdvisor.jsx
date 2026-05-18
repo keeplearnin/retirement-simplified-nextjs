@@ -20,6 +20,9 @@ export default function AIAdvisor() {
   const [loading, setLoading] = useState(false);
   const [healthReport, setHealthReport] = useState(null);
   const [healthLoading, setHealthLoading] = useState(false);
+  const [optimizeReport, setOptimizeReport] = useState(null);
+  const [optimizeLoading, setOptimizeLoading] = useState(false);
+  const [showOptimize, setShowOptimize] = useState(false);
   const chatRef = useRef(null);
 
   useEffect(() => {
@@ -53,6 +56,30 @@ export default function AIAdvisor() {
       // silent — health check is best-effort
     } finally {
       setHealthLoading(false);
+    }
+  }
+
+  async function runOptimization() {
+    setOptimizeLoading(true);
+    setShowOptimize(true);
+    try {
+      const token = Auth.getIdToken();
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/agent/optimize', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ plan, planHistory: loadHistory() }),
+      });
+      if (res.ok) {
+        const { report } = await res.json();
+        setOptimizeReport(report);
+      }
+    } catch {
+      // silent
+    } finally {
+      setOptimizeLoading(false);
     }
   }
 
@@ -167,21 +194,96 @@ export default function AIAdvisor() {
         <p style={{ color: 'var(--text-muted)', margin: '4px 0 8px', fontSize: 14, fontFamily: 'var(--sans)' }}>
           Ask questions about your retirement plan — I can run real calculations on your numbers.
         </p>
-        <span
-          style={{
-            display: 'inline-block',
-            background: 'var(--warn-dim)',
-            color: 'var(--warn)',
-            fontSize: 12,
-            fontWeight: 600,
-            padding: '4px 10px',
-            borderRadius: 20,
-            fontFamily: 'var(--sans)',
-          }}
-        >
-          Educational tool only — not financial advice
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span
+            style={{
+              display: 'inline-block',
+              background: 'var(--warn-dim)',
+              color: 'var(--warn)',
+              fontSize: 12,
+              fontWeight: 600,
+              padding: '4px 10px',
+              borderRadius: 20,
+              fontFamily: 'var(--sans)',
+            }}
+          >
+            Educational tool only — not financial advice
+          </span>
+          <button
+            onClick={runOptimization}
+            disabled={optimizeLoading}
+            style={{
+              background: optimizeLoading ? 'var(--border)' : 'var(--accent)',
+              color: optimizeLoading ? 'var(--text-muted)' : 'var(--bg)',
+              border: 'none',
+              borderRadius: 20,
+              padding: '4px 14px',
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: 'var(--sans)',
+              cursor: optimizeLoading ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {optimizeLoading ? '⏳ Optimizing...' : '⚡ Optimize My Plan'}
+          </button>
+        </div>
       </div>
+
+      {/* Optimization Report */}
+      {showOptimize && (
+        <div style={{ marginBottom: 16, border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', fontFamily: 'var(--sans)' }}>
+          <div style={{ background: 'var(--bg2)', padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>⚡ Optimization Report</span>
+            <button onClick={() => setShowOptimize(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16 }}>×</button>
+          </div>
+          {optimizeLoading && (
+            <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: 13 }}>
+              Running full analysis: projection → SS timing → Roth conversions → withdrawal order...
+            </div>
+          )}
+          {optimizeReport && !optimizeLoading && (
+            <div style={{ padding: '12px 16px' }}>
+              {optimizeReport.headline && (
+                <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: '0 0 12px' }}>
+                  {optimizeReport.headline}
+                </p>
+              )}
+              {optimizeReport.keyMetrics && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+                  {[
+                    { label: 'Money lasts (now)', value: `Age ${optimizeReport.keyMetrics.currentMoneyLastsAge}` },
+                    { label: 'Money lasts (optimized)', value: `Age ${optimizeReport.keyMetrics.optimizedMoneyLastsAge}` },
+                    { label: 'Lifetime tax (now)', value: `$${Math.round(optimizeReport.keyMetrics.currentLifetimeTax / 1000)}K` },
+                    { label: 'Lifetime tax (optimized)', value: `$${Math.round(optimizeReport.keyMetrics.optimizedLifetimeTax / 1000)}K` },
+                  ].map(({ label, value }) => (
+                    <div key={label} style={{ background: 'var(--bg2)', borderRadius: 8, padding: '8px 10px' }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{label}</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {optimizeReport.actions?.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Ranked Actions</div>
+                  {optimizeReport.actions.map((a, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 10, padding: '8px 10px', background: 'var(--bg2)', borderRadius: 8 }}>
+                      <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--accent)', minWidth: 24, lineHeight: 1.2 }}>#{a.rank}</div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{a.action}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{a.detail}</div>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', background: 'var(--accent-dim, rgba(0,200,150,0.1))', padding: '2px 8px', borderRadius: 10 }}>
+                          {a.estimatedImpact}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Chat area */}
       <Card>

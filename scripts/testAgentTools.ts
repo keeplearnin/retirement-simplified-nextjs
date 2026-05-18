@@ -70,7 +70,7 @@ console.log('\n=== agentTools smoke test ===\n');
 // 1. Tool definitions
 console.log('Tool definitions:');
 check(`exports ${TOOL_DEFINITIONS.length} tools`, () => {
-  if (TOOL_DEFINITIONS.length !== 8) throw new Error(`expected 8, got ${TOOL_DEFINITIONS.length}`);
+  if (TOOL_DEFINITIONS.length !== 10) throw new Error(`expected 10, got ${TOOL_DEFINITIONS.length}`);
 });
 TOOL_DEFINITIONS.forEach(t => {
   check(`${t.name} has name + description + input_schema`, () => {
@@ -233,6 +233,38 @@ console.log('\nunknown tool:');
 const unknownResult = executeTool('nonexistent_tool', {}, samplePlan);
 check('returns error string, no throw', () => {
   if (!unknownResult.error) throw new Error('expected error field');
+});
+
+// 13. analyze_withdrawal_order
+console.log('\nanalyze_withdrawal_order:');
+const withdrawalResult = executeTool('analyze_withdrawal_order', { conversionBracket: 22 }, samplePlan);
+check('no error', () => { if (withdrawalResult.error) throw new Error(withdrawalResult.error); });
+check('returns 3 strategies', () => {
+  const r = withdrawalResult.result as Record<string, unknown[]>;
+  if (r.strategies.length !== 3) throw new Error(`expected 3, got ${r.strategies.length}`);
+});
+check('has bestByTax + bestByLongevity + recommendation', () => {
+  const r = withdrawalResult.result as Record<string, unknown>;
+  if (!r.bestByTax || !r.bestByLongevity || !r.recommendation) throw new Error('missing fields');
+  pass('', `best tax: ${r.bestByTax}, best longevity: ${r.bestByLongevity}`);
+});
+
+// 14. run_full_optimization
+console.log('\nrun_full_optimization:');
+const optimizeResult = executeTool('run_full_optimization', {}, samplePlan);
+check('no error', () => { if (optimizeResult.error) throw new Error(optimizeResult.error); });
+check('returns baseline + actions + summary', () => {
+  const r = optimizeResult.result as Record<string, unknown>;
+  if (!r.baseline || !Array.isArray(r.actions) || !r.summary) throw new Error('missing fields');
+});
+check('actions ranked by dollar value desc', () => {
+  const actions = (optimizeResult.result as Record<string, Array<{ dollarValue: number; rank: number }>>).actions;
+  if (actions.length > 1) {
+    for (let i = 1; i < actions.length; i++) {
+      if (actions[i].dollarValue > actions[i - 1].dollarValue) throw new Error('not sorted');
+    }
+  }
+  pass('', `${actions.length} actions, top: ${(optimizeResult.result as Record<string, { summary: string }>).summary}`);
 });
 
 console.log('\n=== done ===\n');

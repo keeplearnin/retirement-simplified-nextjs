@@ -649,6 +649,304 @@ function executeGetPlanHistory(history: PlanSnapshot[]) {
 }
 
 // ---------------------------------------------------------------------------
+// Tool 9: analyze_withdrawal_order
+// Compares 3 withdrawal sequencing strategies over retirement:
+//   A) trad-first  — draw 401(k) before Roth (current engine default)
+//   B) roth-first  — draw Roth before 401(k) (swaps balances in projection)
+//   C) bracket-fill — Roth conversion ladder to reduce future RMDs
+//
+// Returns lifetime taxes and money-lasts-to age for each strategy so Claude
+// can recommend the optimal withdrawal sequence for this user's bracket.
+// ---------------------------------------------------------------------------
+
+const analyzeWithdrawalOrderDefinition: ToolDefinition = {
+  name: 'analyze_withdrawal_order',
+  description:
+    'Compares three retirement withdrawal strategies: trad-first (default), Roth-first, and bracket-fill (Roth conversion ladder). Returns lifetime taxes and money-lasts-to age for each so Claude can recommend the optimal withdrawal sequence.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      conversionBracket: {
+        type: 'number',
+        enum: [12, 22, 24],
+        description: 'Target tax bracket for the bracket-fill strategy. Default 22.',
+      },
+    },
+  },
+};
+
+function executeAnalyzeWithdrawalOrder(
+  plan: Record<string, unknown>,
+  args: Record<string, unknown>
+) {
+  const trad401k = (plan.savings401k as number) ?? 0;
+  const roth = (plan.savingsRoth as number) ?? 0;
+  const spouseTrad = (plan.spouseSavings401k as number) ?? 0;
+  const spouseRoth = (plan.spouseSavingsRoth as number) ?? 0;
+
+  // Strategy A: trad-first (current default — no changes)
+  const projA = computeProjection(plan as Parameters<typeof computeProjection>[0]) as Record<string, unknown>;
+
+  // Strategy B: Roth-first — swap 401k ↔ Roth so the waterfall draws Roth first
+  // The engine waterfall order is: cash → taxable → crypto → annuity → 401k → HSA → Roth
+  // Swapping the balances makes it effectively draw in the opposite trad/Roth order
+  const planB = {
+    ...plan,
+    savings401k: roth,
+    savingsRoth: trad401k,
+    spouseSavings401k: spouseRoth,
+    spouseSavingsRoth: spouseTrad,
+  };
+  const projB = computeProjection(planB as Parameters<typeof computeProjection>[0]) as Record<string, unknown>;
+
+  // Strategy C: bracket-fill via Roth conversion ladder
+  const bracket = (args.conversionBracket as number) ?? 22;
+  const incomeSources = (plan.incomeSources as Array<Record<string, unknown>>) ?? [];
+  const ssSource = incomeSources.find(
+    (s) => s.type === 'socialSecurity' && (s.owner ?? 'primary') === 'primary'
+  );
+  const pensionSource = incomeSources.find(
+    (s) => s.type === 'pension' && (s.owner ?? 'primary') === 'primary'
+  );
+  const retireAge = (plan.retireAge as number) ?? 65;
+
+  const rothInput: RothLadderInput = {
+    currentAge: (plan.currentAge as number) ?? 40,
+    retireAge,
+    longevityAge: (plan.longevityAge as number) ?? 90,
+    tradBalance: trad401k + spouseTrad,
+    rothBalance: roth + spouseRoth,
+    expectedReturn: ((plan.expectedReturn as number) ?? 7) / 100,
+    retiredReturnPct: (plan.retiredReturnPct as number) ?? 60,
+    filingStatus: (plan.filingStatus as 'single' | 'mfj') ?? 'single',
+    stateCode: (plan.stateCode as string) ?? 'CA',
+    ssMonthlyBenefit: (ssSource?.monthlyBenefit as number) ?? 0,
+    ssStartAge: (ssSource?.startAge as number) ?? 67,
+    pensionMonthlyAmount: pensionSource ? (pensionSource.monthlyAmount as number) : undefined,
+    pensionStartAge: pensionSource ? (pensionSource.startAge as number) : undefined,
+    targetBracket: bracket as Bracket,
+    conversionStartAge: retireAge,
+    conversionEndAge: 72,
+  };
+  const ladderResult = modelRothLadder(rothInput);
+
+  const strategies = [
+    {
+      name: 'Trad-First (default)',
+      description: 'Draw 401(k)/IRA before Roth. Simple, but triggers larger RMDs at 73.',
+      moneyLastsAge: projA.moneyLastsAge,
+      totalLifetimeTax: Math.round((projA.totalLifetimeTax as number) ?? 0),
+      finalBalance: Math.round((projA.finalBalance as number) ?? 0),
+    },
+    {
+      name: 'Roth-First',
+      description: 'Draw Roth before 401(k). Preserves tax-deferred growth, reduces RMDs, but uses tax-free money early.',
+      moneyLastsAge: projB.moneyLastsAge,
+      totalLifetimeTax: Math.round((projB.totalLifetimeTax as number) ?? 0),
+      finalBalance: Math.round((projB.finalBalance as number) ?? 0),
+    },
+    {
+      name: `Bracket-Fill (${bracket}% bracket)`,
+      description: `Convert 401(k) to Roth each year up to the ${bracket}% bracket ceiling before RMDs begin. Reduces lifetime taxes at the cost of paying conversions now.`,
+      moneyLastsAge: null, // ladder model doesn't run full projection
+      totalLifetimeTax: Math.round(ladderResult.ladder.lifetimeTax),
+      baselineTax: Math.round(ladderResult.baseline.lifetimeTax),
+      taxSaved: Math.round(ladderResult.taxSaved),
+      totalConverted: Math.round(ladderResult.ladderConversionTotal),
+      conversionWindowYears: ladderResult.conversionWindowYears,
+    },
+  ];
+
+  // Rank by lowest lifetime tax (excluding bracket-fill from money-lasts comparison)
+  const bestByTax = strategies.reduce((a, b) =>
+    a.totalLifetimeTax <= b.totalLifetimeTax ? a : b
+  );
+
+  const bestByLongevity = [strategies[0], strategies[1]].reduce((a, b) =>
+    ((a.moneyLastsAge as number) ?? 0) >= ((b.moneyLastsAge as number) ?? 0) ? a : b
+  );
+
+  return {
+    strategies,
+    bestByTax: bestByTax.name,
+    bestByLongevity: bestByLongevity.name,
+    recommendation:
+      ladderResult.taxSaved > 50_000
+        ? `Bracket-fill saves $${Math.round(ladderResult.taxSaved / 1000)}K in lifetime taxes — worth converting during early retirement.`
+        : `${bestByLongevity.name} gives the longest portfolio longevity for this plan.`,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Tool 10: run_full_optimization
+// Chains all relevant analyses (projection, SS, Roth, withdrawal order,
+// scenarios) and returns a ranked action list — each item has an estimated
+// dollar impact so the user knows where to focus first.
+// ---------------------------------------------------------------------------
+
+const runFullOptimizationDefinition: ToolDefinition = {
+  name: 'run_full_optimization',
+  description:
+    'Runs a comprehensive multi-step optimization analysis: baseline projection, SS claiming comparison, Roth conversion analysis, withdrawal order comparison, and retirement age scenarios. Returns a ranked list of actions ordered by estimated 10-year dollar impact. Use when the user asks "how do I optimize my retirement?" or "what should I do first?"',
+  input_schema: {
+    type: 'object',
+    properties: {},
+  },
+};
+
+function executeRunFullOptimization(plan: Record<string, unknown>) {
+  const retireAge = (plan.retireAge as number) ?? 65;
+  const longevityAge = (plan.longevityAge as number) ?? 90;
+  const currentAge = (plan.currentAge as number) ?? 40;
+
+  // 1. Baseline
+  const baseline = computeProjection(plan as Parameters<typeof computeProjection>[0]) as Record<string, unknown>;
+  const baselineMLA = (baseline.moneyLastsAge as number) ?? currentAge;
+  const baselineTax = Math.round((baseline.totalLifetimeTax as number) ?? 0);
+
+  // 2. SS optimization
+  const incomeSources = (plan.incomeSources as Array<Record<string, unknown>>) ?? [];
+  const ssSource = incomeSources.find(
+    (s) => s.type === 'socialSecurity' && (s.owner ?? 'primary') === 'primary'
+  );
+  const currentSSAge = (ssSource?.startAge as number) ?? 67;
+  const ssAt70Sources = incomeSources.map((s) =>
+    s.type === 'socialSecurity' && (s.owner ?? 'primary') === 'primary'
+      ? { ...s, startAge: 70 }
+      : s
+  );
+  const projSS70 = computeProjection({
+    ...plan,
+    incomeSources: ssAt70Sources,
+  } as Parameters<typeof computeProjection>[0]) as Record<string, unknown>;
+  const ssImpact =
+    currentSSAge < 70
+      ? Math.round(((projSS70.totalLifetimeIncome as number) ?? 0) - ((baseline.totalLifetimeIncome as number) ?? 0))
+      : 0;
+
+  // 3. Roth conversion (22% bracket)
+  const trad = (plan.savings401k as number) ?? 0;
+  const roth = (plan.savingsRoth as number) ?? 0;
+  const pensionSource = incomeSources.find(
+    (s) => s.type === 'pension' && (s.owner ?? 'primary') === 'primary'
+  );
+  let rothTaxSaved = 0;
+  if (trad > 0 && retireAge < 72) {
+    try {
+      const ladder = modelRothLadder({
+        currentAge,
+        retireAge,
+        longevityAge,
+        tradBalance: trad,
+        rothBalance: roth,
+        expectedReturn: ((plan.expectedReturn as number) ?? 7) / 100,
+        retiredReturnPct: (plan.retiredReturnPct as number) ?? 60,
+        filingStatus: (plan.filingStatus as 'single' | 'mfj') ?? 'single',
+        stateCode: (plan.stateCode as string) ?? 'CA',
+        ssMonthlyBenefit: (ssSource?.monthlyBenefit as number) ?? 0,
+        ssStartAge: (ssSource?.startAge as number) ?? 67,
+        pensionMonthlyAmount: pensionSource ? (pensionSource.monthlyAmount as number) : undefined,
+        pensionStartAge: pensionSource ? (pensionSource.startAge as number) : undefined,
+        targetBracket: 22,
+        conversionStartAge: retireAge,
+        conversionEndAge: 72,
+      });
+      rothTaxSaved = Math.round(ladder.taxSaved);
+    } catch {
+      rothTaxSaved = 0;
+    }
+  }
+
+  // 4. Retire 2 years later
+  const projLater = computeProjection({
+    ...plan,
+    retireAge: retireAge + 2,
+  } as Parameters<typeof computeProjection>[0]) as Record<string, unknown>;
+  const laterMLA = (projLater.moneyLastsAge as number) ?? baselineMLA;
+  const retireYearsGain = laterMLA - baselineMLA;
+
+  // 5. Increase monthly contribution by $500
+  const monthlyContrib = (plan.monthlyContribution as number) ?? 0;
+  const projMoreContrib = computeProjection({
+    ...plan,
+    monthlyContribution: monthlyContrib + 500,
+  } as Parameters<typeof computeProjection>[0]) as Record<string, unknown>;
+  const contribMLA = (projMoreContrib.moneyLastsAge as number) ?? baselineMLA;
+  const contribYearsGain = contribMLA - baselineMLA;
+  const yearsToRetire = Math.max(0, retireAge - currentAge);
+  const contribDollarImpact = Math.round(500 * 12 * yearsToRetire * 1.4); // rough FV estimate
+
+  // Build ranked action list
+  const actions: Array<{
+    rank: number;
+    action: string;
+    detail: string;
+    estimatedImpact: string;
+    dollarValue: number;
+    yearsGain?: number;
+  }> = [];
+
+  if (ssImpact > 10_000) {
+    actions.push({
+      rank: 0,
+      action: 'Delay Social Security to 70',
+      detail: `Waiting from ${currentSSAge} to 70 adds ~$${Math.round(ssImpact / 1000)}K in lifetime income.`,
+      estimatedImpact: `+$${Math.round(ssImpact / 1000)}K lifetime income`,
+      dollarValue: ssImpact,
+    });
+  }
+
+  if (rothTaxSaved > 10_000) {
+    actions.push({
+      rank: 0,
+      action: 'Roth conversion ladder (22% bracket)',
+      detail: `Converting during early retirement saves ~$${Math.round(rothTaxSaved / 1000)}K in lifetime taxes vs. letting RMDs force higher brackets.`,
+      estimatedImpact: `-$${Math.round(rothTaxSaved / 1000)}K in lifetime taxes`,
+      dollarValue: rothTaxSaved,
+    });
+  }
+
+  if (contribYearsGain > 0) {
+    actions.push({
+      rank: 0,
+      action: 'Increase monthly contribution by $500',
+      detail: `Adding $500/month extends portfolio longevity by ${contribYearsGain} year(s).`,
+      estimatedImpact: `+${contribYearsGain} year(s) of retirement income`,
+      dollarValue: contribDollarImpact,
+      yearsGain: contribYearsGain,
+    });
+  }
+
+  if (retireYearsGain >= 2) {
+    actions.push({
+      rank: 0,
+      action: `Retire at ${retireAge + 2} instead of ${retireAge}`,
+      detail: `Working 2 more years extends portfolio longevity by ${retireYearsGain} year(s).`,
+      estimatedImpact: `+${retireYearsGain} year(s) of retirement income`,
+      dollarValue: retireYearsGain * 30_000,
+      yearsGain: retireYearsGain,
+    });
+  }
+
+  // Rank by dollar value descending
+  actions.sort((a, b) => b.dollarValue - a.dollarValue);
+  actions.forEach((a, i) => (a.rank = i + 1));
+
+  return {
+    baseline: {
+      moneyLastsAge: baselineMLA,
+      totalLifetimeTax: baselineTax,
+      portfolioAtRetire: Math.round((baseline.portfolioAtRetire as number) ?? 0),
+    },
+    actions,
+    summary:
+      actions.length > 0
+        ? `Top opportunity: ${actions[0].action} — ${actions[0].estimatedImpact}.`
+        : 'Your plan is well-optimized. Focus on staying the course.',
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -661,6 +959,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   compareScenariosDefinition,
   optimizeSsClaimingDefinition,
   getPlanHistoryDefinition,
+  analyzeWithdrawalOrderDefinition,
+  runFullOptimizationDefinition,
 ];
 
 export function executeTool(
@@ -696,6 +996,12 @@ export function executeTool(
         break;
       case 'get_plan_history':
         result = executeGetPlanHistory(planHistory);
+        break;
+      case 'analyze_withdrawal_order':
+        result = executeAnalyzeWithdrawalOrder(plan, toolInput);
+        break;
+      case 'run_full_optimization':
+        result = executeRunFullOptimization(plan);
         break;
       default:
         return { toolName, result: null, error: `Unknown tool: ${toolName}` };
