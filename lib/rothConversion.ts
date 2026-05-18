@@ -137,7 +137,7 @@ function pensionInYear(input: RothLadderInput, age: number): number {
 function runScenario(input: RothLadderInput, withLadder: boolean): RothLadderScenario {
   let tradBal = input.tradBalance;
   let rothBal = input.rothBalance;
-  const yearReturn = input.expectedReturn * input.retiredReturnPct;
+  const yearReturn = input.expectedReturn * (input.retiredReturnPct / 100);
   const stdDed = input.filingStatus === 'mfj' ? STD_DEDUCTION_MFJ : STD_DEDUCTION_SINGLE;
   const bracketTops = input.filingStatus === 'mfj' ? BRACKET_TOPS_MFJ : BRACKET_TOPS_SINGLE;
   const targetTaxableTop = input.targetBracket > 0 ? bracketTops[input.targetBracket] : 0;
