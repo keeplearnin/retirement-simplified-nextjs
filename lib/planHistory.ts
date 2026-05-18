@@ -104,8 +104,30 @@ export function savePlanSnapshot(plan: Record<string, unknown>): void {
     const updated = [snapshot, ...filtered].slice(0, MAX_SNAPSHOTS);
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+
+    // Fire-and-forget sync to DB — non-blocking, never crashes
+    syncSnapshotToDb(snapshot).catch(() => undefined);
   } catch {
     // Never crash the UI — history is best-effort
+  }
+}
+
+async function syncSnapshotToDb(snapshot: PlanSnapshot): Promise<void> {
+  try {
+    const Auth = (await import('@/lib/auth')).default;
+    const token = Auth.getIdToken?.();
+    if (!token) return;
+
+    await fetch('/api/db/snapshots', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ savedAt: snapshot.savedAt, data: snapshot }),
+    });
+  } catch {
+    // DB sync is best-effort — localStorage is the offline fallback
   }
 }
 
@@ -116,6 +138,40 @@ export function loadHistory(): PlanSnapshot[] {
     return raw ? (JSON.parse(raw) as PlanSnapshot[]) : [];
   } catch {
     return [];
+  }
+}
+
+/**
+ * Fetches history from DB and merges with localStorage.
+ * DB is source of truth; localStorage fills gaps when offline.
+ * Returns merged array sorted newest-first.
+ */
+export async function loadHistoryFromDb(token: string): Promise<PlanSnapshot[]> {
+  try {
+    const resp = await fetch('/api/db/snapshots', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!resp.ok) return loadHistory();
+
+    const { snapshots } = await resp.json() as { snapshots: Array<{ saved_at: string; data: PlanSnapshot }> };
+    const dbSnapshots: PlanSnapshot[] = snapshots.map((row) => ({
+      ...row.data,
+      savedAt: row.saved_at,
+    }));
+
+    // Merge: DB rows + any localStorage entries not yet synced
+    const local = loadHistory();
+    const dbDates = new Set(dbSnapshots.map((s) => s.savedAt));
+    const localOnly = local.filter((s) => !dbDates.has(s.savedAt));
+    const merged = [...dbSnapshots, ...localOnly]
+      .sort((a, b) => b.savedAt.localeCompare(a.savedAt))
+      .slice(0, MAX_SNAPSHOTS);
+
+    // Update localStorage cache
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    return merged;
+  } catch {
+    return loadHistory();
   }
 }
 

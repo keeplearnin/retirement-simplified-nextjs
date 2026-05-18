@@ -5,7 +5,7 @@ import Card from '@/components/ui/Card';
 import { AI_SUGGESTED_QUESTIONS } from '@/lib/constants';
 import Auth from '@/lib/auth';
 import { usePlan } from '@/components/PlanProvider';
-import { savePlanSnapshot, loadHistory } from '@/lib/planHistory';
+import { savePlanSnapshot, loadHistory, loadHistoryFromDb } from '@/lib/planHistory';
 import {
   isHealthCheckDue,
   markHealthCheckRan,
@@ -27,11 +27,24 @@ export default function AIAdvisor() {
 
   useEffect(() => {
     savePlanSnapshot(plan);
-    // Load any existing report immediately
+    // Load any existing health report immediately
     const existing = loadHealthReport();
     if (existing) setHealthReport(existing);
-    // Auto-run if overdue
-    if (isHealthCheckDue()) runHealthCheck();
+    // Load DB history and auto-run health check if overdue
+    const token = Auth.getIdToken?.();
+    if (token) {
+      loadHistoryFromDb(token).then(() => {
+        if (isHealthCheckDue()) runHealthCheck();
+      });
+      // Sync current plan to DB for cross-device access
+      fetch('/api/db/plan', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ plan }),
+      }).catch(() => undefined);
+    } else {
+      if (isHealthCheckDue()) runHealthCheck();
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function runHealthCheck() {
