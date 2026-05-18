@@ -6,17 +6,55 @@ import { AI_SUGGESTED_QUESTIONS } from '@/lib/constants';
 import Auth from '@/lib/auth';
 import { usePlan } from '@/components/PlanProvider';
 import { savePlanSnapshot, loadHistory } from '@/lib/planHistory';
+import {
+  isHealthCheckDue,
+  markHealthCheckRan,
+  saveHealthReport,
+  loadHealthReport,
+} from '@/lib/healthCheck';
 
 export default function AIAdvisor() {
   const { plan } = usePlan();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [healthReport, setHealthReport] = useState(null);
+  const [healthLoading, setHealthLoading] = useState(false);
   const chatRef = useRef(null);
 
   useEffect(() => {
     savePlanSnapshot(plan);
+    // Load any existing report immediately
+    const existing = loadHealthReport();
+    if (existing) setHealthReport(existing);
+    // Auto-run if overdue
+    if (isHealthCheckDue()) runHealthCheck();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function runHealthCheck() {
+    setHealthLoading(true);
+    try {
+      const token = Auth.getIdToken();
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/agent/health-check', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ plan, planHistory: loadHistory() }),
+      });
+      if (res.ok) {
+        const { report } = await res.json();
+        saveHealthReport(report);
+        markHealthCheckRan();
+        setHealthReport(report);
+      }
+    } catch {
+      // silent — health check is best-effort
+    } finally {
+      setHealthLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (chatRef.current) {
@@ -72,15 +110,62 @@ export default function AIAdvisor() {
     'Tax-loss harvesting',
   ];
 
+  const scoreColors = {
+    excellent: { bg: 'var(--success-dim, #d1fae5)', text: 'var(--success, #059669)', border: 'var(--success, #059669)' },
+    good: { bg: 'var(--info-dim, #dbeafe)', text: 'var(--info, #2563eb)', border: 'var(--info, #2563eb)' },
+    needs_attention: { bg: 'var(--warn-dim)', text: 'var(--warn)', border: 'var(--warn)' },
+    critical: { bg: 'var(--danger-dim, #fee2e2)', text: 'var(--danger, #dc2626)', border: 'var(--danger, #dc2626)' },
+  };
+
   return (
     <div>
+      {/* Weekly Health Report Banner */}
+      {healthLoading && (
+        <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: '12px 16px', marginBottom: 16, fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ animation: 'fade 1.2s ease-in-out infinite', display: 'inline-block' }}>⏳</span>
+          Running weekly plan health check...
+        </div>
+      )}
+      {healthReport && !healthLoading && (() => {
+        const colors = scoreColors[healthReport.overallScore] || scoreColors.needs_attention;
+        return (
+          <div style={{ border: `1px solid ${colors.border}`, borderRadius: 12, padding: '14px 16px', marginBottom: 16, background: colors.bg, fontFamily: 'var(--sans)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontWeight: 700, fontSize: 14, color: colors.text }}>
+                📋 Weekly Plan Health — {healthReport.scoreLabel}
+              </span>
+              <button
+                onClick={runHealthCheck}
+                style={{ fontSize: 11, color: colors.text, background: 'transparent', border: `1px solid ${colors.border}`, borderRadius: 8, padding: '2px 8px', cursor: 'pointer', fontFamily: 'var(--sans)' }}
+              >
+                Refresh
+              </button>
+            </div>
+            {healthReport.alerts.length > 0 && (
+              <ul style={{ margin: '0 0 8px', paddingLeft: 18, fontSize: 13, color: 'var(--text)' }}>
+                {healthReport.alerts.slice(0, 3).map((a, i) => (
+                  <li key={i} style={{ marginBottom: 2 }}>
+                    {a.severity === 'high' ? '🔴' : a.severity === 'medium' ? '🟡' : '🟢'} {a.message}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {healthReport.recommendations.length > 0 && (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', borderTop: `1px solid ${colors.border}`, paddingTop: 8, marginTop: 4 }}>
+                <strong>Top action:</strong> {healthReport.recommendations[0]}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Header */}
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: 'var(--text)', fontFamily: 'var(--serif)' }}>
-          🤖 AI Financial Educator
+          🤖 AI Financial Advisor
         </h2>
         <p style={{ color: 'var(--text-muted)', margin: '4px 0 8px', fontSize: 14, fontFamily: 'var(--sans)' }}>
-          Ask questions about retirement planning, investing, and personal finance.
+          Ask questions about your retirement plan — I can run real calculations on your numbers.
         </p>
         <span
           style={{
