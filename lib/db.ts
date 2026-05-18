@@ -1,83 +1,62 @@
 /**
- * db.ts — thin Supabase REST client. No SDK, no new dependencies.
+ * db.ts — DynamoDB persistence layer.
  *
- * Gracefully degrades: if SUPABASE_URL / SUPABASE_SERVICE_KEY are not set,
- * every function returns null / empty without throwing.
+ * Three tables (configurable prefix via DYNAMODB_TABLE_PREFIX):
+ *   - user_plans       PK userId
+ *   - plan_snapshots   PK userId, SK savedAt (YYYY-MM-DD)
+ *   - user_preferences PK userId
  *
- * All calls are server-side only (route handlers). Never import this in
- * client components.
+ * Gracefully degrades: if AWS region isn't resolvable, every function
+ * returns null / empty without throwing. Server-side only.
+ *
+ * Credentials: in Amplify the IAM role is picked up automatically. For
+ * local dev set AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY (or an AWS_PROFILE).
  */
 
-const SUPABASE_URL = process.env.SUPABASE_URL ?? '';
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY ?? '';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import {
+  DynamoDBDocumentClient,
+  GetCommand,
+  PutCommand,
+  QueryCommand,
+  ScanCommand,
+  UpdateCommand,
+} from '@aws-sdk/lib-dynamodb';
+
+const TABLE_PREFIX = process.env.DYNAMODB_TABLE_PREFIX ?? '';
+const AWS_REGION =
+  process.env.AWS_REGION ??
+  process.env.NEXT_PUBLIC_AWS_REGION ??
+  '';
+
+const TABLES = {
+  userPlans: `${TABLE_PREFIX}user_plans`,
+  planSnapshots: `${TABLE_PREFIX}plan_snapshots`,
+  userPreferences: `${TABLE_PREFIX}user_preferences`,
+};
+
+let client: DynamoDBDocumentClient | null = null;
+
+function getClient(): DynamoDBDocumentClient | null {
+  if (!AWS_REGION) return null;
+  if (!client) {
+    const raw = new DynamoDBClient({ region: AWS_REGION });
+    client = DynamoDBDocumentClient.from(raw, {
+      marshallOptions: { removeUndefinedValues: true },
+    });
+  }
+  return client;
+}
 
 export function isDbConfigured(): boolean {
-  return Boolean(SUPABASE_URL && SUPABASE_SERVICE_KEY);
-}
-
-interface SupabaseRequestOptions {
-  method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
-  table: string;
-  body?: unknown;
-  filters?: Record<string, string>;  // column=value pairs for ?column=eq.value
-  select?: string;
-  order?: string;
-  limit?: number;
-  onConflict?: string; // for upsert — comma-separated column names
-}
-
-async function supabaseRequest<T>(opts: SupabaseRequestOptions): Promise<T | null> {
-  if (!isDbConfigured()) return null;
-
-  const url = new URL(`${SUPABASE_URL}/rest/v1/${opts.table}`);
-
-  if (opts.select) url.searchParams.set('select', opts.select);
-  if (opts.order) url.searchParams.set('order', opts.order);
-  if (opts.limit) url.searchParams.set('limit', String(opts.limit));
-
-  for (const [col, val] of Object.entries(opts.filters ?? {})) {
-    url.searchParams.set(col, `eq.${val}`);
-  }
-
-  const headers: Record<string, string> = {
-    'apikey': SUPABASE_SERVICE_KEY,
-    'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-    'Content-Type': 'application/json',
-    'Prefer': 'return=representation',
-  };
-
-  if (opts.onConflict) {
-    headers['Prefer'] = `resolution=merge-duplicates,return=representation`;
-    url.searchParams.set('on_conflict', opts.onConflict);
-  }
-
-  const fetchMethod = opts.onConflict ? 'POST' : opts.method;
-
-  try {
-    const resp = await fetch(url.toString(), {
-      method: fetchMethod,
-      headers,
-      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-    });
-
-    if (!resp.ok) {
-      console.error(`Supabase ${fetchMethod} ${opts.table} failed:`, resp.status, await resp.text());
-      return null;
-    }
-
-    return resp.status === 204 ? null : (await resp.json()) as T;
-  } catch (e) {
-    console.error(`Supabase request error (${opts.table}):`, e);
-    return null;
-  }
+  return Boolean(AWS_REGION);
 }
 
 // ---------------------------------------------------------------------------
-// plan_snapshots
+// plan_snapshots — one row per user per day
 // ---------------------------------------------------------------------------
 
 export interface DbSnapshot {
-  id: string;
   user_id: string;
   saved_at: string;
   data: Record<string, unknown>;
@@ -85,14 +64,29 @@ export interface DbSnapshot {
 }
 
 export async function getSnapshots(userId: string, limit = 90): Promise<DbSnapshot[]> {
-  const rows = await supabaseRequest<DbSnapshot[]>({
-    method: 'GET',
-    table: 'plan_snapshots',
-    filters: { user_id: userId },
-    order: 'saved_at.desc',
-    limit,
-  });
-  return rows ?? [];
+  const c = getClient();
+  if (!c) return [];
+
+  try {
+    const res = await c.send(
+      new QueryCommand({
+        TableName: TABLES.planSnapshots,
+        KeyConditionExpression: 'userId = :u',
+        ExpressionAttributeValues: { ':u': userId },
+        ScanIndexForward: false, // newest first
+        Limit: limit,
+      })
+    );
+    return (res.Items ?? []).map((it) => ({
+      user_id: it.userId as string,
+      saved_at: it.savedAt as string,
+      data: it.data as Record<string, unknown>,
+      created_at: (it.createdAt as string) ?? '',
+    }));
+  } catch (e) {
+    console.error('DynamoDB getSnapshots error:', e);
+    return [];
+  }
 }
 
 export async function upsertSnapshot(
@@ -100,16 +94,28 @@ export async function upsertSnapshot(
   savedAt: string,
   data: Record<string, unknown>
 ): Promise<void> {
-  await supabaseRequest({
-    method: 'POST',
-    table: 'plan_snapshots',
-    body: { user_id: userId, saved_at: savedAt, data },
-    onConflict: 'user_id,saved_at',
-  });
+  const c = getClient();
+  if (!c) return;
+
+  try {
+    await c.send(
+      new PutCommand({
+        TableName: TABLES.planSnapshots,
+        Item: {
+          userId,
+          savedAt,
+          data,
+          createdAt: new Date().toISOString(),
+        },
+      })
+    );
+  } catch (e) {
+    console.error('DynamoDB upsertSnapshot error:', e);
+  }
 }
 
 // ---------------------------------------------------------------------------
-// user_plans (current plan synced across devices)
+// user_plans — current plan synced across devices
 // ---------------------------------------------------------------------------
 
 export interface DbPlan {
@@ -119,29 +125,49 @@ export interface DbPlan {
 }
 
 export async function getUserPlan(userId: string): Promise<DbPlan | null> {
-  const rows = await supabaseRequest<DbPlan[]>({
-    method: 'GET',
-    table: 'user_plans',
-    filters: { user_id: userId },
-    limit: 1,
-  });
-  return rows?.[0] ?? null;
+  const c = getClient();
+  if (!c) return null;
+
+  try {
+    const res = await c.send(
+      new GetCommand({
+        TableName: TABLES.userPlans,
+        Key: { userId },
+      })
+    );
+    if (!res.Item) return null;
+    return {
+      user_id: res.Item.userId as string,
+      plan: res.Item.plan as Record<string, unknown>,
+      updated_at: (res.Item.updatedAt as string) ?? '',
+    };
+  } catch (e) {
+    console.error('DynamoDB getUserPlan error:', e);
+    return null;
+  }
 }
 
 export async function upsertUserPlan(
   userId: string,
   plan: Record<string, unknown>
 ): Promise<void> {
-  await supabaseRequest({
-    method: 'POST',
-    table: 'user_plans',
-    body: { user_id: userId, plan, updated_at: new Date().toISOString() },
-    onConflict: 'user_id',
-  });
+  const c = getClient();
+  if (!c) return;
+
+  try {
+    await c.send(
+      new PutCommand({
+        TableName: TABLES.userPlans,
+        Item: { userId, plan, updatedAt: new Date().toISOString() },
+      })
+    );
+  } catch (e) {
+    console.error('DynamoDB upsertUserPlan error:', e);
+  }
 }
 
 // ---------------------------------------------------------------------------
-// user_preferences (email opt-in + weekly check scheduling)
+// user_preferences — email opt-in + scheduling state
 // ---------------------------------------------------------------------------
 
 export interface DbUserPreferences {
@@ -153,34 +179,82 @@ export interface DbUserPreferences {
 }
 
 export async function getUserPreferences(userId: string): Promise<DbUserPreferences | null> {
-  const rows = await supabaseRequest<DbUserPreferences[]>({
-    method: 'GET',
-    table: 'user_preferences',
-    filters: { user_id: userId },
-    limit: 1,
-  });
-  return rows?.[0] ?? null;
+  const c = getClient();
+  if (!c) return null;
+
+  try {
+    const res = await c.send(
+      new GetCommand({
+        TableName: TABLES.userPreferences,
+        Key: { userId },
+      })
+    );
+    if (!res.Item) return null;
+    return {
+      user_id: res.Item.userId as string,
+      email: (res.Item.email as string) ?? null,
+      weekly_check_enabled: Boolean(res.Item.weeklyCheckEnabled),
+      last_emailed_at: (res.Item.lastEmailedAt as string) ?? null,
+      updated_at: (res.Item.updatedAt as string) ?? '',
+    };
+  } catch (e) {
+    console.error('DynamoDB getUserPreferences error:', e);
+    return null;
+  }
 }
 
 export async function upsertUserPreferences(
   userId: string,
   prefs: { email?: string; weekly_check_enabled?: boolean }
 ): Promise<void> {
-  await supabaseRequest({
-    method: 'POST',
-    table: 'user_preferences',
-    body: { user_id: userId, ...prefs, updated_at: new Date().toISOString() },
-    onConflict: 'user_id',
-  });
+  const c = getClient();
+  if (!c) return;
+
+  // Build a partial UPDATE so we don't clobber fields the caller didn't set.
+  const sets: string[] = ['updatedAt = :now'];
+  const names: Record<string, string> = {};
+  const values: Record<string, unknown> = { ':now': new Date().toISOString() };
+
+  if (prefs.email !== undefined) {
+    sets.push('email = :email');
+    values[':email'] = prefs.email;
+  }
+  if (prefs.weekly_check_enabled !== undefined) {
+    sets.push('weeklyCheckEnabled = :wce');
+    values[':wce'] = prefs.weekly_check_enabled;
+  }
+
+  try {
+    await c.send(
+      new UpdateCommand({
+        TableName: TABLES.userPreferences,
+        Key: { userId },
+        UpdateExpression: `SET ${sets.join(', ')}`,
+        ExpressionAttributeNames: Object.keys(names).length ? names : undefined,
+        ExpressionAttributeValues: values,
+      })
+    );
+  } catch (e) {
+    console.error('DynamoDB upsertUserPreferences error:', e);
+  }
 }
 
 export async function updateLastEmailed(userId: string): Promise<void> {
-  await supabaseRequest({
-    method: 'POST',
-    table: 'user_preferences',
-    body: { user_id: userId, last_emailed_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-    onConflict: 'user_id',
-  });
+  const c = getClient();
+  if (!c) return;
+
+  try {
+    await c.send(
+      new UpdateCommand({
+        TableName: TABLES.userPreferences,
+        Key: { userId },
+        UpdateExpression: 'SET lastEmailedAt = :now, updatedAt = :now',
+        ExpressionAttributeValues: { ':now': new Date().toISOString() },
+      })
+    );
+  } catch (e) {
+    console.error('DynamoDB updateLastEmailed error:', e);
+  }
 }
 
 export interface UserForWeeklyCheck {
@@ -189,28 +263,48 @@ export interface UserForWeeklyCheck {
   last_emailed_at: string | null;
 }
 
-/** Returns users opted-in to weekly email who haven't been emailed in 6+ days. */
+/**
+ * Returns users opted-in to weekly email who haven't been emailed in 6+ days.
+ *
+ * Uses Scan with FilterExpression — fine for <10K users. At scale, add a GSI
+ * on weeklyCheckEnabled (sparse, only contains opted-in users) and Query that
+ * GSI instead. Cost today: well within the 25 RCU free tier.
+ */
 export async function getUsersForWeeklyCheck(): Promise<UserForWeeklyCheck[]> {
-  if (!isDbConfigured()) return [];
+  const c = getClient();
+  if (!c) return [];
 
   const sixDaysAgo = new Date(Date.now() - 6 * 86_400_000).toISOString();
-  const url = new URL(`${SUPABASE_URL}/rest/v1/user_preferences`);
-  url.searchParams.set('select', 'user_id,email,last_emailed_at');
-  url.searchParams.set('weekly_check_enabled', 'eq.true');
-  // Users never emailed OR not emailed in 6+ days
-  url.searchParams.set('or', `(last_emailed_at.is.null,last_emailed_at.lt.${sixDaysAgo})`);
+  const results: UserForWeeklyCheck[] = [];
 
   try {
-    const resp = await fetch(url.toString(), {
-      headers: {
-        apikey: SUPABASE_SERVICE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-      },
-    });
-    if (!resp.ok) return [];
-    const rows = await resp.json() as UserForWeeklyCheck[];
-    return rows.filter((r) => r.email);
-  } catch {
+    let ExclusiveStartKey: Record<string, unknown> | undefined;
+    do {
+      const res = await c.send(
+        new ScanCommand({
+          TableName: TABLES.userPreferences,
+          FilterExpression:
+            'weeklyCheckEnabled = :true AND attribute_exists(email) AND (attribute_not_exists(lastEmailedAt) OR lastEmailedAt < :cutoff)',
+          ExpressionAttributeValues: { ':true': true, ':cutoff': sixDaysAgo },
+          ExclusiveStartKey,
+        })
+      );
+
+      for (const item of res.Items ?? []) {
+        if (item.email) {
+          results.push({
+            user_id: item.userId as string,
+            email: item.email as string,
+            last_emailed_at: (item.lastEmailedAt as string) ?? null,
+          });
+        }
+      }
+      ExclusiveStartKey = res.LastEvaluatedKey;
+    } while (ExclusiveStartKey);
+
+    return results;
+  } catch (e) {
+    console.error('DynamoDB getUsersForWeeklyCheck error:', e);
     return [];
   }
 }

@@ -11,7 +11,7 @@ Retire.Simplified is a Next.js 16 / React 19 retirement planning app deployed to
 
 - **10 Claude tools** wrapping the existing financial calculators (`computeProjection`, `taxEngine`, `verdict`, `rothConversion`, etc.) as callable functions
 - **4 agent endpoints** that run an agentic tool-use loop (one conversational, three autonomous)
-- **A persistence layer** in Supabase (plans + snapshot history + user preferences)
+- **A persistence layer** in DynamoDB (plans + snapshot history + user preferences)
 - **A scheduled cron pipeline** (GitHub Actions → `/api/cron/weekly-check` → Claude → Resend) that emails users a weekly plan health report
 
 ---
@@ -46,7 +46,7 @@ graph TB
     subgraph External["External Services"]
         Cognito[AWS Cognito<br/>auth + JWKS]
         Claude[Anthropic API<br/>Sonnet 4 / Haiku 4.5]
-        Supabase[(Supabase<br/>plan_snapshots<br/>user_plans<br/>user_preferences)]
+        Supabase[(DynamoDB<br/>plan_snapshots<br/>user_plans<br/>user_preferences)]
         Resend[Resend<br/>email]
     end
 
@@ -218,36 +218,37 @@ sequenceDiagram
 
 ⚠️ No `rs:` namespace prefix — collision risk if domain is shared.
 
-### 6.2 Server-side (Supabase)
+### 6.2 Server-side (DynamoDB)
 
-Defined in [supabase/migrations/](supabase/migrations/).
+Created via [scripts/create-dynamodb-tables.sh](scripts/create-dynamodb-tables.sh). See [docs/dynamodb-setup.md](docs/dynamodb-setup.md) for the IAM policy.
 
 ```mermaid
 erDiagram
     user_plans {
-        text user_id PK "Cognito sub"
-        jsonb plan
-        timestamptz updated_at
+        string userId PK "Cognito sub"
+        map plan
+        string updatedAt
     }
     plan_snapshots {
-        uuid id PK
-        text user_id
-        date saved_at
-        jsonb data
-        timestamptz created_at
+        string userId PK "Cognito sub"
+        string savedAt SK "YYYY-MM-DD"
+        map data
+        string createdAt
     }
     user_preferences {
-        text user_id PK "Cognito sub"
-        text email
-        boolean weekly_check_enabled
-        timestamptz last_emailed_at
-        timestamptz updated_at
+        string userId PK "Cognito sub"
+        string email
+        bool weeklyCheckEnabled
+        string lastEmailedAt
+        string updatedAt
     }
 ```
 
-**Sync model:** localStorage is the offline cache; Supabase is the source of truth. `savePlanSnapshot()` writes both. `loadHistoryFromDb()` merges DB rows over the local cache on mount.
+All tables use PAY_PER_REQUEST billing — no provisioned capacity, no minimum bill. At <1K users monthly cost is ~$0–2.
 
-⚠️ RLS is disabled. All row filtering happens in API routes using the Cognito `sub` claim. This is safe only if `verifyAuth()` is sound (now fixed via JWKS, but service-role access from Next.js routes means any bypass = full read).
+**Sync model:** localStorage is the offline cache; DynamoDB is the source of truth. `savePlanSnapshot()` writes both. `loadHistoryFromDb()` merges DB rows over the local cache on mount.
+
+**Access control:** DynamoDB access is governed by the Amplify SSR IAM role (one policy attached, scoped to the three tables). Row-level isolation is enforced by API routes — every read/write keys on the Cognito-verified `sub` claim from `verifyAuth()`. Unlike Supabase + service-role, there's no separate RLS layer to enable/forget. The trust chain is: Cognito → JWKS-verified JWT → `sub` claim → DynamoDB key.
 
 ---
 
@@ -279,7 +280,7 @@ flowchart LR
 |-------|-----------|-------|
 | User auth | Cognito JWT verified via JWKS (`lib/apiAuth.ts`) | ✅ Signature + issuer + audience + token_use + sub |
 | Cron auth | `CRON_SECRET` bearer token | ⚠️ Non-constant-time compare (see Known Issues) |
-| DB access | Supabase service-role key, server-only | Bypasses RLS — all filtering in API routes |
+| DB access | DynamoDB via Amplify IAM role | Server-only; row filtering by Cognito sub in API routes |
 | Rate limiting | In-memory per-IP (`checkRateLimit`) | Per-instance; replace with Redis for multi-instance |
 | Anthropic key | `ANTHROPIC_API_KEY` env, server-only | Never exposed to client |
 | Resend key | `RESEND_API_KEY` env, server-only | Same |
@@ -301,12 +302,16 @@ NEXT_PUBLIC_USER_POOL_CLIENT_ID=
 NEXT_PUBLIC_COGNITO_DOMAIN=
 NEXT_PUBLIC_API_URL=
 
+# DynamoDB (server-only)
+AWS_REGION=us-east-1
+DYNAMODB_TABLE_PREFIX=          # optional, e.g. rs_prod_
+
 # Server-only secrets
 ANTHROPIC_API_KEY=
-SUPABASE_URL=
-SUPABASE_SERVICE_KEY=
 RESEND_API_KEY=
 CRON_SECRET=
+WEEKLY_CHECK_BATCH_SIZE=50      # optional cost cap, default 50
+WEEKLY_CHECK_DISABLED=          # set to "1" for emergency kill switch
 ```
 
 See [.env.local.example](.env.local.example).
@@ -320,7 +325,7 @@ See [.env.local.example](.env.local.example).
 | ~~CRITICAL~~ ✅ fixed | `agentTools.ts:678` — `analyze_withdrawal_order` | Roth-first balance-swap strategy removed. Tool now compares default waterfall vs bracket-fill only. Added absolute-bound sanity check on Roth ladder output. True Roth-first comparison deferred until `computeProjection` accepts a `withdrawalOrder` parameter. |
 | ~~CRITICAL~~ ✅ fixed | `weekly-check/route.ts` | Model ID corrected to `claude-haiku-4-5`. |
 | ~~CRITICAL~~ ✅ fixed | `weekly-check/route.ts` | Cost cap: `WEEKLY_CHECK_BATCH_SIZE` (default 50, hard ceiling 200), kill switch `WEEKLY_CHECK_DISABLED`, timing-safe `CRON_SECRET` compare. |
-| **CRITICAL** | `001_plan_snapshots.sql` | RLS disabled + service-role keys = single auth bypass → full DB read. |
+| ~~CRITICAL~~ ✅ resolved | DB access control | Migrated from Supabase (which would have required RLS) to DynamoDB. Access is now controlled by the Amplify SSR IAM role + Cognito-verified `sub` claim — no service-role bypass concern. |
 | SIGNIFICANT | `agentTools.ts:512` | SS lifetime benefit formula uses FV-of-annuity, not PV. Overstates by ~1.5×, biases "claim at 70" recommendation. |
 | SIGNIFICANT | `weekly-check/route.ts` | Processes first 10 users only, no cursor/resumption. Users 11+ never get emailed. |
 | SIGNIFICANT | All 4 agent endpoints | Agentic loop duplicated. Extract to `lib/agentLoop.ts`. |
@@ -357,9 +362,10 @@ lib/
   planHistory.ts                     Snapshot save/load/DB sync
 components/
   tabs/AIAdvisor.jsx                 UI for chat + optimize + email opt-in
-supabase/migrations/
-  001_plan_snapshots.sql             plan_snapshots + user_plans
-  002_user_preferences.sql           user_preferences
+scripts/
+  create-dynamodb-tables.sh          AWS CLI script — creates the 3 tables
+docs/
+  dynamodb-setup.md                  IAM policy + setup instructions
 .github/workflows/
   weekly-check.yml                   Monday 08:00 UTC trigger
 scripts/
