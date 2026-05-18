@@ -23,6 +23,7 @@ export default function AIAdvisor() {
   const [optimizeReport, setOptimizeReport] = useState(null);
   const [optimizeLoading, setOptimizeLoading] = useState(false);
   const [showOptimize, setShowOptimize] = useState(false);
+  const [emailPrefs, setEmailPrefs] = useState({ email: '', weeklyCheckEnabled: false, loaded: false });
   const chatRef = useRef(null);
 
   useEffect(() => {
@@ -42,6 +43,17 @@ export default function AIAdvisor() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ plan }),
       }).catch(() => undefined);
+      // Load email preferences
+      fetch('/api/db/preferences', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => r.json())
+        .then(({ preferences }) => {
+          if (preferences) {
+            setEmailPrefs({ email: preferences.email ?? '', weeklyCheckEnabled: preferences.weeklyCheckEnabled, loaded: true });
+          }
+        })
+        .catch(() => undefined);
     } else {
       if (isHealthCheckDue()) runHealthCheck();
     }
@@ -94,6 +106,18 @@ export default function AIAdvisor() {
     } finally {
       setOptimizeLoading(false);
     }
+  }
+
+  async function saveEmailPrefs(updates) {
+    const token = Auth.getIdToken?.();
+    if (!token) return;
+    const next = { ...emailPrefs, ...updates };
+    setEmailPrefs(next);
+    await fetch('/api/db/preferences', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ email: next.email, weeklyCheckEnabled: next.weeklyCheckEnabled }),
+    }).catch(() => undefined);
   }
 
   useEffect(() => {
@@ -293,6 +317,39 @@ export default function AIAdvisor() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Weekly Email Settings */}
+      {emailPrefs.loaded && (
+        <div style={{ marginBottom: 12, padding: '10px 14px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, fontFamily: 'var(--sans)', fontSize: 13 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <span style={{ fontWeight: 600, color: 'var(--text)' }}>📬 Weekly Email Check</span>
+              <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>Get your plan health report every Monday</span>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={emailPrefs.weeklyCheckEnabled}
+                onChange={(e) => saveEmailPrefs({ weeklyCheckEnabled: e.target.checked })}
+                style={{ width: 16, height: 16, cursor: 'pointer' }}
+              />
+              <span style={{ color: 'var(--text)', fontWeight: 500 }}>{emailPrefs.weeklyCheckEnabled ? 'On' : 'Off'}</span>
+            </label>
+          </div>
+          {emailPrefs.weeklyCheckEnabled && (
+            <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                type="email"
+                value={emailPrefs.email}
+                onChange={(e) => setEmailPrefs((p) => ({ ...p, email: e.target.value }))}
+                onBlur={(e) => saveEmailPrefs({ email: e.target.value })}
+                placeholder="your@email.com"
+                style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px', color: 'var(--text)', fontSize: 13, fontFamily: 'var(--sans)', outline: 'none' }}
+              />
             </div>
           )}
         </div>

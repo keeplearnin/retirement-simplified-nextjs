@@ -139,3 +139,78 @@ export async function upsertUserPlan(
     onConflict: 'user_id',
   });
 }
+
+// ---------------------------------------------------------------------------
+// user_preferences (email opt-in + weekly check scheduling)
+// ---------------------------------------------------------------------------
+
+export interface DbUserPreferences {
+  user_id: string;
+  email: string | null;
+  weekly_check_enabled: boolean;
+  last_emailed_at: string | null;
+  updated_at: string;
+}
+
+export async function getUserPreferences(userId: string): Promise<DbUserPreferences | null> {
+  const rows = await supabaseRequest<DbUserPreferences[]>({
+    method: 'GET',
+    table: 'user_preferences',
+    filters: { user_id: userId },
+    limit: 1,
+  });
+  return rows?.[0] ?? null;
+}
+
+export async function upsertUserPreferences(
+  userId: string,
+  prefs: { email?: string; weekly_check_enabled?: boolean }
+): Promise<void> {
+  await supabaseRequest({
+    method: 'POST',
+    table: 'user_preferences',
+    body: { user_id: userId, ...prefs, updated_at: new Date().toISOString() },
+    onConflict: 'user_id',
+  });
+}
+
+export async function updateLastEmailed(userId: string): Promise<void> {
+  await supabaseRequest({
+    method: 'POST',
+    table: 'user_preferences',
+    body: { user_id: userId, last_emailed_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    onConflict: 'user_id',
+  });
+}
+
+export interface UserForWeeklyCheck {
+  user_id: string;
+  email: string;
+  last_emailed_at: string | null;
+}
+
+/** Returns users opted-in to weekly email who haven't been emailed in 6+ days. */
+export async function getUsersForWeeklyCheck(): Promise<UserForWeeklyCheck[]> {
+  if (!isDbConfigured()) return [];
+
+  const sixDaysAgo = new Date(Date.now() - 6 * 86_400_000).toISOString();
+  const url = new URL(`${SUPABASE_URL}/rest/v1/user_preferences`);
+  url.searchParams.set('select', 'user_id,email,last_emailed_at');
+  url.searchParams.set('weekly_check_enabled', 'eq.true');
+  // Users never emailed OR not emailed in 6+ days
+  url.searchParams.set('or', `(last_emailed_at.is.null,last_emailed_at.lt.${sixDaysAgo})`);
+
+  try {
+    const resp = await fetch(url.toString(), {
+      headers: {
+        apikey: SUPABASE_SERVICE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      },
+    });
+    if (!resp.ok) return [];
+    const rows = await resp.json() as UserForWeeklyCheck[];
+    return rows.filter((r) => r.email);
+  } catch {
+    return [];
+  }
+}

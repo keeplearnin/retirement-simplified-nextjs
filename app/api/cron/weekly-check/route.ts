@@ -1,0 +1,157 @@
+/**
+ * /api/cron/weekly-check — server-side weekly health check for all opted-in users.
+ *
+ * Triggered by GitHub Actions (.github/workflows/weekly-check.yml) every Monday at 8am.
+ * Can also be triggered by AWS EventBridge or any HTTP cron service.
+ *
+ * Security: requires Authorization: Bearer ${CRON_SECRET} header.
+ *
+ * Flow per user:
+ *   1. Load plan from user_plans table
+ *   2. Load snapshot history from plan_snapshots
+ *   3. Run autonomous health check agent (Claude + all tools)
+ *   4. Send email via Resend
+ *   5. Update last_emailed_at
+ */
+
+import { NextResponse } from 'next/server';
+import { getUsersForWeeklyCheck, getUserPlan, getSnapshots, updateLastEmailed } from '@/lib/db';
+import { sendEmail, buildHealthCheckEmail, isEmailConfigured } from '@/lib/email';
+import { TOOL_DEFINITIONS, executeTool } from '@/lib/agentTools';
+import type { PlanSnapshot } from '@/lib/planHistory';
+
+const CRON_SECRET = process.env.CRON_SECRET ?? '';
+const MAX_ITERATIONS = 8;
+const BATCH_SIZE = 10; // process N users per invocation to avoid timeout
+
+const HEALTH_CHECK_PROMPT = `You are an autonomous retirement plan health check agent. Analyze the user's retirement plan thoroughly and produce a structured health report.
+
+Follow these steps in order:
+1. Call get_plan_summary to read the user's plan
+2. Call run_projection to get their baseline money-lasts-to age
+3. Call get_verdict to check their savings benchmark status
+4. Call optimize_ss_claiming to find the optimal SS claiming age
+5. Call get_plan_history to check their progress trend
+6. Synthesize everything into a JSON health report
+
+Return ONLY a valid JSON object — no markdown, no explanation:
+{
+  "overallScore": "excellent" | "good" | "needs_attention" | "critical",
+  "scoreLabel": "short phrase",
+  "alerts": [{ "severity": "high" | "medium" | "low", "message": "specific issue" }],
+  "recommendations": ["action 1", "action 2", "action 3"],
+  "keyMetrics": { "moneyLastsAge": <number|null>, "gapStatus": "<string>", "savingsGap": <number>, "portfolioAtRetire": <number> },
+  "emailSummary": "2-3 sentence plain-text summary"
+}`;
+
+async function runHealthCheckForUser(
+  plan: Record<string, unknown>,
+  planHistory: PlanSnapshot[],
+  apiKey: string
+): Promise<Record<string, unknown> | null> {
+  let messages: Array<{ role: string; content: unknown }> = [
+    { role: 'user', content: 'Analyze my retirement plan and return the health report JSON.' },
+  ];
+
+  for (let i = 0; i < MAX_ITERATIONS; i++) {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001', // use Haiku for cost efficiency in batch
+        max_tokens: 1500,
+        system: HEALTH_CHECK_PROMPT,
+        tools: TOOL_DEFINITIONS,
+        messages,
+      }),
+    });
+
+    if (!resp.ok) return null;
+
+    const data = await resp.json() as {
+      stop_reason: string;
+      content: Array<{ type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown> }>;
+    };
+
+    if (data.stop_reason === 'end_turn') {
+      const text = data.content.filter((c) => c.type === 'text').map((c) => c.text ?? '').join('\n').trim();
+      try {
+        const clean = text.replace(/^```json\s*/m, '').replace(/^```\s*/m, '').replace(/```$/m, '').trim();
+        return JSON.parse(clean) as Record<string, unknown>;
+      } catch {
+        return null;
+      }
+    }
+
+    if (data.stop_reason === 'tool_use') {
+      const toolUseBlocks = data.content.filter((c) => c.type === 'tool_use');
+      messages.push({ role: 'assistant', content: data.content });
+      const toolResults = toolUseBlocks.map((block) => {
+        const result = executeTool(block.name!, block.input ?? {}, plan, planHistory);
+        return {
+          type: 'tool_result',
+          tool_use_id: block.id,
+          content: result.error ? JSON.stringify({ error: result.error }) : JSON.stringify(result.result),
+        };
+      });
+      messages.push({ role: 'user', content: toolResults });
+    }
+  }
+
+  return null;
+}
+
+export async function POST(request: Request) {
+  // Verify cron secret
+  const authHeader = request.headers.get('Authorization');
+  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 503 });
+  }
+
+  const users = await getUsersForWeeklyCheck();
+  const batch = users.slice(0, BATCH_SIZE);
+
+  const results = { processed: 0, emailed: 0, errors: 0 };
+
+  for (const user of batch) {
+    try {
+      // Load plan and history for this user
+      const planRow = await getUserPlan(user.user_id);
+      if (!planRow?.plan) { results.errors++; continue; }
+
+      const snapshots = await getSnapshots(user.user_id, 90);
+      const planHistory: PlanSnapshot[] = snapshots.map((s) => s.data as unknown as PlanSnapshot);
+
+      // Run health check
+      const report = await runHealthCheckForUser(planRow.plan, planHistory, apiKey);
+      if (!report) { results.errors++; continue; }
+
+      results.processed++;
+
+      // Send email if configured
+      if (isEmailConfigured()) {
+        const { subject, text, html } = buildHealthCheckEmail(report as Parameters<typeof buildHealthCheckEmail>[0]);
+        const sent = await sendEmail({ to: user.email, subject, text, html });
+        if (sent) {
+          await updateLastEmailed(user.user_id);
+          results.emailed++;
+        }
+      }
+    } catch (e) {
+      console.error(`Weekly check failed for user ${user.user_id}:`, e);
+      results.errors++;
+    }
+  }
+
+  console.log('Weekly check complete:', results);
+  return NextResponse.json({ ...results, total: users.length, batchSize: batch.length });
+}
