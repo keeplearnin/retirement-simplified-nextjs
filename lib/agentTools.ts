@@ -387,6 +387,200 @@ function executeRunRothAnalysis(plan: Record<string, unknown>, args: Record<stri
 }
 
 // ---------------------------------------------------------------------------
+// Tool 6: compare_scenarios
+// Runs the projection engine multiple times with different plan overrides
+// and returns a side-by-side comparison. Claude uses this to answer
+// "what if I retire at 60 vs 65 vs 70?" in a single tool call.
+// ---------------------------------------------------------------------------
+
+const compareScenariosDefinition: ToolDefinition = {
+  name: 'compare_scenarios',
+  description:
+    'Runs the retirement projection for multiple scenarios side-by-side and returns a comparison table. Use when the user asks "what if" questions involving multiple alternatives — e.g. different retirement ages, spending levels, or contribution amounts. Each scenario is a partial plan override.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      scenarios: {
+        type: 'array',
+        description: 'Array of scenarios to compare. Each has a label and a set of plan overrides.',
+        items: {
+          type: 'object',
+          properties: {
+            label: { type: 'string', description: 'Short name for this scenario, e.g. "Retire at 60".' },
+            overrides: {
+              type: 'object',
+              description: 'Plan fields to override for this scenario (retireAge, annualSpending, monthlyContribution, expectedReturn, retireSpending).',
+            },
+          },
+          required: ['label', 'overrides'],
+        },
+      },
+    },
+    required: ['scenarios'],
+  },
+};
+
+function executeCompareScenarios(
+  plan: Record<string, unknown>,
+  args: Record<string, unknown>
+) {
+  const scenarios = args.scenarios as Array<{ label: string; overrides: Record<string, unknown> }>;
+
+  const results = scenarios.map(({ label, overrides }) => {
+    const mergedPlan = { ...plan, ...overrides };
+    const result = computeProjection(mergedPlan as Parameters<typeof computeProjection>[0]);
+    const summary = result as Record<string, unknown>;
+
+    return {
+      label,
+      overrides,
+      moneyLastsAge: summary.moneyLastsAge,
+      portfolioAtRetire: Math.round((summary.portfolioAtRetire as number) ?? 0),
+      finalBalance: Math.round((summary.finalBalance as number) ?? 0),
+      firstGapAge: summary.firstGapAge ?? null,
+      totalLifetimeTax: Math.round((summary.totalLifetimeTax as number) ?? 0),
+      avgEffectiveRate: summary.avgEffectiveRate,
+    };
+  });
+
+  // Find best scenario by money-lasts-to age
+  const best = results.reduce((a, b) =>
+    ((a.moneyLastsAge as number) ?? 0) >= ((b.moneyLastsAge as number) ?? 0) ? a : b
+  );
+
+  return { scenarios: results, bestScenario: best.label };
+}
+
+// ---------------------------------------------------------------------------
+// Tool 7: optimize_ss_claiming
+// Models SS benefit at claim ages 62, 65, 67 (FRA), and 70.
+// Computes monthly benefit, lifetime benefit to longevityAge, and the
+// breakeven age vs. claiming at FRA — so Claude can give a data-driven
+// recommendation on when to claim.
+// ---------------------------------------------------------------------------
+
+const SS_FRA = 67;
+
+function ssClaimingFactor(claimAge: number): number {
+  const monthsDiff = (claimAge - SS_FRA) * 12;
+  if (monthsDiff === 0) return 1;
+  if (monthsDiff < 0) {
+    const monthsEarly = Math.abs(monthsDiff);
+    const first36 = Math.min(monthsEarly, 36);
+    const beyond36 = Math.max(monthsEarly - 36, 0);
+    return 1 - (first36 * (5 / 900) + beyond36 * (5 / 1200));
+  }
+  return 1 + monthsDiff * (2 / 300);
+}
+
+const optimizeSsClaimingDefinition: ToolDefinition = {
+  name: 'optimize_ss_claiming',
+  description:
+    'Compares Social Security claiming at ages 62, 65, 67 (FRA), and 70. Returns the adjusted monthly benefit, lifetime total benefit to longevity age, and breakeven age vs. waiting until FRA for each option. Use when the user asks when to claim Social Security.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      compareWithProjection: {
+        type: 'boolean',
+        description:
+          'If true, also runs a full projection for each claiming age to show the impact on money-lasts-to age. Slower but more comprehensive.',
+      },
+    },
+  },
+};
+
+function executeOptimizeSsClaiming(
+  plan: Record<string, unknown>,
+  args: Record<string, unknown>
+) {
+  const incomeSources = (plan.incomeSources as Array<Record<string, unknown>>) ?? [];
+  const ssSource = incomeSources.find(
+    (s) => s.type === 'socialSecurity' && (s.owner ?? 'primary') === 'primary'
+  );
+
+  const fraMonthlyBenefit = (ssSource?.monthlyBenefit as number) ?? 0;
+  const longevityAge = (plan.longevityAge as number) ?? 90;
+  const cola = 0.02;
+  const claimAges = [62, 65, SS_FRA, 70];
+
+  const fraOption = (() => {
+    const factor = ssClaimingFactor(SS_FRA);
+    const monthly = fraMonthlyBenefit * factor;
+    const yearsCollecting = longevityAge - SS_FRA;
+    // Approximate lifetime benefit with COLA
+    const lifetime = yearsCollecting <= 0 ? 0 :
+      monthly * 12 * ((Math.pow(1 + cola, yearsCollecting) - 1) / cola);
+    return { claimAge: SS_FRA, factor, monthly, lifetime };
+  })();
+
+  const options = claimAges.map((claimAge) => {
+    const factor = ssClaimingFactor(claimAge);
+    const monthly = fraMonthlyBenefit * factor;
+    const yearsCollecting = longevityAge - claimAge;
+    const lifetime = yearsCollecting <= 0 ? 0 :
+      monthly * 12 * ((Math.pow(1 + cola, yearsCollecting) - 1) / cola);
+
+    // Breakeven vs FRA: months to recoup the foregone benefits from waiting
+    let breakevenAge: number | null = null;
+    if (claimAge < SS_FRA) {
+      // Claiming early: collect more years but lower monthly
+      const monthlyDiff = fraOption.monthly - monthly; // FRA pays more per month
+      const headstart = (SS_FRA - claimAge) * 12 * monthly; // collected before FRA
+      if (monthlyDiff > 0) {
+        const breakevenMonths = headstart / monthlyDiff;
+        breakevenAge = Math.round((SS_FRA * 12 + breakevenMonths) / 12);
+      }
+    } else if (claimAge > SS_FRA) {
+      // Claiming late: higher monthly but missed years
+      const monthlyDiff = monthly - fraOption.monthly;
+      const foregone = (claimAge - SS_FRA) * 12 * fraOption.monthly;
+      if (monthlyDiff > 0) {
+        const breakevenMonths = foregone / monthlyDiff;
+        breakevenAge = Math.round((claimAge * 12 + breakevenMonths) / 12);
+      }
+    }
+
+    return {
+      claimAge,
+      label: claimAge === SS_FRA ? `${claimAge} (FRA)` : String(claimAge),
+      adjustmentFactor: Math.round(factor * 1000) / 1000,
+      monthlyBenefit: Math.round(monthly),
+      annualBenefit: Math.round(monthly * 12),
+      lifetimeBenefitToLongevity: Math.round(lifetime),
+      breakevenAgeVsFRA: breakevenAge,
+    };
+  });
+
+  const projections = args.compareWithProjection
+    ? claimAges.map((claimAge) => {
+        const updatedSources = incomeSources.map((s) =>
+          s.type === 'socialSecurity' && (s.owner ?? 'primary') === 'primary'
+            ? { ...s, startAge: claimAge }
+            : s
+        );
+        const result = computeProjection({
+          ...plan,
+          incomeSources: updatedSources,
+        } as Parameters<typeof computeProjection>[0]) as Record<string, unknown>;
+        return {
+          claimAge,
+          moneyLastsAge: result.moneyLastsAge,
+          totalLifetimeTax: Math.round((result.totalLifetimeTax as number) ?? 0),
+        };
+      })
+    : null;
+
+  const recommendation = (() => {
+    const maxLifetime = options.reduce((a, b) =>
+      a.lifetimeBenefitToLongevity >= b.lifetimeBenefitToLongevity ? a : b
+    );
+    return `Claiming at ${maxLifetime.label} maximizes lifetime benefits ($${Math.round(maxLifetime.lifetimeBenefitToLongevity / 1000)}K) assuming you live to ${longevityAge}.`;
+  })();
+
+  return { options, projections, recommendation };
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -396,6 +590,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   getVerdictDefinition,
   runTaxEstimateDefinition,
   runRothAnalysisDefinition,
+  compareScenariosDefinition,
+  optimizeSsClaimingDefinition,
 ];
 
 export function executeTool(
@@ -421,6 +617,12 @@ export function executeTool(
         break;
       case 'run_roth_analysis':
         result = executeRunRothAnalysis(plan, toolInput);
+        break;
+      case 'compare_scenarios':
+        result = executeCompareScenarios(plan, toolInput);
+        break;
+      case 'optimize_ss_claiming':
+        result = executeOptimizeSsClaiming(plan, toolInput);
         break;
       default:
         return { toolName, result: null, error: `Unknown tool: ${toolName}` };
