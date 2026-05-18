@@ -24,7 +24,19 @@ export default function AIAdvisor() {
   const [optimizeLoading, setOptimizeLoading] = useState(false);
   const [showOptimize, setShowOptimize] = useState(false);
   const [emailPrefs, setEmailPrefs] = useState({ email: '', weeklyCheckEnabled: false, loaded: false });
+  const [introOpen, setIntroOpen] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('rs:intro-seen-v1') !== '1';
+  });
+  const [howToOpen, setHowToOpen] = useState(false);
   const chatRef = useRef(null);
+
+  function dismissIntro() {
+    setIntroOpen(false);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('rs:intro-seen-v1', '1');
+    }
+  }
 
   useEffect(() => {
     savePlanSnapshot(plan);
@@ -246,6 +258,116 @@ export default function AIAdvisor() {
           >
             Educational tool only — not financial advice
           </span>
+          {!introOpen && (
+            <button
+              onClick={() => setIntroOpen(true)}
+              style={{
+                background: 'transparent',
+                color: 'var(--text-muted)',
+                border: '1px solid var(--border)',
+                borderRadius: 20,
+                padding: '4px 12px',
+                fontSize: 11,
+                fontWeight: 500,
+                fontFamily: 'var(--sans)',
+                cursor: 'pointer',
+              }}
+            >
+              ✨ What's new
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* What's New + How to Navigate (dismissible) */}
+      {introOpen && (
+        <div
+          style={{
+            marginBottom: 16,
+            border: '1px solid var(--accent)',
+            borderRadius: 12,
+            padding: '14px 16px',
+            background: 'var(--accent-dim, rgba(16,185,129,0.08))',
+            fontFamily: 'var(--sans)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 8 }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>✨ What's new</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>The AI Advisor just got a major upgrade.</div>
+            </div>
+            <button
+              onClick={dismissIntro}
+              aria-label="Dismiss"
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0 }}
+            >
+              ×
+            </button>
+          </div>
+
+          <ul style={{ margin: '8px 0 12px', paddingLeft: 20, fontSize: 13, color: 'var(--text)', lineHeight: 1.55 }}>
+            <li><strong>Real plan calculations.</strong> Ask "am I on track" or "what if I retire at 62" — I now run the actual projection engine on your numbers.</li>
+            <li><strong>⚡ Optimize My Plan.</strong> One click runs SS timing + Roth conversion + withdrawal analysis, returns a ranked action list with dollar impact.</li>
+            <li><strong>📋 Weekly plan health check.</strong> A short report shows here every Monday — alerts, recommendations, and trend over time.</li>
+            <li><strong>📬 Email digest (optional).</strong> Toggle on below the chat to get the weekly summary in your inbox.</li>
+          </ul>
+
+          <button
+            onClick={() => setHowToOpen(o => !o)}
+            style={{
+              background: 'transparent',
+              color: 'var(--accent)',
+              border: 'none',
+              padding: 0,
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: 'var(--sans)',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+            }}
+          >
+            {howToOpen ? '▾ Hide' : '▸ How to navigate this tab'}
+          </button>
+
+          {howToOpen && (
+            <div style={{ marginTop: 10, fontSize: 13, color: 'var(--text)', lineHeight: 1.55 }}>
+              <ol style={{ margin: 0, paddingLeft: 20 }}>
+                <li><strong>Start with the green optimize card below</strong> if you want a complete plan review with ranked actions. Takes ~20 seconds.</li>
+                <li><strong>Use chat for specific questions</strong> — "should I do a Roth conversion?", "when should I claim Social Security?", "what's my biggest risk?". Suggested questions are just starters; type anything.</li>
+                <li><strong>Check the weekly report banner at the top</strong> for proactive alerts about your plan. It re-runs every 7 days automatically.</li>
+                <li><strong>Edit your plan in the My Plan tab</strong> — the advisor reads from the same data source, so changes there reflect here immediately.</li>
+              </ol>
+              <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+                All calculations are deterministic and use the same engine as the rest of the app. Educational tool — not financial advice.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Hero CTA — Optimize My Plan */}
+      {!showOptimize && (
+        <div
+          style={{
+            marginBottom: 16,
+            border: '1px solid var(--border)',
+            borderRadius: 12,
+            padding: '16px 18px',
+            background: 'linear-gradient(135deg, var(--accent-dim, rgba(16,185,129,0.10)), transparent 80%)',
+            fontFamily: 'var(--sans)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 16,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ flex: '1 1 320px', minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)', marginBottom: 4 }}>⚡ Optimize My Plan</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              Run a full multi-step analysis — SS timing, Roth conversions, withdrawal strategy, and retirement age scenarios. Returns a ranked action list with estimated dollar impact for each change.
+            </div>
+          </div>
           <button
             onClick={runOptimization}
             disabled={optimizeLoading}
@@ -253,18 +375,20 @@ export default function AIAdvisor() {
               background: optimizeLoading ? 'var(--border)' : 'var(--accent)',
               color: optimizeLoading ? 'var(--text-muted)' : 'var(--bg)',
               border: 'none',
-              borderRadius: 20,
-              padding: '4px 14px',
-              fontSize: 12,
-              fontWeight: 600,
+              borderRadius: 10,
+              padding: '10px 18px',
+              fontSize: 14,
+              fontWeight: 700,
               fontFamily: 'var(--sans)',
               cursor: optimizeLoading ? 'not-allowed' : 'pointer',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
             }}
           >
-            {optimizeLoading ? '⏳ Optimizing...' : '⚡ Optimize My Plan'}
+            {optimizeLoading ? '⏳ Analyzing...' : 'Run optimization →'}
           </button>
         </div>
-      </div>
+      )}
 
       {/* Optimization Report */}
       {showOptimize && (

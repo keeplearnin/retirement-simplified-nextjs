@@ -78,9 +78,11 @@ function AppContent() {
       { id: 'torpedo', label: 'Tax Torpedo' },
       { id: 'montecarlo', label: 'Monte Carlo' },
     ]},
+    { id: 'advisor-cat', label: 'AI Advisor', icon: '🤖', tabs: [
+      { id: 'advisor', label: 'AI Advisor' },
+    ]},
     { id: 'learn', label: 'Learn', icon: '💡', tabs: [
       { id: 'guide', label: 'Getting Started' },
-      { id: 'advisor', label: 'AI Advisor' },
     ]},
   ];
 
