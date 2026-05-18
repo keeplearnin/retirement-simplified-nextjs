@@ -4,8 +4,10 @@ import { useState, useEffect, useRef } from 'react';
 import Card from '@/components/ui/Card';
 import { AI_SUGGESTED_QUESTIONS } from '@/lib/constants';
 import Auth from '@/lib/auth';
+import { usePlan } from '@/components/PlanProvider';
 
 export default function AIAdvisor() {
+  const { plan } = usePlan();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,7 +37,7 @@ export default function AIAdvisor() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ messages: newMessages }),
+        body: JSON.stringify({ messages: newMessages, plan }),
       });
       const data = await res.json();
       if (res.status === 401) {
