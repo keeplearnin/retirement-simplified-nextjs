@@ -239,14 +239,22 @@ check('returns error string, no throw', () => {
 console.log('\nanalyze_withdrawal_order:');
 const withdrawalResult = executeTool('analyze_withdrawal_order', { conversionBracket: 22 }, samplePlan);
 check('no error', () => { if (withdrawalResult.error) throw new Error(withdrawalResult.error); });
-check('returns 3 strategies', () => {
-  const r = withdrawalResult.result as Record<string, unknown[]>;
-  if (r.strategies.length !== 3) throw new Error(`expected 3, got ${r.strategies.length}`);
-});
-check('has bestByTax + bestByLongevity + recommendation', () => {
+check('returns defaultWaterfall + bracketFill (no Roth-first)', () => {
   const r = withdrawalResult.result as Record<string, unknown>;
-  if (!r.bestByTax || !r.bestByLongevity || !r.recommendation) throw new Error('missing fields');
-  pass('', `best tax: ${r.bestByTax}, best longevity: ${r.bestByLongevity}`);
+  if (!r.defaultWaterfall || !r.bracketFill) throw new Error('missing strategy fields');
+  if ('strategies' in r) throw new Error('legacy strategies array should be gone');
+});
+check('has recommendation + note about Roth-first not modelled', () => {
+  const r = withdrawalResult.result as Record<string, unknown>;
+  if (!r.recommendation) throw new Error('missing recommendation');
+  if (!r.note || !(r.note as string).includes('Roth-first')) throw new Error('missing note about Roth-first');
+  pass('', r.recommendation as string);
+});
+check('bracketFill includes sanity check flag', () => {
+  const bf = (withdrawalResult.result as Record<string, Record<string, unknown>>).bracketFill;
+  if (!('sanityWarning' in bf)) throw new Error('missing sanityWarning field');
+  // For this small-balance plan, taxSaved was ~$-38K — well within sanity bounds
+  if (bf.sanityWarning !== null) throw new Error(`unexpected warning: ${bf.sanityWarning}`);
 });
 
 // 14. run_full_optimization

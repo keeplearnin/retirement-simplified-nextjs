@@ -165,7 +165,7 @@ All 10 tools live in [lib/agentTools.ts](lib/agentTools.ts). Each tool has a JSO
 | 6 | `compare_scenarios` | `computeProjection` × N | Side-by-side comparison of N plan overrides |
 | 7 | `optimize_ss_claiming` | actuarial formulas | SS at 62/65/67/70: monthly, lifetime, breakeven ages |
 | 8 | `get_plan_history` | snapshot store | Trend, changed fields, recent snapshots |
-| 9 | `analyze_withdrawal_order` | `computeProjection` + ladder | Trad-first vs Roth-first vs bracket-fill ⚠️ *known bug* |
+| 9 | `analyze_withdrawal_order` | `computeProjection` + ladder | Default waterfall vs bracket-fill conversion ladder (Roth-first not modelled — needs engine change) |
 | 10 | `run_full_optimization` | chains 1+2+5+7 | Ranked action list with dollar impact |
 
 ---
@@ -317,7 +317,7 @@ See [.env.local.example](.env.local.example).
 
 | Severity | Location | Issue |
 |---|---|---|
-| **CRITICAL** | `agentTools.ts:690` — `analyze_withdrawal_order` | "Roth-first" approximation swaps 401k ↔ Roth balances. Engine taxes 401k as ordinary income and applies RMDs — swap inverts both. Output is nonsense. |
+| ~~CRITICAL~~ ✅ fixed | `agentTools.ts:678` — `analyze_withdrawal_order` | Roth-first balance-swap strategy removed. Tool now compares default waterfall vs bracket-fill only. Added absolute-bound sanity check on Roth ladder output. True Roth-first comparison deferred until `computeProjection` accepts a `withdrawalOrder` parameter. |
 | ~~CRITICAL~~ ✅ fixed | `weekly-check/route.ts` | Model ID corrected to `claude-haiku-4-5`. |
 | ~~CRITICAL~~ ✅ fixed | `weekly-check/route.ts` | Cost cap: `WEEKLY_CHECK_BATCH_SIZE` (default 50, hard ceiling 200), kill switch `WEEKLY_CHECK_DISABLED`, timing-safe `CRON_SECRET` compare. |
 | **CRITICAL** | `001_plan_snapshots.sql` | RLS disabled + service-role keys = single auth bypass → full DB read. |

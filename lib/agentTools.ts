@@ -662,7 +662,7 @@ function executeGetPlanHistory(history: PlanSnapshot[]) {
 const analyzeWithdrawalOrderDefinition: ToolDefinition = {
   name: 'analyze_withdrawal_order',
   description:
-    'Compares three retirement withdrawal strategies: trad-first (default), Roth-first, and bracket-fill (Roth conversion ladder). Returns lifetime taxes and money-lasts-to age for each so Claude can recommend the optimal withdrawal sequence.',
+    'Compares the user\'s default withdrawal waterfall (taxable → 401k → Roth) against a bracket-fill strategy that does Roth conversions during early retirement. Returns lifetime tax and longevity for the default plan and net tax savings from converting. Use when the user asks about withdrawal sequencing or whether to do Roth conversions.',
   input_schema: {
     type: 'object',
     properties: {
@@ -675,6 +675,15 @@ const analyzeWithdrawalOrderDefinition: ToolDefinition = {
   },
 };
 
+// Note: a true "Roth-first" sequencing strategy is not modelled here because
+// computeProjection has a fixed withdrawal waterfall (cash → taxable → 401k →
+// HSA → Roth) hard-coded into the engine. An earlier version of this tool
+// approximated Roth-first by swapping the 401k and Roth balances; that was
+// removed because the engine taxes withdrawals from `withdrawal401k` as
+// ordinary income and forces RMDs on it — after the swap, Roth dollars got
+// taxed and Trad dollars came out tax-free, producing garbage numbers. Adding
+// a real Roth-first strategy requires a `withdrawalOrder` parameter on
+// computeProjection itself.
 function executeAnalyzeWithdrawalOrder(
   plan: Record<string, unknown>,
   args: Record<string, unknown>
@@ -684,22 +693,10 @@ function executeAnalyzeWithdrawalOrder(
   const spouseTrad = (plan.spouseSavings401k as number) ?? 0;
   const spouseRoth = (plan.spouseSavingsRoth as number) ?? 0;
 
-  // Strategy A: trad-first (current default — no changes)
-  const projA = computeProjection(plan as Parameters<typeof computeProjection>[0]) as Record<string, unknown>;
+  // Strategy A: default waterfall — what the engine actually does today
+  const proj = computeProjection(plan as Parameters<typeof computeProjection>[0]) as Record<string, unknown>;
 
-  // Strategy B: Roth-first — swap 401k ↔ Roth so the waterfall draws Roth first
-  // The engine waterfall order is: cash → taxable → crypto → annuity → 401k → HSA → Roth
-  // Swapping the balances makes it effectively draw in the opposite trad/Roth order
-  const planB = {
-    ...plan,
-    savings401k: roth,
-    savingsRoth: trad401k,
-    spouseSavings401k: spouseRoth,
-    spouseSavingsRoth: spouseTrad,
-  };
-  const projB = computeProjection(planB as Parameters<typeof computeProjection>[0]) as Record<string, unknown>;
-
-  // Strategy C: bracket-fill via Roth conversion ladder
+  // Strategy B: bracket-fill via Roth conversion ladder
   const bracket = (args.conversionBracket as number) ?? 22;
   const incomeSources = (plan.incomeSources as Array<Record<string, unknown>>) ?? [];
   const ssSource = incomeSources.find(
@@ -730,50 +727,52 @@ function executeAnalyzeWithdrawalOrder(
   };
   const ladderResult = modelRothLadder(rothInput);
 
-  const strategies = [
-    {
-      name: 'Trad-First (default)',
-      description: 'Draw 401(k)/IRA before Roth. Simple, but triggers larger RMDs at 73.',
-      moneyLastsAge: projA.moneyLastsAge,
-      totalLifetimeTax: Math.round((projA.totalLifetimeTax as number) ?? 0),
-      finalBalance: Math.round((projA.finalBalance as number) ?? 0),
-    },
-    {
-      name: 'Roth-First',
-      description: 'Draw Roth before 401(k). Preserves tax-deferred growth, reduces RMDs, but uses tax-free money early.',
-      moneyLastsAge: projB.moneyLastsAge,
-      totalLifetimeTax: Math.round((projB.totalLifetimeTax as number) ?? 0),
-      finalBalance: Math.round((projB.finalBalance as number) ?? 0),
-    },
-    {
-      name: `Bracket-Fill (${bracket}% bracket)`,
-      description: `Convert 401(k) to Roth each year up to the ${bracket}% bracket ceiling before RMDs begin. Reduces lifetime taxes at the cost of paying conversions now.`,
-      moneyLastsAge: null, // ladder model doesn't run full projection
-      totalLifetimeTax: Math.round(ladderResult.ladder.lifetimeTax),
-      baselineTax: Math.round(ladderResult.baseline.lifetimeTax),
-      taxSaved: Math.round(ladderResult.taxSaved),
-      totalConverted: Math.round(ladderResult.ladderConversionTotal),
-      conversionWindowYears: ladderResult.conversionWindowYears,
-    },
-  ];
-
-  // Rank by lowest lifetime tax (excluding bracket-fill from money-lasts comparison)
-  const bestByTax = strategies.reduce((a, b) =>
-    a.totalLifetimeTax <= b.totalLifetimeTax ? a : b
-  );
-
-  const bestByLongevity = [strategies[0], strategies[1]].reduce((a, b) =>
-    ((a.moneyLastsAge as number) ?? 0) >= ((b.moneyLastsAge as number) ?? 0) ? a : b
-  );
+  // Sanity clamp: modelRothLadder has produced absurd numbers in the past
+  // when retiredReturnPct was misinterpreted (4200% return → 10^21 balances).
+  // Use an absolute bound — any lifetime tax beyond $50M for any realistic
+  // retirement plan is impossible. The 1.5× baseline ratio check is too tight
+  // for small-balance plans where the conversion delta naturally exceeds the
+  // (small) baseline tax.
+  const MAX_REASONABLE_LIFETIME_TAX = 50_000_000;
+  const baselineTax = Math.round(ladderResult.baseline.lifetimeTax);
+  const ladderTax = Math.round(ladderResult.ladder.lifetimeTax);
+  const rawTaxSaved = ladderResult.taxSaved;
+  const taxSavedLooksSane =
+    Number.isFinite(rawTaxSaved) &&
+    Math.abs(baselineTax) <= MAX_REASONABLE_LIFETIME_TAX &&
+    Math.abs(ladderTax) <= MAX_REASONABLE_LIFETIME_TAX &&
+    Math.abs(rawTaxSaved) <= MAX_REASONABLE_LIFETIME_TAX;
 
   return {
-    strategies,
-    bestByTax: bestByTax.name,
-    bestByLongevity: bestByLongevity.name,
+    defaultWaterfall: {
+      name: 'Default Waterfall (taxable → 401k → Roth)',
+      description: 'The engine\'s built-in withdrawal sequence. Spends taxable money first, then 401(k), then Roth last. Triggers RMDs on the 401(k) at age 73.',
+      moneyLastsAge: proj.moneyLastsAge,
+      totalLifetimeTax: Math.round((proj.totalLifetimeTax as number) ?? 0),
+      finalBalance: Math.round((proj.finalBalance as number) ?? 0),
+    },
+    bracketFill: {
+      name: `Bracket-Fill (${bracket}% bracket)`,
+      description: `Convert 401(k) to Roth each year up to the ${bracket}% bracket ceiling between retirement and age 72. Reduces future RMDs and may reduce total lifetime taxes.`,
+      baselineLifetimeTax: baselineTax,
+      ladderLifetimeTax: ladderTax,
+      netTaxSavings: taxSavedLooksSane ? Math.round(rawTaxSaved) : null,
+      totalConverted: Math.round(ladderResult.ladderConversionTotal),
+      conversionWindowYears: ladderResult.conversionWindowYears,
+      irmaaTrippedAges: ladderResult.irmaaTrippedAges,
+      sanityWarning: taxSavedLooksSane
+        ? null
+        : 'Bracket-fill output failed sanity check (|taxSaved| > 1.5× baseline). The Roth ladder model may be miscalibrated for this plan — treat numbers as approximate.',
+    },
     recommendation:
-      ladderResult.taxSaved > 50_000
-        ? `Bracket-fill saves $${Math.round(ladderResult.taxSaved / 1000)}K in lifetime taxes — worth converting during early retirement.`
-        : `${bestByLongevity.name} gives the longest portfolio longevity for this plan.`,
+      taxSavedLooksSane && rawTaxSaved > 50_000
+        ? `Bracket-fill saves $${Math.round(rawTaxSaved / 1000)}K in lifetime taxes — worth converting during early retirement.`
+        : taxSavedLooksSane && rawTaxSaved > 0
+        ? `Bracket-fill saves modest taxes ($${Math.round(rawTaxSaved / 1000)}K) — small benefit for this plan size.`
+        : taxSavedLooksSane
+        ? 'Bracket-fill does not reduce lifetime taxes for this plan — sticking with the default waterfall is fine.'
+        : 'Could not produce a reliable bracket-fill comparison for this plan. Report the default waterfall metrics only.',
+    note: 'A "Roth-first" sequencing strategy is not modelled — computeProjection has a fixed withdrawal order. Adding that comparison requires an engine change.',
   };
 }
 
