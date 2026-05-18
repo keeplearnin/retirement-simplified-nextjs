@@ -14,7 +14,7 @@ export async function POST(request) {
     const rateLimited = checkRateLimit(`chat:${ip}`, 20, 60_000);
     if (rateLimited) return rateLimited;
 
-    const { messages, plan } = await request.json();
+    const { messages, plan, planHistory } = await request.json();
     const apiKey = process.env.ANTHROPIC_API_KEY;
 
     if (!apiKey) {
@@ -72,7 +72,7 @@ export async function POST(request) {
 
         // Execute each tool and collect results
         const toolResults = toolUseBlocks.map((block) => {
-          const result = executeTool(block.name, block.input, plan || {});
+          const result = executeTool(block.name, block.input, plan || {}, planHistory || []);
           return {
             type: 'tool_result',
             tool_use_id: block.id,

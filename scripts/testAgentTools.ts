@@ -70,7 +70,7 @@ console.log('\n=== agentTools smoke test ===\n');
 // 1. Tool definitions
 console.log('Tool definitions:');
 check(`exports ${TOOL_DEFINITIONS.length} tools`, () => {
-  if (TOOL_DEFINITIONS.length !== 7) throw new Error(`expected 7, got ${TOOL_DEFINITIONS.length}`);
+  if (TOOL_DEFINITIONS.length !== 8) throw new Error(`expected 8, got ${TOOL_DEFINITIONS.length}`);
 });
 TOOL_DEFINITIONS.forEach(t => {
   check(`${t.name} has name + description + input_schema`, () => {
@@ -200,7 +200,35 @@ check('has recommendation', () => {
   pass('', r.recommendation as string);
 });
 
-// 10. Unknown tool
+// 10. get_plan_history — no history
+console.log('\nget_plan_history (empty):');
+const historyEmpty = executeTool('get_plan_history', {}, samplePlan, []);
+check('no error', () => { if (historyEmpty.error) throw new Error(historyEmpty.error); });
+check('returns available=false when empty', () => {
+  const r = historyEmpty.result as Record<string, unknown>;
+  if (r.available !== false) throw new Error(`expected false, got ${r.available}`);
+});
+
+// 11. get_plan_history — with mock snapshots
+console.log('\nget_plan_history (with data):');
+const mockHistory = [
+  { savedAt: '2026-03-01', retireAge: 67, longevityAge: 90, totalSavings: 280000, monthlyContribution: 1200, annualSpending: 80000, retireSpending: 65000, moneyLastsAge: 82, portfolioAtRetire: 900000, gapStatus: 'behind', savingsGap: 120000, projectedBalance: 880000 },
+  { savedAt: '2026-04-01', retireAge: 65, longevityAge: 90, totalSavings: 310000, monthlyContribution: 1500, annualSpending: 80000, retireSpending: 65000, moneyLastsAge: 85, portfolioAtRetire: 980000, gapStatus: 'behind', savingsGap: 90000, projectedBalance: 960000 },
+  { savedAt: '2026-05-01', retireAge: 65, longevityAge: 90, totalSavings: 365000, monthlyContribution: 1500, annualSpending: 80000, retireSpending: 65000, moneyLastsAge: 87, portfolioAtRetire: 1050000, gapStatus: 'on-track', savingsGap: 10000, projectedBalance: 1040000 },
+];
+const historyResult = executeTool('get_plan_history', {}, samplePlan, mockHistory as never);
+check('no error', () => { if (historyResult.error) throw new Error(historyResult.error); });
+check('trend = improving', () => {
+  const r = historyResult.result as Record<string, unknown>;
+  if (r.trend !== 'improving') throw new Error(`expected improving, got ${r.trend}`);
+  pass('', `trend=${r.trend}, ${(r.changes as string[]).length} changes detected`);
+});
+check('detects retirement age change', () => {
+  const changes = (historyResult.result as Record<string, string[]>).changes;
+  if (!changes.some(c => c.includes('Retirement age'))) throw new Error('expected retirement age change');
+});
+
+// 12. Unknown tool
 console.log('\nunknown tool:');
 const unknownResult = executeTool('nonexistent_tool', {}, samplePlan);
 check('returns error string, no throw', () => {

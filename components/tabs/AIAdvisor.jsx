@@ -5,6 +5,7 @@ import Card from '@/components/ui/Card';
 import { AI_SUGGESTED_QUESTIONS } from '@/lib/constants';
 import Auth from '@/lib/auth';
 import { usePlan } from '@/components/PlanProvider';
+import { savePlanSnapshot, loadHistory } from '@/lib/planHistory';
 
 export default function AIAdvisor() {
   const { plan } = usePlan();
@@ -12,6 +13,10 @@ export default function AIAdvisor() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const chatRef = useRef(null);
+
+  useEffect(() => {
+    savePlanSnapshot(plan);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (chatRef.current) {
@@ -37,7 +42,7 @@ export default function AIAdvisor() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ messages: newMessages, plan }),
+        body: JSON.stringify({ messages: newMessages, plan, planHistory: loadHistory() }),
       });
       const data = await res.json();
       if (res.status === 401) {

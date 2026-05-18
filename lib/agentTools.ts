@@ -16,6 +16,7 @@ import { computeTax } from '@/lib/taxEngine';
 import type { VerdictInput } from '@/lib/verdict';
 import type { RothLadderInput, Bracket } from '@/lib/rothConversion';
 import type { TaxInput } from '@/lib/taxEngine';
+import type { PlanSnapshot } from '@/lib/planHistory';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -581,6 +582,73 @@ function executeOptimizeSsClaiming(
 }
 
 // ---------------------------------------------------------------------------
+// Tool 8: get_plan_history
+// Reads the client-supplied snapshot array (passed from localStorage via the
+// API request body) and surfaces trends, changed fields, and milestones so
+// Claude can answer "how has my plan changed?" questions.
+// ---------------------------------------------------------------------------
+
+const getPlanHistoryDefinition: ToolDefinition = {
+  name: 'get_plan_history',
+  description:
+    'Returns a summary of how the user\'s retirement plan has changed over time — trends in savings, retirement age, and money-lasts-to age. Use when the user asks about their progress, what changed, or how their plan has improved.',
+  input_schema: {
+    type: 'object',
+    properties: {},
+  },
+};
+
+function executeGetPlanHistory(history: PlanSnapshot[]) {
+  if (!history || history.length === 0) {
+    return { available: false, message: 'No plan history yet. History builds up as you use the app over multiple days.' };
+  }
+
+  const sorted = [...history].sort((a, b) => a.savedAt.localeCompare(b.savedAt));
+  const oldest = sorted[0];
+  const newest = sorted[sorted.length - 1];
+  const daysCovered = Math.round(
+    (new Date(newest.savedAt).getTime() - new Date(oldest.savedAt).getTime()) / 86_400_000
+  );
+
+  // Detect which key fields changed
+  const changes: string[] = [];
+  if (oldest.retireAge !== newest.retireAge)
+    changes.push(`Retirement age: ${oldest.retireAge} → ${newest.retireAge}`);
+  if (Math.abs(oldest.totalSavings - newest.totalSavings) > 1000)
+    changes.push(`Total savings: $${Math.round(oldest.totalSavings / 1000)}K → $${Math.round(newest.totalSavings / 1000)}K`);
+  if (Math.abs(oldest.monthlyContribution - newest.monthlyContribution) > 50)
+    changes.push(`Monthly contribution: $${oldest.monthlyContribution} → $${newest.monthlyContribution}`);
+  if (oldest.moneyLastsAge !== newest.moneyLastsAge)
+    changes.push(`Money lasts to: age ${oldest.moneyLastsAge} → age ${newest.moneyLastsAge}`);
+  if (oldest.gapStatus !== newest.gapStatus)
+    changes.push(`Savings status: ${oldest.gapStatus} → ${newest.gapStatus}`);
+
+  // Overall trend based on moneyLastsAge delta
+  const ageDelta = (newest.moneyLastsAge ?? 0) - (oldest.moneyLastsAge ?? 0);
+  const trend = ageDelta > 1 ? 'improving' : ageDelta < -1 ? 'declining' : 'stable';
+
+  // Recent snapshots (last 5) for context
+  const recent = sorted.slice(-5).reverse().map((s) => ({
+    date: s.savedAt,
+    retireAge: s.retireAge,
+    totalSavings: Math.round(s.totalSavings / 1000) + 'K',
+    moneyLastsAge: s.moneyLastsAge,
+    gapStatus: s.gapStatus,
+  }));
+
+  return {
+    available: true,
+    snapshotCount: history.length,
+    daysCovered,
+    oldest: { date: oldest.savedAt, moneyLastsAge: oldest.moneyLastsAge, gapStatus: oldest.gapStatus, totalSavings: Math.round(oldest.totalSavings / 1000) + 'K' },
+    newest: { date: newest.savedAt, moneyLastsAge: newest.moneyLastsAge, gapStatus: newest.gapStatus, totalSavings: Math.round(newest.totalSavings / 1000) + 'K' },
+    trend,
+    changes,
+    recent,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -592,12 +660,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   runRothAnalysisDefinition,
   compareScenariosDefinition,
   optimizeSsClaimingDefinition,
+  getPlanHistoryDefinition,
 ];
 
 export function executeTool(
   toolName: string,
   toolInput: Record<string, unknown>,
-  plan: Record<string, unknown>
+  plan: Record<string, unknown>,
+  planHistory: PlanSnapshot[] = []
 ): ToolResult {
   try {
     let result: unknown;
@@ -623,6 +693,9 @@ export function executeTool(
         break;
       case 'optimize_ss_claiming':
         result = executeOptimizeSsClaiming(plan, toolInput);
+        break;
+      case 'get_plan_history':
+        result = executeGetPlanHistory(planHistory);
         break;
       default:
         return { toolName, result: null, error: `Unknown tool: ${toolName}` };

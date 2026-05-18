@@ -105,6 +105,7 @@ TOOLS: You have 7 tools available:
 - run_roth_analysis: Model a Roth conversion ladder vs. no conversions.
 - compare_scenarios: Run multiple projection scenarios side-by-side (e.g. retire at 60 vs 65 vs 70). Use for any "what if" question with multiple alternatives.
 - optimize_ss_claiming: Compare Social Security at 62, 65, 67 (FRA), and 70 — monthly benefit, lifetime total, and breakeven ages.
+- get_plan_history: Read the user's plan history over time — savings growth, retirement age changes, trend (improving/declining/stable). Use when the user asks about their progress or what has changed.
 
 WHEN TO USE TOOLS: Use tools whenever the question is about the user's specific situation — "am I on track", "when can I retire", "what if I retire early", "should I do a Roth conversion", "how much tax will I pay", "when should I claim Social Security". For general education questions (how does a 401k work, what is dollar-cost averaging), answer directly without tools.
 
