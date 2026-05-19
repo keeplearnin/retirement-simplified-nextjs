@@ -9,8 +9,8 @@ Covers the agent endpoints, tool catalog, data flow, and scheduled pipeline adde
 
 Retire.Simplified is a Next.js 16 / React 19 retirement planning app deployed to AWS Amplify, authenticated via Cognito. The agentic layer adds:
 
-- **10 Claude tools** wrapping the existing financial calculators (`computeProjection`, `taxEngine`, `verdict`, `rothConversion`, etc.) as callable functions
-- **4 agent endpoints** that run an agentic tool-use loop (one conversational, three autonomous)
+- **11 Claude tools** wrapping the existing financial calculators (`computeProjection`, `taxEngine`, `verdict`, `rothConversion`, `portfolioInsights`, etc.) as callable functions
+- **4 agent endpoints** that run an agentic tool-use loop (one conversational, three autonomous), plus **1 non-LLM endpoint** for cheap inline recommendations
 - **A persistence layer** in DynamoDB (plans + snapshot history + user preferences)
 - **A scheduled cron pipeline** (GitHub Actions → `/api/cron/weekly-check` → Claude → Resend) that emails users a weekly plan health report
 
@@ -167,6 +167,7 @@ All 10 tools live in [lib/agentTools.ts](lib/agentTools.ts). Each tool has a JSO
 | 8 | `get_plan_history` | snapshot store | Trend, changed fields, recent snapshots |
 | 9 | `analyze_withdrawal_order` | `computeProjection` + ladder | Default waterfall vs bracket-fill conversion ladder (Roth-first not modelled — needs engine change) |
 | 10 | `run_full_optimization` | chains 1+2+5+7 | Ranked action list with dollar impact |
+| 11 | `analyze_portfolio_recommendations` | `portfolioInsights.ts` | Proactive account-level recs: tax bucket diversification, concentration, cash drag, Roth window, contribution destination, return assumption sanity |
 
 ---
 
@@ -346,6 +347,7 @@ app/
     agent/
       health-check/route.ts          Autonomous health agent
       optimize/route.ts              Autonomous optimization agent
+      portfolio-insights/route.ts    Non-LLM endpoint for inline recs panel
     cron/
       weekly-check/route.ts          Batch email pipeline
     db/
@@ -353,7 +355,8 @@ app/
       snapshots/route.ts             Daily snapshot persistence
       preferences/route.ts           Email opt-in toggle
 lib/
-  agentTools.ts                      10 tool definitions + executors
+  agentTools.ts                      11 tool definitions + executors
+  portfolioInsights.ts               Pure-calc portfolio recommendation engine (7 checks)
   apiAuth.ts                         JWKS-verified Cognito auth
   constants.ts                       AI_AGENT_SYSTEM_PROMPT
   db.ts                              Supabase REST client

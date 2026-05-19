@@ -17,6 +17,7 @@ import type { VerdictInput } from '@/lib/verdict';
 import type { RothLadderInput, Bracket } from '@/lib/rothConversion';
 import type { TaxInput } from '@/lib/taxEngine';
 import type { PlanSnapshot } from '@/lib/planHistory';
+import { analyzePortfolio } from '@/lib/portfolioInsights';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -961,6 +962,28 @@ function executeRunFullOptimization(plan: Record<string, unknown>) {
 }
 
 // ---------------------------------------------------------------------------
+// Tool 11: analyze_portfolio_recommendations
+// Runs the pure-calculation portfolio insights engine (lib/portfolioInsights.ts)
+// and returns a ranked list of account-level recommendations. The same engine
+// powers the AI Advisor's Portfolio Insights panel directly (no LLM round-trip
+// needed there) — Claude calls this tool when reasoning about the broader plan.
+// ---------------------------------------------------------------------------
+
+const analyzePortfolioRecommendationsDefinition: ToolDefinition = {
+  name: 'analyze_portfolio_recommendations',
+  description:
+    "Returns proactive account-level portfolio recommendations: tax bucket diversification, account concentration, cash drag, Roth conversion window, return assumption sanity, contribution destination. Each recommendation has a severity, dollar impact, and concrete action. Use when the user asks 'what should I change' or for general portfolio review questions.",
+  input_schema: {
+    type: 'object',
+    properties: {},
+  },
+};
+
+function executeAnalyzePortfolioRecommendations(plan: Record<string, unknown>) {
+  return analyzePortfolio(plan);
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -975,6 +998,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   getPlanHistoryDefinition,
   analyzeWithdrawalOrderDefinition,
   runFullOptimizationDefinition,
+  analyzePortfolioRecommendationsDefinition,
 ];
 
 export function executeTool(
@@ -1016,6 +1040,9 @@ export function executeTool(
         break;
       case 'run_full_optimization':
         result = executeRunFullOptimization(plan);
+        break;
+      case 'analyze_portfolio_recommendations':
+        result = executeAnalyzePortfolioRecommendations(plan);
         break;
       default:
         return { toolName, result: null, error: `Unknown tool: ${toolName}` };

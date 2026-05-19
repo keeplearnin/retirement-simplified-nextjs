@@ -70,7 +70,7 @@ console.log('\n=== agentTools smoke test ===\n');
 // 1. Tool definitions
 console.log('Tool definitions:');
 check(`exports ${TOOL_DEFINITIONS.length} tools`, () => {
-  if (TOOL_DEFINITIONS.length !== 10) throw new Error(`expected 10, got ${TOOL_DEFINITIONS.length}`);
+  if (TOOL_DEFINITIONS.length !== 11) throw new Error(`expected 11, got ${TOOL_DEFINITIONS.length}`);
 });
 TOOL_DEFINITIONS.forEach(t => {
   check(`${t.name} has name + description + input_schema`, () => {
@@ -273,6 +273,45 @@ check('actions ranked by dollar value desc', () => {
     }
   }
   pass('', `${actions.length} actions, top: ${(optimizeResult.result as Record<string, { summary: string }>).summary}`);
+});
+
+// 15. analyze_portfolio_recommendations
+console.log('\nanalyze_portfolio_recommendations:');
+const insightsResult = executeTool('analyze_portfolio_recommendations', {}, samplePlan);
+check('no error', () => { if (insightsResult.error) throw new Error(insightsResult.error); });
+check('returns recommendations + summary', () => {
+  const r = insightsResult.result as Record<string, unknown>;
+  if (!Array.isArray(r.recommendations)) throw new Error('missing recommendations array');
+  if (typeof r.summary !== 'string') throw new Error('missing summary');
+  pass('', `${(r.recommendations as unknown[]).length} recs — ${r.summary}`);
+});
+
+// 16. Portfolio insights — heavy tax-deferred plan triggers warning
+console.log('\nportfolio_insights edge cases:');
+const heavyTradPlan = { ...samplePlan, savings401k: 500_000, savingsRoth: 0, savingsTaxable: 0, savingsHSA: 0 };
+const heavyTradResult = executeTool('analyze_portfolio_recommendations', {}, heavyTradPlan);
+check('tax-deferred concentration triggers', () => {
+  const recs = (heavyTradResult.result as Record<string, unknown[]>).recommendations as Array<Record<string, unknown>>;
+  const hit = recs.find(r => r.type === 'tax_diversification');
+  if (!hit) throw new Error('expected tax_diversification rec');
+  if (hit.severity !== 'high') throw new Error(`expected high severity, got ${hit.severity}`);
+});
+
+// 17. Portfolio insights — RE concentration
+const heavyREPlan = { ...samplePlan, savingsRealEstate: 600_000, savings401k: 100_000, useRealEstateInRetirement: false };
+const heavyREResult = executeTool('analyze_portfolio_recommendations', {}, heavyREPlan);
+check('real estate concentration triggers', () => {
+  const recs = (heavyREResult.result as Record<string, unknown[]>).recommendations as Array<Record<string, unknown>>;
+  const hit = recs.find(r => r.type === 'real_estate');
+  if (!hit) throw new Error('expected real_estate rec');
+});
+
+// 18. Portfolio insights — empty/skinny plan returns no recs gracefully
+const tinyPlan = { ...samplePlan, savings401k: 5_000, savingsRoth: 0, savingsTaxable: 0, savingsCash: 0, savingsRealEstate: 0, monthlyContribution: 0 };
+const tinyResult = executeTool('analyze_portfolio_recommendations', {}, tinyPlan);
+check('skinny plan returns gracefully (no crash)', () => {
+  const r = tinyResult.result as Record<string, unknown>;
+  if (!Array.isArray(r.recommendations)) throw new Error('expected array');
 });
 
 console.log('\n=== done ===\n');

@@ -24,6 +24,8 @@ export default function AIAdvisor() {
   const [optimizeLoading, setOptimizeLoading] = useState(false);
   const [optimizeError, setOptimizeError] = useState(null);
   const [showOptimize, setShowOptimize] = useState(false);
+  const [insights, setInsights] = useState(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
   const [emailPrefs, setEmailPrefs] = useState({ email: '', weeklyCheckEnabled: false, loaded: false });
   const [introOpen, setIntroOpen] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -39,6 +41,26 @@ export default function AIAdvisor() {
     }
   }
 
+  async function fetchInsights() {
+    setInsightsLoading(true);
+    try {
+      const token = Auth.getIdToken?.();
+      if (!token) return;
+      const res = await fetch('/api/agent/portfolio-insights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ plan }),
+      });
+      if (res.ok) {
+        setInsights(await res.json());
+      }
+    } catch {
+      // silent — insights are nice-to-have
+    } finally {
+      setInsightsLoading(false);
+    }
+  }
+
   useEffect(() => {
     savePlanSnapshot(plan);
     // Load any existing health report immediately
@@ -47,6 +69,8 @@ export default function AIAdvisor() {
     // Load DB history and auto-run health check if overdue
     const token = Auth.getIdToken?.();
     if (token) {
+      // Portfolio insights are cheap (no LLM) — auto-fetch on mount
+      fetchInsights();
       loadHistoryFromDb(token).then(() => {
         if (isHealthCheckDue()) runHealthCheck();
       });
@@ -430,6 +454,94 @@ export default function AIAdvisor() {
           </div>
         );
       })()}
+
+      {/* Portfolio Insights — auto-fetched proactive recommendations */}
+      {insights && insights.recommendations?.length > 0 && (
+        <div
+          style={{
+            marginBottom: 16,
+            border: '1px solid var(--border)',
+            borderRadius: 12,
+            overflow: 'hidden',
+            fontFamily: 'var(--sans)',
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--bg2)',
+              padding: '10px 16px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 12,
+            }}
+          >
+            <div>
+              <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>📊 Portfolio Insights</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 8 }}>{insights.summary}</span>
+            </div>
+            <button
+              onClick={fetchInsights}
+              disabled={insightsLoading}
+              style={{
+                background: 'transparent',
+                color: 'var(--text-muted)',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                padding: '4px 10px',
+                fontSize: 11,
+                fontWeight: 500,
+                fontFamily: 'var(--sans)',
+                cursor: insightsLoading ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {insightsLoading ? '...' : 'Refresh'}
+            </button>
+          </div>
+          <div>
+            {insights.recommendations.slice(0, 3).map((rec, i) => {
+              const sev = rec.severity;
+              const dot = sev === 'high' ? '🔴' : sev === 'medium' ? '🟡' : '🟢';
+              const isLast = i === Math.min(2, insights.recommendations.length - 1);
+              return (
+                <div
+                  key={rec.id}
+                  style={{
+                    padding: '12px 16px',
+                    borderBottom: isLast ? 'none' : '1px solid var(--border)',
+                    display: 'flex',
+                    gap: 12,
+                    alignItems: 'flex-start',
+                  }}
+                >
+                  <span style={{ fontSize: 14, lineHeight: '20px', flexShrink: 0 }}>{dot}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>{rec.title}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, lineHeight: 1.5 }}>{rec.detail}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <span style={{
+                        fontSize: 11, fontWeight: 600, color: 'var(--accent)',
+                        background: 'var(--accent-dim, rgba(16,185,129,0.10))',
+                        padding: '2px 8px', borderRadius: 10,
+                      }}>{rec.impactLabel}</span>
+                      <button
+                        onClick={() => sendMessage(`Tell me more about this recommendation: ${rec.title}`)}
+                        style={{
+                          background: 'transparent', color: 'var(--text-muted)', border: 'none',
+                          padding: 0, fontSize: 11, fontWeight: 600, fontFamily: 'var(--sans)',
+                          cursor: 'pointer', textDecoration: 'underline',
+                        }}
+                      >
+                        {rec.action.label} →
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Hero CTA — Optimize My Plan */}
       {!showOptimize && (

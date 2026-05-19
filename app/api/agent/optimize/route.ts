@@ -21,7 +21,8 @@ Follow these steps in order — do NOT skip any:
 2. Call run_full_optimization to get baseline metrics and ranked actions
 3. Call optimize_ss_claiming to get detailed SS claiming analysis
 4. Call analyze_withdrawal_order to compare withdrawal strategies
-5. Synthesize all findings into the JSON report below
+5. Call analyze_portfolio_recommendations for account-level opportunities
+6. Synthesize all findings into the JSON report below — merge portfolio recommendations into the actions array alongside the other recommendations
 
 Return ONLY a valid JSON object — no markdown, no explanation, just raw JSON:
 {

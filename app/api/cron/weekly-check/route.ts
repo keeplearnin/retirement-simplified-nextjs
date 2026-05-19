@@ -51,7 +51,8 @@ Follow these steps in order:
 3. Call get_verdict to check their savings benchmark status
 4. Call optimize_ss_claiming to find the optimal SS claiming age
 5. Call get_plan_history to check their progress trend
-6. Synthesize everything into a JSON health report
+6. Call analyze_portfolio_recommendations for proactive account-level recs
+7. Synthesize everything into a JSON health report — the top portfolio recommendation should appear in the recommendations array
 
 Return ONLY a valid JSON object — no markdown, no explanation:
 {
