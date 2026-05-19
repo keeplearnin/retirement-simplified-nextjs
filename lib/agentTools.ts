@@ -125,6 +125,21 @@ function executePlanSummary(plan: Record<string, unknown>) {
       healthcareInflation: plan.healthcareInflation ?? 3.5,
       healthcareMultiplier: plan.healthcareMultiplier ?? 1.0,
     },
+    realEstateTreatment: {
+      balance: (plan.savingsRealEstate as number) ?? 0,
+      includedInRetirement: Boolean(plan.useRealEstateInRetirement),
+      // IMPORTANT for the agent: when includedInRetirement is false, the
+      // projection engine does NOT use real estate to cover retirement
+      // spending — so a user with significant RE may appear to "run out of
+      // money" even if their RE wealth is large. If you see balance > $100K
+      // AND includedInRetirement = false, suggest the user enable the
+      // "Plan to draw from real estate" toggle in My Plan → Assumptions.
+      warning:
+        ((plan.savingsRealEstate as number) ?? 0) > 100_000 &&
+        !plan.useRealEstateInRetirement
+          ? `User has $${Math.round(((plan.savingsRealEstate as number) ?? 0) / 1000)}K in real estate but the "Plan to draw from real estate" toggle is OFF. This RE is NOT counted in their projection or money-lasts-to age. If they're asking about running out of money or their plan score, mention this and suggest they enable the toggle (My Plan tab → Assumptions section) if they intend to sell, downsize, or take a reverse mortgage.`
+          : null,
+    },
   };
 }
 

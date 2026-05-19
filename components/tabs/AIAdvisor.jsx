@@ -14,7 +14,7 @@ import {
 } from '@/lib/healthCheck';
 
 export default function AIAdvisor() {
-  const { plan } = usePlan();
+  const { plan, updatePlan } = usePlan();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -22,6 +22,7 @@ export default function AIAdvisor() {
   const [healthLoading, setHealthLoading] = useState(false);
   const [optimizeReport, setOptimizeReport] = useState(null);
   const [optimizeLoading, setOptimizeLoading] = useState(false);
+  const [optimizeError, setOptimizeError] = useState(null);
   const [showOptimize, setShowOptimize] = useState(false);
   const [emailPrefs, setEmailPrefs] = useState({ email: '', weeklyCheckEnabled: false, loaded: false });
   const [introOpen, setIntroOpen] = useState(() => {
@@ -99,22 +100,47 @@ export default function AIAdvisor() {
   async function runOptimization() {
     setOptimizeLoading(true);
     setShowOptimize(true);
+    setOptimizeError(null);
+    setOptimizeReport(null);
     try {
-      const token = Auth.getIdToken();
-      const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
+      const token = Auth.getIdToken?.();
+      if (!token) {
+        setOptimizeError({ status: 401, message: 'Please sign in to use the optimizer.' });
+        return;
+      }
       const res = await fetch('/api/agent/optimize', {
         method: 'POST',
-        headers,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ plan, planHistory: loadHistory() }),
       });
-      if (res.ok) {
-        const { report } = await res.json();
-        setOptimizeReport(report);
+
+      if (!res.ok) {
+        let serverMsg = '';
+        try {
+          const body = await res.json();
+          serverMsg = body.error || body.message || '';
+        } catch { /* non-JSON response */ }
+
+        const fallback = {
+          401: 'Session expired. Sign in again to optimize.',
+          429: 'Too many requests — try again in a minute.',
+          503: 'Optimizer is not configured on the server (likely a missing ANTHROPIC_API_KEY env var). Contact support.',
+          502: 'AI service temporarily unavailable. Try again in a moment.',
+          500: 'Server error while running the optimization.',
+        }[res.status] || `Optimization failed (status ${res.status}).`;
+
+        setOptimizeError({ status: res.status, message: serverMsg || fallback });
+        return;
       }
-    } catch {
-      // silent
+
+      const { report } = await res.json();
+      if (!report) {
+        setOptimizeError({ status: 200, message: 'Optimizer returned no report. Try again.' });
+        return;
+      }
+      setOptimizeReport(report);
+    } catch (err) {
+      setOptimizeError({ status: 0, message: err?.message || 'Network error — check your connection.' });
     } finally {
       setOptimizeLoading(false);
     }
@@ -345,6 +371,66 @@ export default function AIAdvisor() {
         </div>
       )}
 
+      {/* Real-estate callout — fires when user has significant RE but the
+          "draw from RE in retirement" toggle is off. Surfaces the most
+          impactful single setting the engine has, which is otherwise buried
+          in My Plan → Assumptions. */}
+      {(() => {
+        const reBalance = plan?.savingsRealEstate ?? 0;
+        const reIncluded = !!plan?.useRealEstateInRetirement;
+        if (reBalance < 100_000 || reIncluded) return null;
+        const reInK = reBalance >= 1_000_000
+          ? `$${(reBalance / 1_000_000).toFixed(1)}M`
+          : `$${Math.round(reBalance / 1000)}K`;
+        return (
+          <div
+            style={{
+              marginBottom: 16,
+              border: '1px solid var(--warn, #f59e0b)',
+              borderRadius: 12,
+              padding: '14px 16px',
+              background: 'var(--warn-dim, rgba(245,158,11,0.10))',
+              fontFamily: 'var(--sans)',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 12,
+            }}
+          >
+            <div style={{ fontSize: 22, lineHeight: 1 }}>🏠</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', marginBottom: 4 }}>
+                {reInK} in real estate is not counted in your projection
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5, marginBottom: 10 }}>
+                By default the projection treats real estate as illiquid — it's tracked and grows, but doesn't cover retirement spending. If you plan to sell, downsize, or take a reverse mortgage, enable the toggle and your "money lasts to" age will extend significantly.
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => updatePlan('useRealEstateInRetirement', true)}
+                  style={{
+                    background: 'var(--accent)', color: 'var(--bg)', border: 'none',
+                    borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 700,
+                    fontFamily: 'var(--sans)', cursor: 'pointer',
+                  }}
+                >
+                  Include real estate in retirement
+                </button>
+                <button
+                  onClick={() => sendMessage(`I have ${reInK} in real estate that isn't counted in my plan. How does enabling "draw from real estate in retirement" change my projection?`)}
+                  style={{
+                    background: 'transparent', color: 'var(--text)', border: '1px solid var(--border)',
+                    borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 600,
+                    fontFamily: 'var(--sans)', cursor: 'pointer',
+                  }}
+                >
+                  Ask the advisor
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Hero CTA — Optimize My Plan */}
       {!showOptimize && (
         <div
@@ -400,6 +486,30 @@ export default function AIAdvisor() {
           {optimizeLoading && (
             <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: 13 }}>
               Running full analysis: projection → SS timing → Roth conversions → withdrawal order...
+            </div>
+          )}
+          {optimizeError && !optimizeLoading && (
+            <div style={{ padding: '14px 16px', borderTop: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+                <span style={{ fontSize: 18, lineHeight: 1 }}>⚠️</span>
+                <div style={{ fontSize: 13, color: 'var(--text)' }}>
+                  <div style={{ fontWeight: 600, marginBottom: 2 }}>Optimization failed</div>
+                  <div style={{ color: 'var(--text-muted)' }}>{optimizeError.message}</div>
+                  {optimizeError.status > 0 && (
+                    <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 4 }}>HTTP {optimizeError.status}</div>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={runOptimization}
+                style={{
+                  background: 'var(--accent)', color: 'var(--bg)', border: 'none',
+                  borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 600,
+                  fontFamily: 'var(--sans)', cursor: 'pointer',
+                }}
+              >
+                Try again
+              </button>
             </div>
           )}
           {optimizeReport && !optimizeLoading && (
