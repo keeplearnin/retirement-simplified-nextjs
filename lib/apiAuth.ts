@@ -84,9 +84,15 @@ export async function verifyAuth(request: Request): Promise<TokenPayload | NextR
   // Path 3: No valid path — explain what's wrong
   if (!ISSUER && !ALLOW_ANONYMOUS_USERS) {
     console.error('Neither Cognito nor anonymous mode is configured');
-    return NextResponse.json({ error: 'Auth not configured' }, { status: 503 });
+    return NextResponse.json(
+      { error: 'Auth not configured', hint: 'Set ALLOW_ANONYMOUS_USERS=1 (pilot) or Cognito vars (prod)' },
+      { status: 503 },
+    );
   }
-  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  return NextResponse.json(
+    { error: 'Unauthorized', hint: ALLOW_ANONYMOUS_USERS ? 'Provide X-Device-Id header (UUID)' : 'Provide Bearer token' },
+    { status: 401 },
+  );
 }
 
 async function verifyCognitoToken(request: Request): Promise<TokenPayload | NextResponse> {
