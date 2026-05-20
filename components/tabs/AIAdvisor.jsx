@@ -11,6 +11,12 @@ import {
   saveHealthReport,
   loadHealthReport,
 } from '@/lib/healthCheck';
+import {
+  isReviewDue,
+  markReviewRan,
+  saveReport as saveReviewReport,
+  loadReport as loadReviewReport,
+} from '@/lib/quarterlyReview';
 
 export default function AIAdvisor() {
   const { plan, updatePlan } = usePlan();
@@ -24,6 +30,9 @@ export default function AIAdvisor() {
   const [optimizeError, setOptimizeError] = useState(null);
   const [insights, setInsights] = useState(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
+  const [reviewReport, setReviewReport] = useState(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewSeen, setReviewSeen] = useState(false);
   const [emailPrefs, setEmailPrefs] = useState({ email: '', weeklyCheckEnabled: false, loaded: false });
   const [introOpen, setIntroOpen] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -64,12 +73,19 @@ export default function AIAdvisor() {
     const existing = loadHealthReport();
     if (existing) setHealthReport(existing);
 
+    const existingReview = loadReviewReport();
+    if (existingReview) {
+      setReviewReport(existingReview);
+      setReviewSeen(true); // existing report has been seen before
+    }
+
     // Anonymous device-ID is always available; Cognito token is optional.
     // All API calls work either way — backend resolves identity from
     // X-Device-Id header when no Bearer token is present.
     fetchInsights();
-    loadHistoryFromDb().then(() => {
+    loadHistoryFromDb().then((history) => {
       if (isHealthCheckDue()) runHealthCheck();
+      if (isReviewDue(history?.length ?? 0)) runReview();
     });
     fetch('/api/db/plan', {
       method: 'PUT',
@@ -89,6 +105,29 @@ export default function AIAdvisor() {
       })
       .catch(() => undefined);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function runReview() {
+    setReviewLoading(true);
+    setActivePanel('review');
+    try {
+      const res = await fetch('/api/agent/quarterly-review', {
+        method: 'POST',
+        headers: Auth.getAuthHeaders(),
+        body: JSON.stringify({ plan, planHistory: loadHistory() }),
+      });
+      if (res.ok) {
+        const { report } = await res.json();
+        saveReviewReport(report);
+        markReviewRan();
+        setReviewReport(report);
+        setReviewSeen(false); // mark as fresh — chip will get the "new" dot
+      }
+    } catch {
+      // silent
+    } finally {
+      setReviewLoading(false);
+    }
+  }
 
   async function runHealthCheck() {
     setHealthLoading(true);
@@ -336,6 +375,37 @@ export default function AIAdvisor() {
           </button>
         )}
 
+        {(reviewReport || reviewLoading) && (
+          <button
+            onClick={() => {
+              togglePanel('review');
+              setReviewSeen(true);
+            }}
+            style={chipStyle(activePanel === 'review')}
+          >
+            {!reviewSeen && reviewReport && (
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: 'var(--accent)',
+                  display: 'inline-block',
+                }}
+              />
+            )}
+            <span>
+              📅 {reviewLoading
+                ? 'Review running…'
+                : reviewReport?.framing === 'quarterly'
+                ? 'Quarterly review'
+                : reviewReport?.framing === 'monthly'
+                ? 'Monthly review'
+                : 'Progress review'}
+            </span>
+          </button>
+        )}
+
         {reExcluded && (
           <button onClick={() => togglePanel('re')} style={chipStyle(activePanel === 're')}>
             <span
@@ -391,6 +461,12 @@ export default function AIAdvisor() {
               {activePanel === 'insights' && 'Portfolio Insights'}
               {activePanel === 're' && 'Real Estate Treatment'}
               {activePanel === 'optimize' && 'Optimization Report'}
+              {activePanel === 'review' &&
+                (reviewReport?.framing === 'quarterly'
+                  ? 'Quarterly Review'
+                  : reviewReport?.framing === 'monthly'
+                  ? 'Monthly Progress'
+                  : 'Progress Review')}
               {activePanel === 'settings' && 'Settings'}
             </span>
             <button
@@ -601,6 +677,126 @@ export default function AIAdvisor() {
                     Ask the advisor
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* Review panel — progress / monthly / quarterly */}
+            {activePanel === 'review' && (
+              <div>
+                {reviewLoading && (
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                    Comparing your plan to past snapshots and re-running the projection…
+                  </div>
+                )}
+                {!reviewLoading && reviewReport && (() => {
+                  const trendColor =
+                    reviewReport.trend === 'improving' ? 'var(--accent)'
+                    : reviewReport.trend === 'declining' ? '#f59e0b'
+                    : 'var(--text-muted)';
+                  const trendIcon =
+                    reviewReport.trend === 'improving' ? '↗'
+                    : reviewReport.trend === 'declining' ? '↘'
+                    : '→';
+                  return (
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                        <span style={{ fontSize: 18, color: trendColor, fontWeight: 700 }}>{trendIcon}</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', lineHeight: 1.4 }}>
+                          {reviewReport.headline}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>
+                        Looking at the last {reviewReport.periodDays} day{reviewReport.periodDays === 1 ? '' : 's'} of your plan history.
+                      </div>
+
+                      {reviewReport.metrics && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 12 }}>
+                          {[
+                            {
+                              label: 'Money lasts to',
+                              before: reviewReport.metrics.moneyLastsAge?.before,
+                              after: reviewReport.metrics.moneyLastsAge?.after,
+                              fmt: (v) => v == null ? '—' : `Age ${v}`,
+                            },
+                            {
+                              label: 'Portfolio at retire',
+                              before: reviewReport.metrics.portfolioAtRetire?.before,
+                              after: reviewReport.metrics.portfolioAtRetire?.after,
+                              fmt: (v) => v == null ? '—' : `$${Math.round((v || 0) / 1000)}K`,
+                            },
+                          ].map(({ label, before, after, fmt: f }) => (
+                            <div key={label} style={{ background: 'var(--bg)', borderRadius: 6, padding: '6px 8px' }}>
+                              <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{label}</div>
+                              <div style={{ fontSize: 12, color: 'var(--text-muted)', textDecoration: 'line-through', display: 'inline-block', marginRight: 6 }}>
+                                {f(before)}
+                              </div>
+                              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+                                {f(after)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {reviewReport.changes?.length > 0 && (
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
+                            What changed
+                          </div>
+                          {reviewReport.changes.slice(0, 5).map((c, i) => (
+                            <div key={i} style={{ display: 'flex', gap: 8, padding: '4px 0', fontSize: 12 }}>
+                              <span style={{ color: c.significance === 'major' ? 'var(--accent)' : 'var(--text-muted)' }}>
+                                {c.significance === 'major' ? '●' : '○'}
+                              </span>
+                              <span style={{ flex: 1, color: 'var(--text)' }}>
+                                <strong>{c.field}:</strong> {c.before} → {c.after}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {reviewReport.topRecommendation && (
+                        <div style={{
+                          background: 'var(--bg)',
+                          borderLeft: '3px solid var(--accent)',
+                          padding: '8px 10px',
+                          borderRadius: 6,
+                          marginBottom: 10,
+                        }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+                            Next action
+                          </div>
+                          <div style={{ fontSize: 13, color: 'var(--text)' }}>
+                            {reviewReport.topRecommendation}
+                          </div>
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          Next review in {reviewReport.nextReviewInDays} days
+                        </span>
+                        <button
+                          onClick={runReview}
+                          style={{
+                            background: 'transparent',
+                            color: 'var(--accent)',
+                            border: '1px solid var(--accent)',
+                            borderRadius: 8,
+                            padding: '4px 10px',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            fontFamily: 'var(--sans)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Refresh now
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
