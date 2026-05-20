@@ -116,6 +116,45 @@ const Auth = {
       return false;
     }
   },
+
+  /**
+   * Returns a stable per-browser UUID. Generated on first call, persisted
+   * to localStorage. Used as the partition key for anonymous-mode pilots
+   * (when Cognito is not configured server-side).
+   */
+  getDeviceId(): string {
+    if (typeof window === 'undefined') return '';
+    const KEY = 'rs:device-id-v1';
+    let id = localStorage.getItem(KEY);
+    if (!id) {
+      // crypto.randomUUID is universally available in modern browsers.
+      // Fallback to a manual UUID for unusual environments.
+      id = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : (([1e7] as any) + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c: string) => {
+            const r = Math.floor(Math.random() * 16);
+            const v = c === '8' ? (r & 0x3) | 0x8 : r;
+            return v.toString(16);
+          });
+      localStorage.setItem(KEY, id);
+    }
+    return id;
+  },
+
+  /**
+   * Returns headers for an authenticated API call. Always includes
+   * X-Device-Id (for anonymous-mode fallback) and adds Authorization
+   * when a Cognito ID token is available.
+   */
+  getAuthHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'X-Device-Id': this.getDeviceId(),
+    };
+    const token = this.getIdToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return headers;
+  },
 };
 
 export default Auth;

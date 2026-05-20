@@ -46,11 +46,9 @@ export default function AIAdvisor() {
   async function fetchInsights() {
     setInsightsLoading(true);
     try {
-      const token = Auth.getIdToken?.();
-      if (!token) return;
       const res = await fetch('/api/agent/portfolio-insights', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: Auth.getAuthHeaders(),
         body: JSON.stringify({ plan }),
       });
       if (res.ok) setInsights(await res.json());
@@ -65,43 +63,39 @@ export default function AIAdvisor() {
     savePlanSnapshot(plan);
     const existing = loadHealthReport();
     if (existing) setHealthReport(existing);
-    const token = Auth.getIdToken?.();
-    if (token) {
-      fetchInsights();
-      loadHistoryFromDb(token).then(() => {
-        if (isHealthCheckDue()) runHealthCheck();
-      });
-      fetch('/api/db/plan', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ plan }),
-      }).catch(() => undefined);
-      fetch('/api/db/preferences', { headers: { Authorization: `Bearer ${token}` } })
-        .then((r) => r.json())
-        .then(({ preferences }) => {
-          if (preferences) {
-            setEmailPrefs({
-              email: preferences.email ?? '',
-              weeklyCheckEnabled: preferences.weeklyCheckEnabled,
-              loaded: true,
-            });
-          }
-        })
-        .catch(() => undefined);
-    } else if (isHealthCheckDue()) {
-      runHealthCheck();
-    }
+
+    // Anonymous device-ID is always available; Cognito token is optional.
+    // All API calls work either way — backend resolves identity from
+    // X-Device-Id header when no Bearer token is present.
+    fetchInsights();
+    loadHistoryFromDb().then(() => {
+      if (isHealthCheckDue()) runHealthCheck();
+    });
+    fetch('/api/db/plan', {
+      method: 'PUT',
+      headers: Auth.getAuthHeaders(),
+      body: JSON.stringify({ plan }),
+    }).catch(() => undefined);
+    fetch('/api/db/preferences', { headers: Auth.getAuthHeaders() })
+      .then((r) => r.json())
+      .then(({ preferences }) => {
+        if (preferences) {
+          setEmailPrefs({
+            email: preferences.email ?? '',
+            weeklyCheckEnabled: preferences.weeklyCheckEnabled,
+            loaded: true,
+          });
+        }
+      })
+      .catch(() => undefined);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function runHealthCheck() {
     setHealthLoading(true);
     try {
-      const token = Auth.getIdToken();
-      const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
       const res = await fetch('/api/agent/health-check', {
         method: 'POST',
-        headers,
+        headers: Auth.getAuthHeaders(),
         body: JSON.stringify({ plan, planHistory: loadHistory() }),
       });
       if (res.ok) {
@@ -123,14 +117,9 @@ export default function AIAdvisor() {
     setOptimizeError(null);
     setOptimizeReport(null);
     try {
-      const token = Auth.getIdToken?.();
-      if (!token) {
-        setOptimizeError({ status: 401, message: 'Please sign in to use the optimizer.' });
-        return;
-      }
       const res = await fetch('/api/agent/optimize', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: Auth.getAuthHeaders(),
         body: JSON.stringify({ plan, planHistory: loadHistory() }),
       });
       if (!res.ok) {
@@ -141,9 +130,9 @@ export default function AIAdvisor() {
           /* non-JSON */
         }
         const fallback = {
-          401: 'Session expired. Sign in again to optimize.',
+          401: 'Optimizer needs a valid session or device ID. Try refreshing the page.',
           429: 'Too many requests — try again in a minute.',
-          503: 'Optimizer is not configured on the server (likely a missing ANTHROPIC_API_KEY env var).',
+          503: 'Optimizer is not configured on the server (missing ANTHROPIC_API_KEY or auth env vars).',
           502: 'AI service temporarily unavailable. Try again in a moment.',
           500: 'Server error while running the optimization.',
         }[res.status] || `Optimization failed (status ${res.status}).`;
@@ -164,13 +153,11 @@ export default function AIAdvisor() {
   }
 
   async function saveEmailPrefs(updates) {
-    const token = Auth.getIdToken?.();
-    if (!token) return;
     const next = { ...emailPrefs, ...updates };
     setEmailPrefs(next);
     await fetch('/api/db/preferences', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: Auth.getAuthHeaders(),
       body: JSON.stringify({ email: next.email, weeklyCheckEnabled: next.weeklyCheckEnabled }),
     }).catch(() => undefined);
   }
@@ -188,17 +175,14 @@ export default function AIAdvisor() {
     setInput('');
     setLoading(true);
     try {
-      const token = Auth.getIdToken();
-      const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers,
+        headers: Auth.getAuthHeaders(),
         body: JSON.stringify({ messages: newMessages, plan, planHistory: loadHistory() }),
       });
       const data = await res.json();
       if (res.status === 401) {
-        setMessages((prev) => [...prev, { role: 'assistant', content: 'Please sign in to use the AI advisor.' }]);
+        setMessages((prev) => [...prev, { role: 'assistant', content: 'Session issue — try refreshing the page.' }]);
         return;
       }
       if (res.status === 429) {

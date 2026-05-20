@@ -115,15 +115,9 @@ export function savePlanSnapshot(plan: Record<string, unknown>): void {
 async function syncSnapshotToDb(snapshot: PlanSnapshot): Promise<void> {
   try {
     const Auth = (await import('@/lib/auth')).default;
-    const token = Auth.getIdToken?.();
-    if (!token) return;
-
     await fetch('/api/db/snapshots', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
+      headers: Auth.getAuthHeaders(),
       body: JSON.stringify({ savedAt: snapshot.savedAt, data: snapshot }),
     });
   } catch {
@@ -146,10 +140,11 @@ export function loadHistory(): PlanSnapshot[] {
  * DB is source of truth; localStorage fills gaps when offline.
  * Returns merged array sorted newest-first.
  */
-export async function loadHistoryFromDb(token: string): Promise<PlanSnapshot[]> {
+export async function loadHistoryFromDb(_legacyToken?: string): Promise<PlanSnapshot[]> {
   try {
+    const Auth = (await import('@/lib/auth')).default;
     const resp = await fetch('/api/db/snapshots', {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: Auth.getAuthHeaders(),
     });
     if (!resp.ok) return loadHistory();
 

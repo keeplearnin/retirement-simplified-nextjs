@@ -2,16 +2,28 @@ import { NextResponse } from 'next/server';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
 
 // ---------------------------------------------------------------------------
-// Cognito JWT validation with full signature verification.
+// Auth strategy
 //
-// Verifies: signature (via JWKS), expiry, issuer, token_use, audience (when
-// the App Client ID is configured). All checks are mandatory — if env vars
-// are not set, every request is rejected with 503.
+// 1. If Cognito env vars are present AND the request carries a Bearer token,
+//    verify the JWT against Cognito's JWKS (signature, issuer, audience,
+//    token_use, sub). This is the secure production path.
+//
+// 2. If ALLOW_ANONYMOUS_USERS=1 AND the request carries a valid X-Device-Id
+//    header (UUID v4), accept it and return a synthetic identity prefixed
+//    with `dev:` to keep anonymous and Cognito sub spaces disjoint. This is
+//    the pilot-mode path — zero-friction onboarding, isolated per-browser
+//    data, no sign-up flow.
+//
+// 3. Otherwise, return 401.
+//
+// Note: anonymous mode is NOT secure. Anyone who steals the deviceId can
+// read/write that "user's" data. Acceptable for pilots, never for prod.
 // ---------------------------------------------------------------------------
 
 const COGNITO_REGION = process.env.NEXT_PUBLIC_AWS_REGION ?? '';
 const USER_POOL_ID = process.env.NEXT_PUBLIC_USER_POOL_ID ?? '';
 const APP_CLIENT_ID = process.env.NEXT_PUBLIC_USER_POOL_CLIENT_ID ?? '';
+const ALLOW_ANONYMOUS_USERS = process.env.ALLOW_ANONYMOUS_USERS === '1';
 
 const ISSUER = COGNITO_REGION && USER_POOL_ID
   ? `https://cognito-idp.${COGNITO_REGION}.amazonaws.com/${USER_POOL_ID}`
@@ -35,6 +47,19 @@ export interface TokenPayload extends JWTPayload {
   token_use?: string;
   client_id?: string;
   aud?: string | string[];
+  anonymous?: boolean;
+}
+
+// Loose UUID v4-ish check — exact RFC parsing isn't worth it. We just want
+// to reject obviously bogus strings (SQL, path traversal, etc.) before they
+// reach DynamoDB as a partition key.
+const UUID_RE = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+
+function tryAnonymousIdentity(request: Request): TokenPayload | null {
+  if (!ALLOW_ANONYMOUS_USERS) return null;
+  const deviceId = request.headers.get('X-Device-Id');
+  if (!deviceId || !UUID_RE.test(deviceId)) return null;
+  return { sub: `dev:${deviceId.toLowerCase()}`, anonymous: true };
 }
 
 /**
@@ -44,15 +69,28 @@ export interface TokenPayload extends JWTPayload {
  * Async: signature verification fetches the JWKS (cached after first call).
  */
 export async function verifyAuth(request: Request): Promise<TokenPayload | NextResponse> {
-  if (!ISSUER) {
-    console.error('Cognito env vars not configured — auth disabled');
-    return NextResponse.json({ error: 'Auth not configured' }, { status: 503 });
+  const authHeader = request.headers.get('Authorization');
+  const hasBearerToken = authHeader?.startsWith('Bearer ');
+
+  // Path 1: Cognito JWT (production)
+  if (ISSUER && hasBearerToken) {
+    return verifyCognitoToken(request);
   }
 
-  const authHeader = request.headers.get('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Path 2: Anonymous device-ID (pilot mode)
+  const anon = tryAnonymousIdentity(request);
+  if (anon) return anon;
+
+  // Path 3: No valid path — explain what's wrong
+  if (!ISSUER && !ALLOW_ANONYMOUS_USERS) {
+    console.error('Neither Cognito nor anonymous mode is configured');
+    return NextResponse.json({ error: 'Auth not configured' }, { status: 503 });
   }
+  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+}
+
+async function verifyCognitoToken(request: Request): Promise<TokenPayload | NextResponse> {
+  const authHeader = request.headers.get('Authorization') ?? '';
   const token = authHeader.slice(7).trim();
   if (!token) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
