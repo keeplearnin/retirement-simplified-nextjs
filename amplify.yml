@@ -1,0 +1,38 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        # Surface what's present at build time so we can debug propagation
+        - echo "=== Env vars visible to the build ==="
+        - env | grep -E '^(ANTHROPIC|ALLOW_|CRON_|RESEND|WEEKLY_|NEXT_PUBLIC_|AWS_REGION|DYNAMODB_)' | sed 's/=.*/=<REDACTED>/' || true
+        - npm ci --cache .npm --prefer-offline
+    build:
+      commands:
+        # CRITICAL: Amplify Hosting Gen 1 for Next.js SSR does NOT propagate
+        # Console env vars to the runtime Lambda automatically. Workaround:
+        # dump them into .env.production at build time so Next.js bundles
+        # them. NEXT_PUBLIC_* vars get inlined into the client bundle,
+        # server-only vars get loaded by Next at SSR runtime.
+        - touch .env.production
+        - echo "Writing env vars to .env.production"
+        - env | grep -E '^ANTHROPIC_API_KEY=' >> .env.production || true
+        - env | grep -E '^ALLOW_ANONYMOUS_USERS=' >> .env.production || true
+        - env | grep -E '^CRON_SECRET=' >> .env.production || true
+        - env | grep -E '^RESEND_API_KEY=' >> .env.production || true
+        - env | grep -E '^WEEKLY_CHECK_DISABLED=' >> .env.production || true
+        - env | grep -E '^WEEKLY_CHECK_BATCH_SIZE=' >> .env.production || true
+        - env | grep -E '^DYNAMODB_TABLE_PREFIX=' >> .env.production || true
+        - env | grep -E '^NEXT_PUBLIC_' >> .env.production || true
+        - echo "=== .env.production keys (values redacted) ==="
+        - sed 's/=.*/=<REDACTED>/' .env.production || true
+        - npm run build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - .next/cache/**/*
+      - .npm/**/*
+      - node_modules/**/*
