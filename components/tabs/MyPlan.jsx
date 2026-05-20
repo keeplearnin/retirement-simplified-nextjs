@@ -1343,7 +1343,7 @@ export default function MyPlan() {
     <div className="slide-in myplan-layout">
       {/* ============ INPUTS SIDEBAR ============ */}
       <div className="myplan-inputs">
-        <Collapsible title="Personal Info" defaultOpen={true} badge={plan.hasSpouse ? `Couple, ages ${plan.currentAge}/${plan.spouseCurrentAge}` : `Age ${plan.currentAge}, retire ${plan.retireAge}`}>
+        <Collapsible title="Personal Info" defaultOpen={false} badge={plan.hasSpouse ? `Couple, ages ${plan.currentAge}/${plan.spouseCurrentAge}` : `Age ${plan.currentAge}, retire ${plan.retireAge}`}>
           {/* Household-type toggle — lets a single user enable couples mode after onboarding */}
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -1426,7 +1426,7 @@ export default function MyPlan() {
           </div>
         </Collapsible>
 
-        <Collapsible title="Savings & Portfolio" defaultOpen={true} badge={fmt(results.startingBalance)}>
+        <Collapsible title="Savings & Portfolio" defaultOpen={false} badge={fmt(results.startingBalance)}>
           <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, fontWeight: 600 }}>{plan.hasSpouse ? 'Your retirement accounts' : 'Retirement Accounts'}</div>
           <Slider label="401(k) / 403(b)" value={plan.savings401k} onChange={v => updatePlan('savings401k', v)} min={0} max={3000000} step={5000} format={fmt} />
           <Slider label="Roth IRA" value={plan.savingsRoth} onChange={v => updatePlan('savingsRoth', v)} min={0} max={1000000} step={5000} format={fmt} />
@@ -1472,7 +1472,7 @@ export default function MyPlan() {
           </div>
         </Collapsible>
 
-        <Collapsible title="Income Sources" badge={`${plan.incomeSources.length} source${plan.incomeSources.length !== 1 ? 's' : ''}`}>
+        <Collapsible title="Income Sources" defaultOpen={false} badge={`${plan.incomeSources.length} source${plan.incomeSources.length !== 1 ? 's' : ''}`}>
           {plan.incomeSources.map(src => (
             <IncomeSourceCard
               key={src.id}
@@ -1522,7 +1522,7 @@ export default function MyPlan() {
         </Collapsible>
 
         {/* ---- Debts ---- */}
-        <Collapsible title="Debts" defaultOpen={(plan.debts || []).length > 0} badge={(plan.debts || []).length > 0 ? `${fmt((plan.debts || []).reduce((s, d) => s + d.monthlyPayment, 0))}/mo` : 'None'}>
+        <Collapsible title="Debts" defaultOpen={false} badge={(plan.debts || []).length > 0 ? `${fmt((plan.debts || []).reduce((s, d) => s + d.monthlyPayment, 0))}/mo` : 'None'}>
           {(plan.debts || []).map(debt => (
             <DebtCard
               key={debt.id}
@@ -1571,7 +1571,7 @@ export default function MyPlan() {
           </div>
         </Collapsible>
 
-        <Collapsible title="Expenses" defaultOpen={true} badge={expenseMode === 'simple' ? fmt(plan.annualSpending) + '/yr' : fmt(detailedTotal) + '/yr'}>
+        <Collapsible title="Expenses" defaultOpen={false} badge={expenseMode === 'simple' ? fmt(plan.annualSpending) + '/yr' : fmt(detailedTotal) + '/yr'}>
           <div style={{ display: 'flex', gap: 2, background: 'var(--bg)', borderRadius: 20, padding: 2, marginBottom: 16, width: 'fit-content' }}>
             {['simple', 'detailed'].map(mode => (
               <button key={mode} onClick={() => updatePlan('expenseMode', mode)} style={{
