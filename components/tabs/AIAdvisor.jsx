@@ -755,6 +755,36 @@ export default function AIAdvisor() {
                     }}
                   />
                 )}
+
+                <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
+                    🤖 Replay setup
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
+                    Re-open the onboarding chooser to walk through plan setup again. Your existing plan stays — you can update fields conversationally instead of editing the form.
+                  </div>
+                  <button
+                    onClick={() => {
+                      setActivePanel(null);
+                      if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new Event('replay-onboarding'));
+                      }
+                    }}
+                    style={{
+                      background: 'transparent',
+                      color: 'var(--accent)',
+                      border: '1px solid var(--accent)',
+                      borderRadius: 8,
+                      padding: '6px 14px',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      fontFamily: 'var(--sans)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Replay onboarding
+                  </button>
+                </div>
               </div>
             )}
           </div>

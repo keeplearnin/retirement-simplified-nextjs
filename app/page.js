@@ -36,7 +36,12 @@ function AppContent() {
   useEffect(() => {
     setTimeout(() => setLoaded(true), 100);
     const handler = (e) => setTab(e.detail);
+    const replayHandler = () => {
+      localStorage.removeItem('retirement-onboarded');
+      setOnboarded(false);
+    };
     window.addEventListener('navigate-tab', handler);
+    window.addEventListener('replay-onboarding', replayHandler);
     // Restore saved theme
     const saved = localStorage.getItem('theme');
     if (saved === 'light' || saved === 'dark') {
@@ -47,7 +52,10 @@ function AppContent() {
     const hasOnboarded = localStorage.getItem('retirement-onboarded') === 'true';
     const hasPlan = localStorage.getItem('myplan-v1') !== null;
     setOnboarded(hasOnboarded || hasPlan);
-    return () => window.removeEventListener('navigate-tab', handler);
+    return () => {
+      window.removeEventListener('navigate-tab', handler);
+      window.removeEventListener('replay-onboarding', replayHandler);
+    };
   }, []);
 
   function toggleTheme() {
