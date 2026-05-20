@@ -4,11 +4,13 @@ import { useState } from 'react';
 import Slider from '@/components/ui/Slider';
 import { usePlan } from '@/components/PlanProvider';
 import { fmt } from '@/lib/format';
+import OnboardingChat from '@/components/OnboardingChat';
 
 const STEPS = ['Welcome', 'Age & Timeline', 'Income', 'Savings'];
 
 export default function Onboarding({ onComplete }) {
   const { plan, updatePlan, bulkUpdate } = usePlan();
+  const [mode, setMode] = useState('chooser'); // 'chooser' | 'chat' | 'form'
   const [step, setStep] = useState(0);
 
   // Household type — Phase B: gates the spouse inputs on subsequent steps.
@@ -125,6 +127,110 @@ export default function Onboarding({ onComplete }) {
     </div>
   );
 
+  // ---- Mode router ----
+  if (mode === 'chat') {
+    return (
+      <div className="onboarding-overlay">
+        <div className="onboarding-card" style={{ padding: '32px 24px' }}>
+          <button onClick={skip} style={{
+            position: 'absolute', top: 16, right: 20,
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: 'var(--text-dim)', fontSize: 12, fontFamily: 'var(--sans)',
+          }}>
+            Skip
+          </button>
+          <OnboardingChat
+            onComplete={onComplete}
+            onSwitchToForm={() => setMode('form')}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === 'chooser') {
+    return (
+      <div className="onboarding-overlay">
+        <div className="onboarding-card">
+          <button onClick={skip} style={{
+            position: 'absolute', top: 16, right: 20,
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: 'var(--text-dim)', fontSize: 12, fontFamily: 'var(--sans)',
+          }}>
+            Skip
+          </button>
+          <div style={{ textAlign: 'center', padding: '8px 0' }}>
+            <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--serif)', marginBottom: 8 }}>
+              Welcome to Retire<span style={{ color: 'var(--accent)' }}>.</span>Simplified
+            </div>
+            <div style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 28, maxWidth: 380, margin: '0 auto 28px' }}>
+              How would you like to set up your retirement plan?
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 420, margin: '0 auto' }}>
+              <button
+                onClick={() => setMode('chat')}
+                style={{
+                  background: 'var(--accent)',
+                  color: 'var(--bg)',
+                  border: 'none',
+                  borderRadius: 12,
+                  padding: '16px 20px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  fontFamily: 'var(--sans)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 14,
+                  transition: 'transform 0.1s',
+                }}
+                onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.98)')}
+                onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+              >
+                <span style={{ fontSize: 28 }}>🤖</span>
+                <span style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700 }}>Chat with the AI</div>
+                  <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>5 questions, about 3 minutes</div>
+                </span>
+                <span style={{ fontSize: 18, opacity: 0.7 }}>→</span>
+              </button>
+
+              <button
+                onClick={() => setMode('form')}
+                style={{
+                  background: 'var(--bg2)',
+                  color: 'var(--text)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 12,
+                  padding: '16px 20px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  fontFamily: 'var(--sans)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 14,
+                }}
+              >
+                <span style={{ fontSize: 28 }}>📝</span>
+                <span style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700 }}>Fill in the form myself</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>4 steps, about 5 minutes</div>
+                </span>
+                <span style={{ fontSize: 18, color: 'var(--text-muted)' }}>→</span>
+              </button>
+            </div>
+
+            <div style={{ marginTop: 20, fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+              Either way, you can edit everything later in My Plan.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // mode === 'form' — original step-based flow
   return (
     <div className="onboarding-overlay">
       <div className="onboarding-card">
