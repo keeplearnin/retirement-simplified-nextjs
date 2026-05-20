@@ -19,8 +19,10 @@ import {
 } from '@/lib/quarterlyReview';
 
 export default function AIAdvisor() {
-  const { plan, updatePlan } = usePlan();
+  const { plan, updatePlan, updateIncome } = usePlan();
   const [messages, setMessages] = useState([]);
+  const [toast, setToast] = useState(null);
+  const [appliedProposalIds, setAppliedProposalIds] = useState(() => new Set());
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [healthReport, setHealthReport] = useState(null);
@@ -206,6 +208,36 @@ export default function AIAdvisor() {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
   }, [messages, loading]);
 
+  function showToast(text) {
+    setToast(text);
+    setTimeout(() => setToast((t) => (t === text ? null : t)), 3000);
+  }
+
+  function applyProposal(proposal) {
+    if (!proposal || !proposal.target) return;
+    if (appliedProposalIds.has(proposal.id)) return;
+    try {
+      if (proposal.target.kind === 'planField') {
+        updatePlan(proposal.target.key, proposal.newValue);
+      } else if (proposal.target.kind === 'incomeSource') {
+        const src = (plan.incomeSources || []).find((s) => s.id === proposal.target.sourceId);
+        if (!src) {
+          showToast('Could not find the income source on your plan.');
+          return;
+        }
+        updateIncome(src.id, { ...src, [proposal.target.subfield]: proposal.newValue });
+      }
+      setAppliedProposalIds((prev) => {
+        const next = new Set(prev);
+        next.add(proposal.id);
+        return next;
+      });
+      showToast(`Applied — ${proposal.applyLabel}.`);
+    } catch (err) {
+      showToast(`Could not apply: ${err?.message || 'unknown error'}`);
+    }
+  }
+
   async function sendMessage(text) {
     const trimmed = (text || '').trim();
     if (!trimmed) return;
@@ -232,7 +264,10 @@ export default function AIAdvisor() {
         ]);
         return;
       }
-      setMessages((prev) => [...prev, { role: 'assistant', content: data.text }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: data.text, proposedChanges: data.proposedChanges || [] },
+      ]);
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -1100,22 +1135,73 @@ export default function AIAdvisor() {
                 <div
                   key={i}
                   style={{
-                    alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                    background:
-                      msg.role === 'user'
-                        ? 'linear-gradient(135deg, var(--accent), #2dd4a0)'
-                        : 'var(--bg2)',
-                    color: msg.role === 'user' ? 'var(--bg)' : 'var(--text)',
-                    padding: '10px 14px',
-                    borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                    gap: 6,
                     maxWidth: '80%',
-                    fontSize: 14,
-                    lineHeight: 1.5,
-                    whiteSpace: 'pre-wrap',
-                    fontFamily: 'var(--sans)',
+                    alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
                   }}
                 >
-                  {msg.content}
+                  <div
+                    style={{
+                      background:
+                        msg.role === 'user'
+                          ? 'linear-gradient(135deg, var(--accent), #2dd4a0)'
+                          : 'var(--bg2)',
+                      color: msg.role === 'user' ? 'var(--bg)' : 'var(--text)',
+                      padding: '10px 14px',
+                      borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                      fontSize: 14,
+                      lineHeight: 1.5,
+                      whiteSpace: 'pre-wrap',
+                      fontFamily: 'var(--sans)',
+                    }}
+                  >
+                    {msg.content}
+                  </div>
+                  {msg.role === 'assistant' && msg.proposedChanges?.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+                      {msg.proposedChanges.map((p) => {
+                        const applied = appliedProposalIds.has(p.id);
+                        return (
+                          <button
+                            key={p.id}
+                            onClick={() => applyProposal(p)}
+                            disabled={applied}
+                            style={{
+                              textAlign: 'left',
+                              background: applied ? 'var(--bg2)' : 'var(--accent-dim, rgba(16,185,129,0.10))',
+                              color: applied ? 'var(--text-muted)' : 'var(--accent)',
+                              border: `1px solid ${applied ? 'var(--border)' : 'var(--accent)'}`,
+                              borderRadius: 10,
+                              padding: '8px 12px',
+                              fontSize: 12,
+                              fontWeight: 600,
+                              fontFamily: 'var(--sans)',
+                              cursor: applied ? 'default' : 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 10,
+                            }}
+                            title={p.rationale}
+                          >
+                            <span>
+                              {applied ? '✓ Applied: ' : 'Apply: '}
+                              {p.applyLabel}
+                              {p.currentValue != null && !applied && (
+                                <span style={{ color: 'var(--text-muted)', fontWeight: 500, marginLeft: 6 }}>
+                                  (currently {String(p.currentValue)})
+                                </span>
+                              )}
+                            </span>
+                            {!applied && <span aria-hidden>→</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               ))}
               {loading && (
@@ -1177,6 +1263,28 @@ export default function AIAdvisor() {
           Send
         </button>
       </div>
+
+      {toast && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'var(--accent)',
+            color: 'var(--bg)',
+            padding: '10px 18px',
+            borderRadius: 999,
+            fontFamily: 'var(--sans)',
+            fontSize: 13,
+            fontWeight: 600,
+            boxShadow: '0 6px 20px rgba(0,0,0,0.25)',
+            zIndex: 1000,
+          }}
+        >
+          {toast}
+        </div>
+      )}
 
       <style>{`
         @keyframes fade {

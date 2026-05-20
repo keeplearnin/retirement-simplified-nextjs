@@ -24,6 +24,7 @@ export async function POST(request) {
     // Agentic loop — keep calling Claude until it stops requesting tools
     let loopMessages = messages.map((m) => ({ role: m.role, content: m.content }));
     let iterations = 0;
+    const proposedChanges = [];
 
     while (iterations < MAX_TOOL_ITERATIONS) {
       iterations++;
@@ -60,7 +61,7 @@ export async function POST(request) {
             ?.filter((c) => c.type === 'text')
             .map((c) => c.text)
             .join('\n') || 'Sorry, I had trouble responding.';
-        return NextResponse.json({ text });
+        return NextResponse.json({ text, proposedChanges });
       }
 
       // Claude wants to use tools — execute them and continue the loop
@@ -73,6 +74,16 @@ export async function POST(request) {
         // Execute each tool and collect results
         const toolResults = toolUseBlocks.map((block) => {
           const result = executeTool(block.name, block.input, plan || {}, planHistory || []);
+          // Side-channel: collect propose_plan_change proposals for the client.
+          if (
+            block.name === 'propose_plan_change' &&
+            result.result &&
+            typeof result.result === 'object' &&
+            result.result.ok &&
+            result.result.recorded
+          ) {
+            proposedChanges.push(result.result.recorded);
+          }
           return {
             type: 'tool_result',
             tool_use_id: block.id,
@@ -92,12 +103,13 @@ export async function POST(request) {
           ?.filter((c) => c.type === 'text')
           .map((c) => c.text)
           .join('\n') || 'Sorry, I had trouble responding.';
-      return NextResponse.json({ text });
+      return NextResponse.json({ text, proposedChanges });
     }
 
     // Hit iteration limit — return a graceful fallback
     return NextResponse.json({
       text: "I ran into a complex calculation. Please try rephrasing your question.",
+      proposedChanges,
     });
   } catch (e) {
     console.error('Chat route error:', e);

@@ -984,6 +984,206 @@ function executeAnalyzePortfolioRecommendations(plan: Record<string, unknown>) {
 }
 
 // ---------------------------------------------------------------------------
+// Tool 12: propose_plan_change
+// Records a proposed change to the user's plan so the chat UI can render an
+// "Apply" button. The tool does NOT mutate the plan — it returns an ack to
+// the agent. The route handler aggregates proposals and returns them to the
+// client alongside the assistant text.
+// ---------------------------------------------------------------------------
+
+interface ProposableFieldSpec {
+  label: string;
+  type: 'number' | 'boolean';
+  bounds?: [number, number];
+}
+
+const PROPOSABLE_PLAN_FIELDS: Record<string, ProposableFieldSpec> = {
+  retireAge: { label: 'retirement age', type: 'number', bounds: [40, 95] },
+  longevityAge: { label: 'longevity age', type: 'number', bounds: [60, 110] },
+  spouseRetireAge: { label: "spouse's retirement age", type: 'number', bounds: [40, 95] },
+  spouseLongevityAge: { label: "spouse's longevity age", type: 'number', bounds: [60, 110] },
+  monthlyContribution: { label: 'monthly contribution', type: 'number', bounds: [0, 100_000] },
+  spouseMonthlyContribution: { label: "spouse's monthly contribution", type: 'number', bounds: [0, 100_000] },
+  annualSpending: { label: 'annual working-years spending', type: 'number', bounds: [0, 2_000_000] },
+  retireSpending: { label: 'annual retirement spending', type: 'number', bounds: [0, 2_000_000] },
+  expectedReturn: { label: 'expected return', type: 'number', bounds: [0, 15] },
+  inflationRate: { label: 'inflation rate', type: 'number', bounds: [0, 15] },
+  useRealEstateInRetirement: { label: 'draw real estate in retirement', type: 'boolean' },
+};
+
+const PROPOSABLE_INCOME_SUBFIELDS: Record<string, ProposableFieldSpec> = {
+  startAge: { label: 'start age', type: 'number', bounds: [50, 75] },
+  endAge: { label: 'end age', type: 'number', bounds: [40, 100] },
+  monthlyBenefit: { label: 'monthly benefit', type: 'number', bounds: [0, 10_000] },
+  monthlyAmount: { label: 'monthly amount', type: 'number', bounds: [0, 50_000] },
+  amount: { label: 'annual amount', type: 'number', bounds: [0, 2_000_000] },
+  growthRate: { label: 'growth rate', type: 'number', bounds: [0, 15] },
+};
+
+const ALLOWED_INCOME_OWNERS = new Set(['primary', 'spouse']);
+const ALLOWED_INCOME_TYPES = new Set(['salary', 'socialSecurity', 'pension', 'partTime', 'rental', 'annuity']);
+
+const proposePlanChangeDefinition: ToolDefinition = {
+  name: 'propose_plan_change',
+  description:
+    "Record a single proposed change to the user's plan so the UI can offer them a one-click \"Apply\" button. This does NOT mutate the plan. Call this any time you recommend a specific numeric or boolean change to a plan field (e.g. delay SS to 70, increase monthly contribution to $2500, set retireAge to 67). Allowed `field` values are either a top-level plan field (e.g. \"retireAge\", \"monthlyContribution\", \"useRealEstateInRetirement\") or an income-source path of the form \"incomeSources.<owner>.<type>.<subfield>\" where owner is primary|spouse, type is salary|socialSecurity|pension|partTime, subfield is startAge|endAge|monthlyBenefit|monthlyAmount|amount|growthRate. Example: \"incomeSources.primary.socialSecurity.startAge\".",
+  input_schema: {
+    type: 'object',
+    properties: {
+      field: {
+        type: 'string',
+        description:
+          'Plan field path. Either a top-level field name or "incomeSources.<owner>.<type>.<subfield>".',
+      },
+      newValue: {
+        description: 'The proposed new value. Numbers in natural units (years for ages, dollars for amounts, percent for rates).',
+      },
+      rationale: {
+        type: 'string',
+        description: "Short (1-2 sentence) reason for the change. Shown in the chat as the proposal's explanation.",
+      },
+    },
+    required: ['field', 'newValue', 'rationale'],
+  },
+};
+
+export interface ProposedChange {
+  id: string;
+  field: string;
+  newValue: number | boolean;
+  currentValue: number | boolean | null;
+  rationale: string;
+  applyLabel: string;
+  // For income-source proposals, the resolved target so the client can apply
+  // it without re-parsing the path.
+  target:
+    | { kind: 'planField'; key: string }
+    | { kind: 'incomeSource'; sourceId: number | string; subfield: string };
+}
+
+function humanizeField(spec: ProposableFieldSpec, newValue: number | boolean): string {
+  if (spec.type === 'boolean') {
+    return `${newValue ? 'Enable' : 'Disable'} ${spec.label}`;
+  }
+  return `Set ${spec.label} to ${newValue}`;
+}
+
+function humanizeIncomeField(
+  owner: string,
+  type: string,
+  subfield: string,
+  spec: ProposableFieldSpec,
+  newValue: number | boolean,
+): string {
+  const typeLabels: Record<string, string> = {
+    socialSecurity: 'SS',
+    pension: 'pension',
+    salary: 'salary',
+    partTime: 'part-time',
+    rental: 'rental',
+    annuity: 'annuity',
+  };
+  const prefix = owner === 'spouse' ? "spouse's " : '';
+  const t = typeLabels[type] ?? type;
+  return `Set ${prefix}${t} ${spec.label} to ${newValue}`;
+}
+
+export function validateProposedChange(
+  plan: Record<string, unknown>,
+  input: { field?: unknown; newValue?: unknown; rationale?: unknown },
+): { ok: true; proposal: ProposedChange } | { ok: false; error: string } {
+  const field = typeof input.field === 'string' ? input.field : '';
+  const rationale = typeof input.rationale === 'string' ? input.rationale.trim() : '';
+  if (!field) return { ok: false, error: 'Missing field.' };
+  if (!rationale) return { ok: false, error: 'Missing rationale.' };
+
+  // Income source path
+  if (field.startsWith('incomeSources.')) {
+    const parts = field.split('.');
+    if (parts.length !== 4) {
+      return { ok: false, error: `Invalid income path: ${field}. Expected incomeSources.<owner>.<type>.<subfield>.` };
+    }
+    const [, owner, type, subfield] = parts;
+    if (!ALLOWED_INCOME_OWNERS.has(owner)) return { ok: false, error: `Unknown owner: ${owner}` };
+    if (!ALLOWED_INCOME_TYPES.has(type)) return { ok: false, error: `Unknown income type: ${type}` };
+    const spec = PROPOSABLE_INCOME_SUBFIELDS[subfield];
+    if (!spec) return { ok: false, error: `Subfield ${subfield} not proposable.` };
+
+    const sources = (plan.incomeSources as Array<Record<string, unknown>>) ?? [];
+    const src = sources.find(
+      (s) => s.type === type && ((s.owner as string | undefined) ?? 'primary') === owner,
+    );
+    if (!src) {
+      return { ok: false, error: `No ${owner} ${type} income source on the plan.` };
+    }
+
+    const coerced = coerceValue(spec, input.newValue);
+    if (coerced === null) {
+      return { ok: false, error: `Value ${String(input.newValue)} out of range for ${field}.` };
+    }
+    const currentRaw = src[subfield];
+    const currentValue =
+      typeof currentRaw === 'number' || typeof currentRaw === 'boolean' ? currentRaw : null;
+
+    return {
+      ok: true,
+      proposal: {
+        id: `prop_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+        field,
+        newValue: coerced,
+        currentValue,
+        rationale,
+        applyLabel: humanizeIncomeField(owner, type, subfield, spec, coerced),
+        target: {
+          kind: 'incomeSource',
+          sourceId: (src.id as number | string) ?? `${owner}-${type}`,
+          subfield,
+        },
+      },
+    };
+  }
+
+  // Top-level plan field
+  const spec = PROPOSABLE_PLAN_FIELDS[field];
+  if (!spec) {
+    return { ok: false, error: `Field ${field} is not proposable.` };
+  }
+  const coerced = coerceValue(spec, input.newValue);
+  if (coerced === null) {
+    return { ok: false, error: `Value ${String(input.newValue)} out of range for ${field}.` };
+  }
+  const currentRaw = plan[field];
+  const currentValue =
+    typeof currentRaw === 'number' || typeof currentRaw === 'boolean' ? currentRaw : null;
+
+  return {
+    ok: true,
+    proposal: {
+      id: `prop_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+      field,
+      newValue: coerced,
+      currentValue,
+      rationale,
+      applyLabel: humanizeField(spec, coerced),
+      target: { kind: 'planField', key: field },
+    },
+  };
+}
+
+function coerceValue(spec: ProposableFieldSpec, value: unknown): number | boolean | null {
+  if (spec.type === 'boolean') {
+    if (typeof value === 'boolean') return value;
+    if (value === 'true' || value === 1) return true;
+    if (value === 'false' || value === 0) return false;
+    return null;
+  }
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) return null;
+  if (spec.bounds && (n < spec.bounds[0] || n > spec.bounds[1])) return null;
+  return n;
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -999,6 +1199,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   analyzeWithdrawalOrderDefinition,
   runFullOptimizationDefinition,
   analyzePortfolioRecommendationsDefinition,
+  proposePlanChangeDefinition,
 ];
 
 export function executeTool(
@@ -1044,6 +1245,16 @@ export function executeTool(
       case 'analyze_portfolio_recommendations':
         result = executeAnalyzePortfolioRecommendations(plan);
         break;
+      case 'propose_plan_change': {
+        const validation = validateProposedChange(plan, toolInput);
+        if (validation.ok === false) {
+          return { toolName, result: { ok: false, error: validation.error } };
+        }
+        // The route handler is responsible for collecting the proposal — we
+        // attach it to the result so the caller can read it off the ToolResult.
+        result = { ok: true, recorded: validation.proposal };
+        break;
+      }
       default:
         return { toolName, result: null, error: `Unknown tool: ${toolName}` };
     }
