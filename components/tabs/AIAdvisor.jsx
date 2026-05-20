@@ -28,6 +28,7 @@ export default function AIAdvisor() {
   const [optimizeReport, setOptimizeReport] = useState(null);
   const [optimizeLoading, setOptimizeLoading] = useState(false);
   const [optimizeError, setOptimizeError] = useState(null);
+  const [reasoningOpen, setReasoningOpen] = useState(false);
   const [insights, setInsights] = useState(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [reviewReport, setReviewReport] = useState(null);
@@ -855,6 +856,76 @@ export default function AIAdvisor() {
                             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{value}</div>
                           </div>
                         ))}
+                      </div>
+                    )}
+                    {optimizeReport.reasoningSteps?.length > 0 && (
+                      <div style={{ marginBottom: 10 }}>
+                        <button
+                          onClick={() => setReasoningOpen((v) => !v)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            padding: 0,
+                            cursor: 'pointer',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: 'var(--text-muted)',
+                            textTransform: 'uppercase',
+                            letterSpacing: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                          aria-expanded={reasoningOpen}
+                        >
+                          <span style={{ display: 'inline-block', transform: reasoningOpen ? 'rotate(90deg)' : 'none', transition: 'transform 120ms' }}>▸</span>
+                          See reasoning ({optimizeReport.reasoningSteps.length} steps)
+                        </button>
+                        {reasoningOpen && (
+                          <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            {optimizeReport.reasoningSteps.map((s) => (
+                              <div
+                                key={s.step}
+                                style={{
+                                  display: 'flex',
+                                  gap: 8,
+                                  background: 'var(--bg)',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: 6,
+                                  padding: '6px 8px',
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: 800,
+                                    color: 'var(--text-muted)',
+                                    minWidth: 16,
+                                    lineHeight: '16px',
+                                  }}
+                                >
+                                  {s.step}.
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: 12, color: 'var(--text)' }}>
+                                    {s.action}
+                                    {s.finding && (
+                                      <>
+                                        {' — '}
+                                        <strong>{s.finding}</strong>
+                                      </>
+                                    )}
+                                  </div>
+                                  {s.nextAction && (
+                                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                                      → {s.nextAction}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                     {optimizeReport.actions?.length > 0 && (
