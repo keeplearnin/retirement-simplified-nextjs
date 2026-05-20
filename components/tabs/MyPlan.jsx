@@ -222,7 +222,7 @@ function generateSuggestions(plan, results) {
 // SVG Area Chart
 // ---------------------------------------------------------------------------
 
-function IncomeExpenseChart({ projections, retireAge }) {
+function IncomeExpenseChart({ projections, retireAge, plan }) {
   const W = 700, H = 360, PAD = { top: 24, right: 20, bottom: 44, left: 70 };
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
@@ -303,6 +303,17 @@ function IncomeExpenseChart({ projections, retireAge }) {
   // SuccessScore's brokeAge — keeps the two displays consistent.)
   const liquidExhaustedAtAge = projections.find(p => p.isRetired && p.availableBalance <= 0 && p.gap < 0)?.age;
   const legacy = totalLegacy;
+
+  // Couples: the projection runs until the LONGER-lived spouse dies, so
+  // maxAge reflects the spouse's longevity in the primary's age frame —
+  // not the user's own longevityAge. Compute both so the label is honest.
+  const userLongevity = plan?.longevityAge ?? maxAge;
+  const hasSpouse = !!plan?.hasSpouse;
+  const primaryDeathRow = hasSpouse ? projections.find(p => p.age === userLongevity) : null;
+  const legacyAtUserDeath = primaryDeathRow
+    ? (primaryDeathRow.portfolioEndBalance ?? primaryDeathRow.portfolioBalance ?? 0)
+    : null;
+  const projectionExtendsBeyondUser = hasSpouse && maxAge > userLongevity;
 
   return (
     <div>
@@ -460,10 +471,20 @@ function IncomeExpenseChart({ projections, retireAge }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>Estate / Legacy for Family</div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Projected portfolio remaining at age {maxAge}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                {projectionExtendsBeyondUser
+                  ? `Projected portfolio at end of plan — you ${userLongevity} / spouse ${maxAge}`
+                  : `Projected portfolio remaining at age ${maxAge}`}
+              </div>
             </div>
             <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--accent)', fontFamily: 'var(--sans)' }}>{fmt(legacy)}</div>
           </div>
+          {projectionExtendsBeyondUser && legacyAtUserDeath !== null && (
+            <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(52,211,153,0.15)', fontSize: 11, color: 'var(--text-dim)', display: 'flex', justifyContent: 'space-between' }}>
+              <span>At your longevity (age {userLongevity}): <strong style={{ color: 'var(--text)' }}>{fmt(legacyAtUserDeath)}</strong></span>
+              <span style={{ opacity: 0.7 }}>passed to surviving spouse</span>
+            </div>
+          )}
           {illiquidLegacy > 1000 && (
             <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid rgba(52,211,153,0.15)', fontSize: 11, color: 'var(--text-dim)', display: 'flex', justifyContent: 'space-between' }}>
               <span>{fmt(liquidLegacy)} liquid · {fmt(illiquidLegacy)} real estate / 529</span>
@@ -477,7 +498,7 @@ function IncomeExpenseChart({ projections, retireAge }) {
             <div>
               <div style={{ fontSize: 12, fontWeight: 600, color: '#f59e0b' }}>Legacy is illiquid — spendable savings exhausted at age {liquidExhaustedAtAge}</div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5, marginTop: 4 }}>
-                Total of {fmt(legacy)} at age {maxAge} = <strong>{fmt(liquidLegacy)} liquid</strong> + <strong>{fmt(illiquidLegacy)} real estate / 529</strong>. The illiquid portion isn't available for spending without selling the underlying assets — late-life expenses from age {liquidExhaustedAtAge} onward would require selling real estate, taking a reverse mortgage, or reducing spending. The plan score reflects this cash-flow gap, not the total net worth.
+                Total of {fmt(legacy)} at age {maxAge}{projectionExtendsBeyondUser ? ` (longer-lived spouse's longevity — you live to ${userLongevity})` : ''} = <strong>{fmt(liquidLegacy)} liquid</strong> + <strong>{fmt(illiquidLegacy)} real estate / 529</strong>. The illiquid portion isn't available for spending without selling the underlying assets — late-life expenses from age {liquidExhaustedAtAge} onward would require selling real estate, taking a reverse mortgage, or reducing spending. The plan score reflects this cash-flow gap, not the total net worth.
               </div>
             </div>
             <div style={{ fontSize: 18, fontWeight: 700, color: '#f59e0b', fontFamily: 'var(--sans)', flexShrink: 0 }}>{fmt(legacy)}</div>
@@ -1817,7 +1838,7 @@ export default function MyPlan() {
 
         <div className="glass-card" style={{ padding: '16px 20px' }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>Income vs. Expenses</div>
-          <IncomeExpenseChart projections={combined} retireAge={plan.retireAge} />
+          <IncomeExpenseChart projections={combined} retireAge={plan.retireAge} plan={plan} />
         </div>
       </div>
 
