@@ -21,8 +21,15 @@ import {
 export default function AIAdvisor() {
   const { plan, updatePlan, updateIncome } = usePlan();
   const [messages, setMessages] = useState([]);
-  const [toast, setToast] = useState(null);
+  const [toast, setToast] = useState(null); // null | { text, undo?: () => void }
   const [appliedProposalIds, setAppliedProposalIds] = useState(() => new Set());
+  // Map<proposalId, { previousValue, target }>. While an entry exists, the
+  // Apply button shows an inline "Undo" affordance for 30 seconds after the
+  // user clicks Apply. After expiry the entry is removed and the change
+  // becomes permanent (still editable via My Plan, but no one-click revert).
+  const [pendingUndo, setPendingUndo] = useState(() => new Map());
+  const undoTimersRef = useRef(new Map());      // proposalId → setTimeout handle
+  const toastTimerRef = useRef(null);            // active toast clear timer
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [healthReport, setHealthReport] = useState(null);
@@ -208,9 +215,56 @@ export default function AIAdvisor() {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
   }, [messages, loading]);
 
-  function showToast(text) {
-    setToast(text);
-    setTimeout(() => setToast((t) => (t === text ? null : t)), 3000);
+  // Toast supports an optional `undo` action that renders an inline button.
+  // Uses a single ref'd timer so rapid back-to-back toasts don't leak handles.
+  function showToast(text, options = {}) {
+    const { durationMs = 3000, undo } = options;
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    const payload = { text, undo };
+    setToast(payload);
+    toastTimerRef.current = setTimeout(() => {
+      setToast((t) => (t === payload ? null : t));
+      toastTimerRef.current = null;
+    }, durationMs);
+  }
+
+  function undoProposal(proposal) {
+    const entry = pendingUndo.get(proposal.id);
+    if (!entry) return;
+    try {
+      // Revert the field to its pre-apply value
+      if (entry.target.kind === 'planField') {
+        updatePlan(entry.target.key, entry.previousValue);
+      } else if (entry.target.kind === 'incomeSource') {
+        const src = (plan.incomeSources || []).find((s) => s.id === entry.target.sourceId);
+        if (src) {
+          updateIncome(src.id, { ...src, [entry.target.subfield]: entry.previousValue });
+        }
+      }
+      // Cancel the pending expiry timer
+      const handle = undoTimersRef.current.get(proposal.id);
+      if (handle) clearTimeout(handle);
+      undoTimersRef.current.delete(proposal.id);
+      // Remove from pendingUndo and from applied set so the button is
+      // re-Apply-able if the user changes their mind again.
+      setPendingUndo((prev) => {
+        const next = new Map(prev);
+        next.delete(proposal.id);
+        return next;
+      });
+      setAppliedProposalIds((prev) => {
+        const next = new Set(prev);
+        next.delete(proposal.id);
+        return next;
+      });
+      // Dismiss the toast immediately
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      setToast(null);
+      // Confirm with a short toast (no undo on the undo — that gets silly)
+      showToast(`Undone — restored to ${String(entry.previousValue ?? '—')}.`, { durationMs: 2500 });
+    } catch (err) {
+      showToast(`Could not undo: ${err?.message || 'unknown error'}`, { durationMs: 3500 });
+    }
   }
 
   // Read the LIVE current value of a proposal's target from the plan state
@@ -263,6 +317,10 @@ export default function AIAdvisor() {
       if (!ok) return;
     }
 
+    // Snapshot the pre-apply value so Undo can restore it. Read from the
+    // LIVE plan state, not the proposal's stale snapshot.
+    const previousValue = readLiveTargetValue(proposal.target);
+
     try {
       if (proposal.target.kind === 'planField') {
         updatePlan(proposal.target.key, proposal.newValue);
@@ -279,7 +337,34 @@ export default function AIAdvisor() {
         next.add(proposal.id);
         return next;
       });
-      showToast(`Applied — ${proposal.applyLabel}.`);
+
+      // Register an undo entry. Lives for 30s, then auto-expires and the
+      // change becomes permanent (button settles to "✓ Applied").
+      setPendingUndo((prev) => {
+        const next = new Map(prev);
+        next.set(proposal.id, { previousValue, target: proposal.target });
+        return next;
+      });
+      const existing = undoTimersRef.current.get(proposal.id);
+      if (existing) clearTimeout(existing);
+      undoTimersRef.current.set(
+        proposal.id,
+        setTimeout(() => {
+          setPendingUndo((prev) => {
+            const next = new Map(prev);
+            next.delete(proposal.id);
+            return next;
+          });
+          undoTimersRef.current.delete(proposal.id);
+        }, 30_000),
+      );
+
+      // Toast with inline Undo. Visible 5s; undo on the button persists
+      // for the full 30s window.
+      showToast(`Applied — ${proposal.applyLabel}.`, {
+        durationMs: 5000,
+        undo: () => undoProposal(proposal),
+      });
     } catch (err) {
       showToast(`Could not apply: ${err?.message || 'unknown error'}`);
     }
@@ -1269,6 +1354,7 @@ export default function AIAdvisor() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
                       {msg.proposedChanges.map((p) => {
                         const applied = appliedProposalIds.has(p.id);
+                        const canUndo = applied && pendingUndo.has(p.id);
                         // Show the LIVE value (not the LLM's snapshot). If
                         // the user edited the field since the AI suggested
                         // the change, the chip below the button surfaces
@@ -1276,41 +1362,74 @@ export default function AIAdvisor() {
                         const liveValue = readLiveTargetValue(p.target);
                         const llmSaw = p.currentValue;
                         const drift =
-                          llmSaw !== undefined && valuesDiffer(liveValue, llmSaw);
+                          !applied && llmSaw !== undefined && valuesDiffer(liveValue, llmSaw);
                         return (
-                          <button
+                          <div
                             key={p.id}
-                            onClick={() => applyProposal(p)}
-                            disabled={applied}
                             style={{
-                              textAlign: 'left',
-                              background: applied ? 'var(--bg2)' : 'var(--accent-dim, rgba(16,185,129,0.10))',
-                              color: applied ? 'var(--text-muted)' : 'var(--accent)',
-                              border: `1px solid ${applied ? 'var(--border)' : 'var(--accent)'}`,
-                              borderRadius: 10,
-                              padding: '8px 12px',
-                              fontSize: 12,
-                              fontWeight: 600,
-                              fontFamily: 'var(--sans)',
-                              cursor: applied ? 'default' : 'pointer',
                               display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              gap: 10,
+                              alignItems: 'stretch',
+                              gap: 0,
+                              borderRadius: 10,
+                              border: `1px solid ${applied ? 'var(--border)' : 'var(--accent)'}`,
+                              overflow: 'hidden',
                             }}
-                            title={drift ? `You changed this to ${String(liveValue)} since the AI suggested it.` : p.rationale}
                           >
-                            <span>
-                              {applied ? '✓ Applied: ' : 'Apply: '}
-                              {p.applyLabel}
-                              {liveValue != null && !applied && (
-                                <span style={{ color: drift ? 'var(--warn, #f59e0b)' : 'var(--text-muted)', fontWeight: 500, marginLeft: 6 }}>
-                                  (currently {String(liveValue)}{drift ? ' — you edited this' : ''})
-                                </span>
-                              )}
-                            </span>
-                            {!applied && <span aria-hidden>→</span>}
-                          </button>
+                            <button
+                              onClick={() => applyProposal(p)}
+                              disabled={applied}
+                              style={{
+                                flex: 1,
+                                textAlign: 'left',
+                                background: applied ? 'var(--bg2)' : 'var(--accent-dim, rgba(16,185,129,0.10))',
+                                color: applied ? 'var(--text-muted)' : 'var(--accent)',
+                                border: 'none',
+                                padding: '8px 12px',
+                                fontSize: 12,
+                                fontWeight: 600,
+                                fontFamily: 'var(--sans)',
+                                cursor: applied ? 'default' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: 10,
+                              }}
+                              title={drift ? `You changed this to ${String(liveValue)} since the AI suggested it.` : p.rationale}
+                            >
+                              <span>
+                                {applied ? '✓ Applied: ' : 'Apply: '}
+                                {p.applyLabel}
+                                {liveValue != null && !applied && (
+                                  <span style={{ color: drift ? 'var(--warn, #f59e0b)' : 'var(--text-muted)', fontWeight: 500, marginLeft: 6 }}>
+                                    (currently {String(liveValue)}{drift ? ' — you edited this' : ''})
+                                  </span>
+                                )}
+                              </span>
+                              {!applied && <span aria-hidden>→</span>}
+                            </button>
+                            {canUndo && (
+                              <button
+                                onClick={() => undoProposal(p)}
+                                aria-label="Undo this change"
+                                style={{
+                                  background: 'var(--bg)',
+                                  color: 'var(--accent)',
+                                  border: 'none',
+                                  borderLeft: '1px solid var(--border)',
+                                  padding: '0 14px',
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  fontFamily: 'var(--sans)',
+                                  cursor: 'pointer',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: 0.5,
+                                }}
+                                title="Undo (within 30 seconds)"
+                              >
+                                Undo
+                              </button>
+                            )}
+                          </div>
                         );
                       })}
                     </div>
@@ -1379,6 +1498,8 @@ export default function AIAdvisor() {
 
       {toast && (
         <div
+          role="status"
+          aria-live="polite"
           style={{
             position: 'fixed',
             bottom: 24,
@@ -1386,16 +1507,43 @@ export default function AIAdvisor() {
             transform: 'translateX(-50%)',
             background: 'var(--accent)',
             color: 'var(--bg)',
-            padding: '10px 18px',
+            padding: toast.undo ? '8px 8px 8px 18px' : '10px 18px',
             borderRadius: 999,
             fontFamily: 'var(--sans)',
             fontSize: 13,
             fontWeight: 600,
             boxShadow: '0 6px 20px rgba(0,0,0,0.25)',
             zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            maxWidth: 'calc(100vw - 48px)',
           }}
         >
-          {toast}
+          <span>{toast.text}</span>
+          {toast.undo && (
+            <button
+              onClick={() => {
+                const fn = toast.undo;
+                if (fn) fn();
+              }}
+              style={{
+                background: 'var(--bg)',
+                color: 'var(--accent)',
+                border: 'none',
+                borderRadius: 999,
+                padding: '4px 12px',
+                fontSize: 11,
+                fontWeight: 700,
+                fontFamily: 'var(--sans)',
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+              }}
+            >
+              Undo
+            </button>
+          )}
         </div>
       )}
 
