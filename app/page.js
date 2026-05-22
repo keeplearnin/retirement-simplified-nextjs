@@ -6,12 +6,17 @@ import { PlanProvider } from '@/components/PlanProvider';
 import Onboarding from '@/components/Onboarding';
 import Auth, { isConfigured } from '@/lib/auth';
 
-// Tab imports — only those wired into the nav categories below. Orphan
-// tabs (AccountDashboard, FeeImpact, Rebalance, TaxLossHarvesting,
-// ScenarioComparison, InvestingGuide, MyPlans, Journal, RiskQuiz,
-// LinkedAccounts) were removed from the bundle for launch. Their files
-// remain in components/tabs/ for future revival.
-import GrowthProjector from '@/components/tabs/GrowthProjector';
+// Tab imports — only those wired into the nav categories below.
+//
+// Removed from the bundle for the 3-category Plan/Coach/Learn launch
+// (originally a 5-category structure). Files retained for future revival:
+//   - GrowthProjector  (duplicated My Plan's results chart)
+//   - GoalPlanner      (folded into the retirement-age slider)
+//   - MyPlanV2         (alternate "Stress Test" view — same data twice)
+//
+// Earlier orphans still on the bench: AccountDashboard, FeeImpact, Rebalance,
+// TaxLossHarvesting, ScenarioComparison, InvestingGuide, MyPlans, Journal,
+// RiskQuiz, LinkedAccounts.
 import PortfolioBuilder from '@/components/tabs/PortfolioBuilder';
 import WithdrawalStrategy from '@/components/tabs/WithdrawalStrategy';
 import MonteCarlo from '@/components/tabs/MonteCarlo';
@@ -22,8 +27,6 @@ import RothLadder from '@/components/tabs/RothLadder';
 import GettingStarted from '@/components/tabs/GettingStarted';
 import AIAdvisor from '@/components/tabs/AIAdvisor';
 import MyPlan from '@/components/tabs/MyPlan';
-import MyPlanV2 from '@/components/tabs/MyPlanV2';
-import GoalPlanner from '@/components/tabs/GoalPlanner';
 
 function AppContent() {
   const [tab, setTab] = useState('myplan');
@@ -79,29 +82,29 @@ function AppContent() {
     localStorage.setItem('theme', next);
   }
 
+  // Three top-level categories — Plan, Coach, Learn. Earlier structure was
+  // five (My Plan / Build / Optimize / AI Advisor / Learn); compressed per
+  // design review. PortfolioBuilder moved into Plan; the six optimize
+  // workbench tabs moved under Coach alongside AI Advisor. Tab IDs are
+  // kept stable (myplan, portfolio, advisor, tax, ssa, ...) so any saved
+  // localStorage state and external links continue to resolve.
   const categories = [
-    { id: 'plan', label: 'My Plan', icon: '📊', tabs: [
-      { id: 'myplan', label: 'Plan' },
-      { id: 'myplan-v2', label: 'Stress Test' },
+    { id: 'plan', label: 'Plan', icon: '📊', tabs: [
+      { id: 'myplan', label: 'My Plan' },
+      { id: 'portfolio', label: 'Portfolio' },
     ]},
-    { id: 'build', label: 'Build', icon: '🎯', tabs: [
-      { id: 'portfolio', label: 'Portfolio Builder' },
-      { id: 'growth', label: 'Growth Projector' },
-      { id: 'goals', label: 'Goal Planner' },
-    ]},
-    // Ordered by the user's retirement-planning journey:
+    // Ordered as: chat first (the primary surface), then workbench tabs
+    // in the retirement-planning journey order:
     //   accumulation (Roth vs Trad) → income (SS) → conversion (Roth Ladder)
     //   → drawdown (Withdrawal) → educational (Torpedo) → sensitivity (MC)
-    { id: 'optimize', label: 'Optimize', icon: '⚡', tabs: [
+    { id: 'coach', label: 'Coach', icon: '🤖', tabs: [
+      { id: 'advisor', label: 'AI Advisor' },
       { id: 'tax', label: 'Roth vs Trad' },
       { id: 'ssa', label: 'Social Security' },
       { id: 'roth-ladder', label: 'Roth Ladder' },
       { id: 'withdrawal', label: 'Withdrawal' },
       { id: 'torpedo', label: 'Tax Torpedo' },
       { id: 'montecarlo', label: 'Monte Carlo' },
-    ]},
-    { id: 'advisor-cat', label: 'AI Advisor', icon: '🤖', tabs: [
-      { id: 'advisor', label: 'AI Advisor' },
     ]},
     { id: 'learn', label: 'Learn', icon: '💡', tabs: [
       { id: 'guide', label: 'Getting Started' },
@@ -285,18 +288,15 @@ function AppContent() {
           </div>
         )}
         {tab === 'myplan' && <MyPlan />}
-        {tab === 'myplan-v2' && <MyPlanV2 />}
-        {tab === 'growth' && <GrowthProjector />}
         {tab === 'portfolio' && <PortfolioBuilder />}
-        {tab === 'withdrawal' && <WithdrawalStrategy />}
-        {tab === 'montecarlo' && <MonteCarlo />}
+        {tab === 'advisor' && <AIAdvisor />}
         {tab === 'tax' && <TaxAware />}
         {tab === 'ssa' && <SocialSecurity />}
-        {tab === 'torpedo' && <TaxTorpedo />}
         {tab === 'roth-ladder' && <RothLadder />}
-        {tab === 'advisor' && <AIAdvisor />}
+        {tab === 'withdrawal' && <WithdrawalStrategy />}
+        {tab === 'torpedo' && <TaxTorpedo />}
+        {tab === 'montecarlo' && <MonteCarlo />}
         {tab === 'guide' && <GettingStarted />}
-        {tab === 'goals' && <GoalPlanner />}
       </main>
 
       <footer style={{ maxWidth: 700, margin: '0 auto', textAlign: 'center', padding: '28px 24px 40px', borderTop: '1px solid var(--border)' }}>
