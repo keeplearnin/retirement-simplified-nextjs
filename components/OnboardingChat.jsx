@@ -105,7 +105,23 @@ export default function OnboardingChat({ onComplete, onSwitchToForm }) {
     >
       <div style={{ marginBottom: 12 }}>
         <div style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
-          <span>🤖 Setup with AI · ~3 min</span>
+          <span>
+            🤖 Setup with AI
+            {!isDone && (() => {
+              // Count user replies as completed questions. Clamp display
+              // to 5 so a follow-up doesn't read "Question 7 of 5" — the
+              // ~5 framing is intentional since the agent can ask
+              // clarifications.
+              const answered = messages.filter((m) => m.role === 'user').length;
+              const step = Math.min(answered + 1, 5);
+              return (
+                <>
+                  {' · '}Question {step} of ~5
+                </>
+              );
+            })()}
+            {isDone && ' · Done'}
+          </span>
           <button
             onClick={onSwitchToForm}
             style={{

@@ -101,6 +101,12 @@ export default function Onboarding({ onComplete }) {
   }
 
   function skip() {
+    // Leave a flag so My Plan can show a "Finish setup" banner. Cleared
+    // when the user either replays onboarding or explicitly dismisses
+    // the banner.
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('retirement-onboarding-skipped', '1');
+    }
     onComplete();
   }
 

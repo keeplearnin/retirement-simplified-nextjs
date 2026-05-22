@@ -379,7 +379,9 @@ export default function AIAdvisor() {
 
   return (
     <div>
-      {/* What's New — single-line dismissible toast */}
+      {/* What's New — replaced with a single-line tour offer. The
+          feature catalogue lives in the Tour drawer, reachable from
+          Settings even after dismissal. */}
       {introOpen && (
         <div
           style={{
@@ -398,7 +400,23 @@ export default function AIAdvisor() {
           }}
         >
           <span>
-            ✨ <strong>New:</strong> real plan calculations · ⚡ Optimize · weekly health report · portfolio insights · email digest.
+            ✨ <strong>New here?</strong>{' '}
+            <button
+              onClick={() => setActivePanel('tour')}
+              style={{
+                background: 'transparent',
+                color: 'var(--accent)',
+                border: 'none',
+                padding: 0,
+                fontFamily: 'var(--sans)',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+                textDecoration: 'underline',
+              }}
+            >
+              Take the 30-second tour →
+            </button>
           </span>
           <button
             onClick={dismissIntro}
@@ -551,6 +569,7 @@ export default function AIAdvisor() {
                   ? 'Monthly Progress'
                   : 'Progress Review')}
               {activePanel === 'settings' && 'Settings'}
+              {activePanel === 'tour' && '✨ AI Advisor — 30-second tour'}
             </span>
             <button
               onClick={() => setActivePanel(null)}
@@ -1064,9 +1083,48 @@ export default function AIAdvisor() {
               </div>
             )}
 
+            {/* Tour panel — the actual feature catalogue that used to live
+                in the banner. Reachable from "New here? Take the tour" AND
+                from Settings → "Show tour" so dismissal isn't permanent. */}
+            {activePanel === 'tour' && (
+              <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>
+                <p style={{ margin: '0 0 12px', color: 'var(--text-muted)' }}>
+                  The AI Advisor reads your live retirement plan and runs real calculations on your numbers. Five things to know:
+                </p>
+                <ol style={{ margin: '0 0 12px', paddingLeft: 20 }}>
+                  <li><strong>Real plan calculations</strong> — Ask "am I on track" or "what if I retire at 62" and the AI runs the actual projection engine, not a generic answer.</li>
+                  <li><strong>⚡ Optimize My Plan</strong> — Click the green chip above for a multi-step analysis (SS timing + Roth conversion + withdrawal order) with dollar impact per change.</li>
+                  <li><strong>Plan health</strong> — Color-coded chip auto-runs every 7 days. Green = on track, yellow = needs attention.</li>
+                  <li><strong>Portfolio insights</strong> — Proactive recommendations on tax diversification, concentration, cash drag, etc.</li>
+                  <li><strong>Apply to My Plan</strong> — When the AI suggests a specific change ("claim SS at 70"), an inline button writes it to your plan with one click.</li>
+                </ol>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
+                  Educational tool only — not financial advice. Your data stays in your browser unless you sign in.
+                </p>
+              </div>
+            )}
+
             {/* Settings panel */}
             {activePanel === 'settings' && (
               <div>
+                <div style={{ marginBottom: 18 }}>
+                  <button
+                    onClick={() => setActivePanel('tour')}
+                    style={{
+                      background: 'transparent',
+                      color: 'var(--accent)',
+                      border: '1px solid var(--accent)',
+                      borderRadius: 8,
+                      padding: '6px 12px',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      fontFamily: 'var(--sans)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✨ Show tour
+                  </button>
+                </div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
                   📬 Weekly email digest
                 </div>

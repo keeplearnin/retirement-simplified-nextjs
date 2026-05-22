@@ -32,6 +32,7 @@ function AppContent() {
   const { user, isConfigured: configured, authLoading, signIn, signOut } = useAuth();
 
   const [onboarded, setOnboarded] = useState(true); // true initially to avoid flash
+  const [onboardingSkipped, setOnboardingSkipped] = useState(false);
 
   useEffect(() => {
     setTimeout(() => setLoaded(true), 100);
@@ -52,6 +53,19 @@ function AppContent() {
     const hasOnboarded = localStorage.getItem('retirement-onboarded') === 'true';
     const hasPlan = localStorage.getItem('myplan-v1') !== null;
     setOnboarded(hasOnboarded || hasPlan);
+
+    // Default landing tab: AI Advisor for net-new users (no plan yet),
+    // My Plan for returning users. The AI Advisor is the flagship and
+    // also where the welcome chooser kicks the user after onboarding.
+    if (!hasPlan) {
+      setTab('advisor');
+    }
+
+    // Sticky "Finish setup" banner — set by Onboarding.jsx skip() when
+    // the user bails without completing. Surfaces on My Plan until the
+    // user either finishes setup or has meaningful plan data.
+    const skipped = localStorage.getItem('retirement-onboarding-skipped') === '1';
+    setOnboardingSkipped(skipped && !hasPlan);
     return () => {
       window.removeEventListener('navigate-tab', handler);
       window.removeEventListener('replay-onboarding', replayHandler);
@@ -203,6 +217,73 @@ function AppContent() {
       )}
 
       <main className="section-pad" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 40px' }}>
+        {/* "Finish setup" banner — shown when the user skipped onboarding
+            without entering plan data. Persists across reloads (via the
+            'retirement-onboarding-skipped' localStorage flag) until they
+            either complete onboarding (replay) or enter plan data. */}
+        {onboardingSkipped && tab === 'myplan' && (
+          <div
+            style={{
+              margin: '16px 0',
+              padding: '12px 16px',
+              background: 'var(--accent-dim, rgba(16,185,129,0.10))',
+              border: '1px solid var(--accent)',
+              borderRadius: 10,
+              fontFamily: 'var(--sans)',
+              fontSize: 13,
+              color: 'var(--text)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              flexWrap: 'wrap',
+            }}
+          >
+            <span>
+              👋 <strong>Finish setting up your plan</strong> — you skipped onboarding earlier. Takes ~3 minutes.
+            </span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => {
+                  localStorage.removeItem('retirement-onboarding-skipped');
+                  window.dispatchEvent(new Event('replay-onboarding'));
+                }}
+                style={{
+                  background: 'var(--accent)',
+                  color: 'var(--bg)',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '6px 14px',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  fontFamily: 'var(--sans)',
+                  cursor: 'pointer',
+                }}
+              >
+                Finish setup →
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.setItem('retirement-onboarding-skipped', '0');
+                  setOnboardingSkipped(false);
+                }}
+                style={{
+                  background: 'transparent',
+                  color: 'var(--text-muted)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 8,
+                  padding: '6px 12px',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  fontFamily: 'var(--sans)',
+                  cursor: 'pointer',
+                }}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
         {tab === 'myplan' && <MyPlan />}
         {tab === 'myplan-v2' && <MyPlanV2 />}
         {tab === 'growth' && <GrowthProjector />}
