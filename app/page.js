@@ -18,15 +18,15 @@ import Auth, { isConfigured } from '@/lib/auth';
 // TaxLossHarvesting, ScenarioComparison, InvestingGuide, MyPlans, Journal,
 // RiskQuiz, LinkedAccounts.
 import PortfolioBuilder from '@/components/tabs/PortfolioBuilder';
-import WithdrawalStrategy from '@/components/tabs/WithdrawalStrategy';
 import MonteCarlo from '@/components/tabs/MonteCarlo';
-import TaxAware from '@/components/tabs/TaxAware';
-import SocialSecurity from '@/components/tabs/SocialSecurity';
-import TaxTorpedo from '@/components/tabs/TaxTorpedo';
-import RothLadder from '@/components/tabs/RothLadder';
 import GettingStarted from '@/components/tabs/GettingStarted';
 import AIAdvisor from '@/components/tabs/AIAdvisor';
 import MyPlan from '@/components/tabs/MyPlan';
+// Merged tabs — combine multiple decision surfaces under one nav entry.
+// The underlying tabs (TaxAware, RothLadder, SocialSecurity, WithdrawalStrategy,
+// TaxTorpedo) still exist as components and are rendered via these wrappers.
+import RothStrategy from '@/components/tabs/RothStrategy';
+import RetirementIncome from '@/components/tabs/RetirementIncome';
 
 function AppContent() {
   const [tab, setTab] = useState('myplan');
@@ -93,17 +93,20 @@ function AppContent() {
       { id: 'myplan', label: 'My Plan' },
       { id: 'portfolio', label: 'Portfolio' },
     ]},
-    // Ordered as: chat first (the primary surface), then workbench tabs
-    // in the retirement-planning journey order:
-    //   accumulation (Roth vs Trad) → income (SS) → conversion (Roth Ladder)
-    //   → drawdown (Withdrawal) → educational (Torpedo) → sensitivity (MC)
+    // Coach groups the AI Advisor (chat) with the workbench drill-downs,
+    // ordered by the retirement-planning journey:
+    //   chat (start here) → Roth decisions (accumulation + conversion)
+    //   → retirement income (claim + withdrawal + tax-torpedo explainer)
+    //   → Monte Carlo (downside sensitivity)
+    //
+    // Three workbench tabs in step-1 were merged in step-2 of the
+    // restructure:
+    //   • RothStrategy      = Roth vs Trad + Roth Ladder
+    //   • RetirementIncome  = Social Security + Withdrawal + Tax Torpedo
     { id: 'coach', label: 'Coach', icon: '🤖', tabs: [
       { id: 'advisor', label: 'AI Advisor' },
-      { id: 'tax', label: 'Roth vs Trad' },
-      { id: 'ssa', label: 'Social Security' },
-      { id: 'roth-ladder', label: 'Roth Ladder' },
-      { id: 'withdrawal', label: 'Withdrawal' },
-      { id: 'torpedo', label: 'Tax Torpedo' },
+      { id: 'roth-strategy', label: 'Roth Strategy' },
+      { id: 'income', label: 'Retirement Income' },
       { id: 'montecarlo', label: 'Monte Carlo' },
     ]},
     { id: 'learn', label: 'Learn', icon: '💡', tabs: [
@@ -290,11 +293,8 @@ function AppContent() {
         {tab === 'myplan' && <MyPlan />}
         {tab === 'portfolio' && <PortfolioBuilder />}
         {tab === 'advisor' && <AIAdvisor />}
-        {tab === 'tax' && <TaxAware />}
-        {tab === 'ssa' && <SocialSecurity />}
-        {tab === 'roth-ladder' && <RothLadder />}
-        {tab === 'withdrawal' && <WithdrawalStrategy />}
-        {tab === 'torpedo' && <TaxTorpedo />}
+        {tab === 'roth-strategy' && <RothStrategy />}
+        {tab === 'income' && <RetirementIncome />}
         {tab === 'montecarlo' && <MonteCarlo />}
         {tab === 'guide' && <GettingStarted />}
       </main>
