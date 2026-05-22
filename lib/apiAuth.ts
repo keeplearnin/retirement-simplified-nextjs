@@ -62,9 +62,22 @@ function tryAnonymousIdentity(request: Request): TokenPayload | null {
   return { sub: `dev:${deviceId.toLowerCase()}`, anonymous: true };
 }
 
+// Per-identity rate limit. Defends against the deviceId-enumeration attack:
+// an attacker who guesses or scrapes a UUID can normally hit the per-IP limit
+// from anywhere on the internet, so the per-IP limit alone doesn't bound how
+// many requests a single LEAKED identity can produce. The per-identity limit
+// caps it at 60 req/min/identity across ALL routes — same UUID from 100 IPs
+// still hits the cap.
+const PER_IDENTITY_LIMIT = 60;          // req/min/identity (anonymous mode)
+const PER_IDENTITY_LIMIT_COGNITO = 120; // req/min/identity (verified Cognito user)
+const PER_IDENTITY_WINDOW_MS = 60_000;
+
 /**
  * Validates the Authorization header and returns the verified token payload.
  * Returns a NextResponse error on any failure — never throws.
+ *
+ * Applies a per-identity rate limit AFTER identity is resolved. This catches
+ * the case where a leaked anonymous deviceId is replayed from many IPs.
  *
  * Async: signature verification fetches the JWKS (cached after first call).
  */
@@ -72,27 +85,39 @@ export async function verifyAuth(request: Request): Promise<TokenPayload | NextR
   const authHeader = request.headers.get('Authorization');
   const hasBearerToken = authHeader?.startsWith('Bearer ');
 
+  let identity: TokenPayload | null = null;
+
   // Path 1: Cognito JWT (production)
   if (ISSUER && hasBearerToken) {
-    return verifyCognitoToken(request);
+    const result = await verifyCognitoToken(request);
+    if (result instanceof NextResponse) return result;
+    identity = result;
+  } else {
+    // Path 2: Anonymous device-ID (pilot mode)
+    identity = tryAnonymousIdentity(request);
   }
-
-  // Path 2: Anonymous device-ID (pilot mode)
-  const anon = tryAnonymousIdentity(request);
-  if (anon) return anon;
 
   // Path 3: No valid path — explain what's wrong
-  if (!ISSUER && !ALLOW_ANONYMOUS_USERS) {
-    console.error('Neither Cognito nor anonymous mode is configured');
+  if (!identity) {
+    if (!ISSUER && !ALLOW_ANONYMOUS_USERS) {
+      console.error('Neither Cognito nor anonymous mode is configured');
+      return NextResponse.json(
+        { error: 'Auth not configured', hint: 'Set ALLOW_ANONYMOUS_USERS=1 (pilot) or Cognito vars (prod)' },
+        { status: 503 },
+      );
+    }
     return NextResponse.json(
-      { error: 'Auth not configured', hint: 'Set ALLOW_ANONYMOUS_USERS=1 (pilot) or Cognito vars (prod)' },
-      { status: 503 },
+      { error: 'Unauthorized', hint: ALLOW_ANONYMOUS_USERS ? 'Provide X-Device-Id header (UUID)' : 'Provide Bearer token' },
+      { status: 401 },
     );
   }
-  return NextResponse.json(
-    { error: 'Unauthorized', hint: ALLOW_ANONYMOUS_USERS ? 'Provide X-Device-Id header (UUID)' : 'Provide Bearer token' },
-    { status: 401 },
-  );
+
+  // Per-identity rate limit. Returns 429 if exceeded.
+  const limit = identity.anonymous ? PER_IDENTITY_LIMIT : PER_IDENTITY_LIMIT_COGNITO;
+  const limited = checkRateLimit(`identity:${identity.sub}`, limit, PER_IDENTITY_WINDOW_MS);
+  if (limited) return limited;
+
+  return identity;
 }
 
 async function verifyCognitoToken(request: Request): Promise<TokenPayload | NextResponse> {

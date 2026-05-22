@@ -213,9 +213,56 @@ export default function AIAdvisor() {
     setTimeout(() => setToast((t) => (t === text ? null : t)), 3000);
   }
 
+  // Read the LIVE current value of a proposal's target from the plan state
+  // at the moment apply is clicked — not the value the LLM saw when it
+  // generated the proposal. This catches the case where the user edited
+  // the field in My Plan between when the AI suggested the change and when
+  // they clicked Apply.
+  function readLiveTargetValue(target) {
+    if (!target) return undefined;
+    if (target.kind === 'planField') {
+      return plan?.[target.key];
+    }
+    if (target.kind === 'incomeSource') {
+      const src = (plan?.incomeSources || []).find((s) => s.id === target.sourceId);
+      return src?.[target.subfield];
+    }
+    return undefined;
+  }
+
+  // Loose equality: handles number-vs-string ("70" vs 70) and rounds floats
+  // before comparing so we don't false-positive on float precision noise.
+  function valuesDiffer(a, b) {
+    if (a == null && b == null) return false;
+    if (typeof a === 'number' && typeof b === 'number') {
+      return Math.abs(a - b) > 0.001;
+    }
+    return String(a ?? '').trim() !== String(b ?? '').trim();
+  }
+
   function applyProposal(proposal) {
     if (!proposal || !proposal.target) return;
     if (appliedProposalIds.has(proposal.id)) return;
+
+    // Compare what the LLM saw vs. what the plan ACTUALLY contains right
+    // now. If the user edited the field since the AI made the suggestion,
+    // confirm before clobbering their edit.
+    const liveValue = readLiveTargetValue(proposal.target);
+    const llmSawValue = proposal.currentValue;
+    const driftDetected =
+      llmSawValue !== undefined && valuesDiffer(liveValue, llmSawValue);
+
+    if (driftDetected) {
+      const ok = window.confirm(
+        `Heads up — you've changed this since the AI suggested it.\n\n` +
+        `When the AI made the suggestion: ${String(llmSawValue)}\n` +
+        `Your current value: ${String(liveValue)}\n` +
+        `AI's proposed value: ${String(proposal.newValue)}\n\n` +
+        `Apply the AI's value anyway (overwriting your edit)?`,
+      );
+      if (!ok) return;
+    }
+
     try {
       if (proposal.target.kind === 'planField') {
         updatePlan(proposal.target.key, proposal.newValue);
@@ -1164,6 +1211,14 @@ export default function AIAdvisor() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
                       {msg.proposedChanges.map((p) => {
                         const applied = appliedProposalIds.has(p.id);
+                        // Show the LIVE value (not the LLM's snapshot). If
+                        // the user edited the field since the AI suggested
+                        // the change, the chip below the button surfaces
+                        // the drift so they're not surprised by the confirm.
+                        const liveValue = readLiveTargetValue(p.target);
+                        const llmSaw = p.currentValue;
+                        const drift =
+                          llmSaw !== undefined && valuesDiffer(liveValue, llmSaw);
                         return (
                           <button
                             key={p.id}
@@ -1185,14 +1240,14 @@ export default function AIAdvisor() {
                               justifyContent: 'space-between',
                               gap: 10,
                             }}
-                            title={p.rationale}
+                            title={drift ? `You changed this to ${String(liveValue)} since the AI suggested it.` : p.rationale}
                           >
                             <span>
                               {applied ? '✓ Applied: ' : 'Apply: '}
                               {p.applyLabel}
-                              {p.currentValue != null && !applied && (
-                                <span style={{ color: 'var(--text-muted)', fontWeight: 500, marginLeft: 6 }}>
-                                  (currently {String(p.currentValue)})
+                              {liveValue != null && !applied && (
+                                <span style={{ color: drift ? 'var(--warn, #f59e0b)' : 'var(--text-muted)', fontWeight: 500, marginLeft: 6 }}>
+                                  (currently {String(liveValue)}{drift ? ' — you edited this' : ''})
                                 </span>
                               )}
                             </span>
