@@ -5,6 +5,9 @@ import Card from '@/components/ui/Card';
 import Auth from '@/lib/auth';
 import { usePlan } from '@/components/PlanProvider';
 import { savePlanSnapshot, loadHistory, loadHistoryFromDb } from '@/lib/planHistory';
+import Icon from '@/components/ui/Icon';
+import AnimatedNumber from '@/components/ui/AnimatedNumber';
+import SequencedLoader from '@/components/ui/SequencedLoader';
 import {
   isHealthCheckDue,
   markHealthCheckRan,
@@ -524,7 +527,8 @@ export default function AIAdvisor() {
       {/* Compact header */}
       <div style={{ marginBottom: 12, fontFamily: 'var(--sans)' }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, color: 'var(--text)', fontFamily: 'var(--serif)' }}>
-          🤖 AI Advisor
+          <Icon name="sparkles" size={20} style={{ marginRight: 8, color: 'var(--accent)' }} />
+          AI Advisor
         </h2>
         <p style={{ color: 'var(--text-muted)', margin: '2px 0 0', fontSize: 13 }}>
           Ask anything about your retirement plan.
@@ -556,8 +560,9 @@ export default function AIAdvisor() {
         </button>
 
         {insightCount > 0 && (
-          <button onClick={() => togglePanel('insights')} style={chipStyle(activePanel === 'insights')}>
-            <span>📊 {insightCount} insight{insightCount === 1 ? '' : 's'}</span>
+          <button onClick={() => togglePanel('insights')} style={chipStyle(activePanel === 'insights')} className="chip">
+            <Icon name="chart-pie" size={14} />
+            <span>{insightCount} insight{insightCount === 1 ? '' : 's'}</span>
           </button>
         )}
 
@@ -568,6 +573,7 @@ export default function AIAdvisor() {
               setReviewSeen(true);
             }}
             style={chipStyle(activePanel === 'review')}
+            className="chip"
           >
             {!reviewSeen && reviewReport && (
               <span
@@ -580,8 +586,9 @@ export default function AIAdvisor() {
                 }}
               />
             )}
+            <Icon name="calendar" size={14} />
             <span>
-              📅 {reviewLoading
+              {reviewLoading
                 ? 'Review running…'
                 : reviewReport?.framing === 'quarterly'
                 ? 'Quarterly review'
@@ -593,7 +600,7 @@ export default function AIAdvisor() {
         )}
 
         {reExcluded && (
-          <button onClick={() => togglePanel('re')} style={chipStyle(activePanel === 're')}>
+          <button onClick={() => togglePanel('re')} style={chipStyle(activePanel === 're')} className="chip">
             <span
               style={{
                 width: 8,
@@ -603,12 +610,14 @@ export default function AIAdvisor() {
                 display: 'inline-block',
               }}
             />
-            <span>🏠 {reLabel} RE excluded</span>
+            <Icon name="home" size={14} />
+            <span>{reLabel} RE excluded</span>
           </button>
         )}
 
-        <button onClick={runOptimization} style={chipStyle(false, true)} disabled={optimizeLoading}>
-          {optimizeLoading ? '⏳ Optimizing…' : '⚡ Optimize'}
+        <button onClick={runOptimization} style={chipStyle(false, true)} disabled={optimizeLoading} className="chip">
+          <Icon name="bolt" size={14} />
+          <span>{optimizeLoading ? 'Optimizing…' : 'Optimize'}</span>
         </button>
 
         <button
@@ -616,8 +625,9 @@ export default function AIAdvisor() {
           style={chipStyle(activePanel === 'settings')}
           aria-label="Settings"
           title="Settings"
+          className="chip"
         >
-          ⚙️
+          <Icon name="cog" size={14} />
         </button>
       </div>
 
@@ -676,7 +686,15 @@ export default function AIAdvisor() {
             {activePanel === 'health' && (
               <div>
                 {healthLoading && (
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Running plan health check…</div>
+                  <SequencedLoader
+                    messages={[
+                      'Reading your plan…',
+                      'Running the projection…',
+                      'Checking the Fidelity benchmark…',
+                      'Modeling SS claiming ages…',
+                      'Synthesizing your health report…',
+                    ]}
+                  />
                 )}
                 {!healthLoading && !healthReport && (
                   <div>
@@ -871,9 +889,15 @@ export default function AIAdvisor() {
             {activePanel === 'review' && (
               <div>
                 {reviewLoading && (
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                    Comparing your plan to past snapshots and re-running the projection…
-                  </div>
+                  <SequencedLoader
+                    messages={[
+                      'Loading your snapshot history…',
+                      'Comparing against your last review…',
+                      'Re-running the projection…',
+                      'Identifying what changed…',
+                      'Writing your progress summary…',
+                    ]}
+                  />
                 )}
                 {!reviewLoading && reviewReport && (() => {
                   const trendColor =
@@ -991,9 +1015,15 @@ export default function AIAdvisor() {
             {activePanel === 'optimize' && (
               <div>
                 {optimizeLoading && (
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                    Running multi-step analysis — projection → SS timing → Roth conversions → withdrawal order…
-                  </div>
+                  <SequencedLoader
+                    messages={[
+                      'Reading your plan…',
+                      'Modeling tax impact…',
+                      'Comparing Social Security claiming ages…',
+                      'Testing Roth conversion ladders…',
+                      'Ranking actions by dollar impact…',
+                    ]}
+                  />
                 )}
                 {optimizeError && !optimizeLoading && (
                   <div>
@@ -1032,14 +1062,32 @@ export default function AIAdvisor() {
                     {optimizeReport.keyMetrics && (
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
                         {[
-                          { label: 'Money lasts (now)', value: `Age ${optimizeReport.keyMetrics.currentMoneyLastsAge ?? '—'}` },
-                          { label: 'Money lasts (optimized)', value: `Age ${optimizeReport.keyMetrics.optimizedMoneyLastsAge ?? '—'}` },
-                          { label: 'Lifetime tax (now)', value: `$${Math.round((optimizeReport.keyMetrics.currentLifetimeTax || 0) / 1000)}K` },
-                          { label: 'Lifetime tax (optimized)', value: `$${Math.round((optimizeReport.keyMetrics.optimizedLifetimeTax || 0) / 1000)}K` },
-                        ].map(({ label, value }) => (
+                          {
+                            label: 'Money lasts (now)',
+                            value: optimizeReport.keyMetrics.currentMoneyLastsAge,
+                            format: (v) => v == null ? '—' : `Age ${Math.round(v)}`,
+                          },
+                          {
+                            label: 'Money lasts (optimized)',
+                            value: optimizeReport.keyMetrics.optimizedMoneyLastsAge,
+                            format: (v) => v == null ? '—' : `Age ${Math.round(v)}`,
+                          },
+                          {
+                            label: 'Lifetime tax (now)',
+                            value: optimizeReport.keyMetrics.currentLifetimeTax || 0,
+                            format: (v) => `$${Math.round(v / 1000)}K`,
+                          },
+                          {
+                            label: 'Lifetime tax (optimized)',
+                            value: optimizeReport.keyMetrics.optimizedLifetimeTax || 0,
+                            format: (v) => `$${Math.round(v / 1000)}K`,
+                          },
+                        ].map(({ label, value, format }) => (
                           <div key={label} style={{ background: 'var(--bg)', borderRadius: 6, padding: '6px 8px' }}>
                             <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{label}</div>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{value}</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+                              {value == null ? '—' : <AnimatedNumber value={value} format={format} />}
+                            </div>
                           </div>
                         ))}
                       </div>

@@ -27,6 +27,7 @@ import MyPlan from '@/components/tabs/MyPlan';
 // TaxTorpedo) still exist as components and are rendered via these wrappers.
 import RothStrategy from '@/components/tabs/RothStrategy';
 import RetirementIncome from '@/components/tabs/RetirementIncome';
+import Icon from '@/components/ui/Icon';
 
 function AppContent() {
   const [tab, setTab] = useState('myplan');
@@ -88,8 +89,12 @@ function AppContent() {
   // workbench tabs moved under Coach alongside AI Advisor. Tab IDs are
   // kept stable (myplan, portfolio, advisor, tax, ssa, ...) so any saved
   // localStorage state and external links continue to resolve.
+  // `icon` values are Icon component names (see components/ui/Icon.jsx),
+  // not emoji — gives us consistent monoline glyphs that take currentColor
+  // and sit on the typography baseline. (Design-pass feedback: "looks like
+  // a basic calculator.")
   const categories = [
-    { id: 'plan', label: 'Plan', icon: '📊', tabs: [
+    { id: 'plan', label: 'Plan', icon: 'chart', tabs: [
       { id: 'myplan', label: 'My Plan' },
       { id: 'portfolio', label: 'Portfolio' },
     ]},
@@ -103,13 +108,13 @@ function AppContent() {
     // restructure:
     //   • RothStrategy      = Roth vs Trad + Roth Ladder
     //   • RetirementIncome  = Social Security + Withdrawal + Tax Torpedo
-    { id: 'coach', label: 'Coach', icon: '🤖', tabs: [
+    { id: 'coach', label: 'Coach', icon: 'sparkles', tabs: [
       { id: 'advisor', label: 'AI Advisor' },
       { id: 'roth-strategy', label: 'Roth Strategy' },
       { id: 'income', label: 'Retirement Income' },
       { id: 'montecarlo', label: 'Monte Carlo' },
     ]},
-    { id: 'learn', label: 'Learn', icon: '💡', tabs: [
+    { id: 'learn', label: 'Learn', icon: 'book', tabs: [
       { id: 'guide', label: 'Getting Started' },
     ]},
   ];
@@ -144,15 +149,18 @@ function AppContent() {
                 <button
                   key={c.id}
                   onClick={() => setTab(c.tabs[0].id)}
+                  className="nav-pill"
                   style={{
                     padding: '8px 16px', border: 'none', cursor: 'pointer', borderRadius: 24,
                     background: isActive ? 'var(--accent)' : 'transparent',
                     color: isActive ? '#fff' : 'var(--text-muted)',
-                    fontWeight: isActive ? 600 : 400, fontSize: 13,
+                    fontWeight: isActive ? 600 : 500, fontSize: 13,
                     transition: 'all .2s', fontFamily: 'var(--sans)',
                     whiteSpace: 'nowrap',
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
                   }}
                 >
+                  <Icon name={c.icon} size={15} />
                   {c.label}
                 </button>
               );

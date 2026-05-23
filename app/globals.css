@@ -292,6 +292,31 @@ input[type=range]::-moz-range-thumb {
 .onboarding-dot.active { background: var(--accent); transform: scale(1.3); }
 .onboarding-dot.done { background: var(--accent); opacity: 0.5; }
 
+/* Hover + focus states for interactive surfaces. Inline styles can't
+   easily express :hover / :focus-visible, so we apply them as classes.
+   Subtle background shift + lift on hover; clear focus ring for
+   keyboard users (a11y). Part of the "doesn't look like a basic
+   calculator" polish pass. */
+.nav-pill:hover {
+  background: var(--card-hover, rgba(255,255,255,0.04)) !important;
+  color: var(--text) !important;
+}
+.nav-pill:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.chip:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+.chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.chip:active:not(:disabled) {
+  transform: translateY(0);
+}
+
 /* Nav scroll for mobile */
 .nav-scroll {
   overflow-x: auto; -webkit-overflow-scrolling: touch;
