@@ -16,6 +16,16 @@ export interface TaxInput {
   stateCode: string;             // 2-letter state code
   age: number;                   // for over-65 deduction
   spouseAge?: number;
+  /** Portion of `ordinaryIncome` that is retirement-derived (pension, IRA/401k
+   *  withdrawals, annuity, RMDs) — i.e. everything EXCEPT salary, rental,
+   *  part-time work. Used by computeStateTax to apply state-specific
+   *  retirement-income exemptions (PA, IL, MS, GA, SC, NY, etc. exempt all
+   *  or part of this for over-65 / over-59½ retirees). Defaults to 0 if
+   *  caller doesn't break it out — no state exemption applied in that case.
+   *
+   *  Without this, state tax was overstated by thousands/yr for retired
+   *  users in PA/IL/MS/GA/SC/NY (flagged in the Deloitte FP&A review). */
+  retirementIncome?: number;
   /** Calendar year this tax year corresponds to. Used to gate temporary
    *  provisions like the OBBBA senior bonus deduction (effective 2025-2028).
    *  Defaults to 2026 if absent — matches the rest of the engine's constants. */
@@ -514,23 +524,126 @@ function computeIRMAA(magi: number, filingStatus: 'single' | 'mfj'): number {
   return table[table.length - 1].monthlyPartBSurcharge;
 }
 
+// State retirement-income exemptions. Many states fully or partially exempt
+// SS / pension / 401k withdrawals for retirees — refusing to model this
+// overstates state tax by thousands/yr for users in PA, IL, MS, GA, SC, NY,
+// MI, IA, AL, HI, MA, and KY (Deloitte FP&A review finding).
+//
+// Returns the dollar amount to SUBTRACT from state taxable income.
+// Conservative: when the rule depends on details we don't track (e.g.
+// Alabama's distinction between defined-benefit and defined-contribution
+// pensions), the more restrictive interpretation is used.
+function stateRetirementExemption(
+  stateCode: string,
+  age: number,
+  spouseAge: number | undefined,
+  ssTaxable: number,
+  retirementIncome: number,
+  filingStatus: 'single' | 'mfj',
+): number {
+  if (retirementIncome <= 0 && ssTaxable <= 0) return 0;
+  const code = stateCode.toUpperCase();
+
+  switch (code) {
+    // Full retirement income + SS exemption (subject to age thresholds)
+    case 'IL': // SS + qualified retirement, all ages effectively
+      return ssTaxable + retirementIncome;
+    case 'PA': // Retirement income for 59½+; SS always exempt
+      return age >= 60 ? ssTaxable + retirementIncome : ssTaxable;
+    case 'MS': // SS + qualified retirement income, no age req
+      return ssTaxable + retirementIncome;
+    case 'IA': // SS exempt always; retirement income exempt 55+ (2023 change)
+      return age >= 55 ? ssTaxable + retirementIncome : ssTaxable;
+
+    // SS-only exemption (always)
+    case 'AL': // SS always exempt; DB pensions also, but we conservatively
+               // only credit SS to avoid over-exempting 401k withdrawals
+    case 'HI': // SS exempt; employer-funded pensions also (conservatively SS only)
+    case 'MA': // SS exempt; IRA/401k taxable
+    case 'NJ':
+    case 'OR':
+      return ssTaxable;
+
+    // Capped retirement exemption (Georgia — large, age-tiered)
+    case 'GA': {
+      if (age < 62) return ssTaxable; // SS still exempt
+      const cap = age >= 65 ? 65_000 : 35_000;
+      const primary = Math.min(retirementIncome, cap);
+      if (filingStatus === 'mfj' && (spouseAge ?? 0) >= 62) {
+        const spouseCap = (spouseAge ?? 0) >= 65 ? 65_000 : 35_000;
+        return ssTaxable + Math.min(primary + spouseCap, retirementIncome);
+      }
+      return ssTaxable + primary;
+    }
+
+    // SC: full SS exemption, partial retirement exemption
+    case 'SC': {
+      const cap = age >= 65 ? 15_000 : 10_000;
+      return ssTaxable + Math.min(retirementIncome, cap);
+    }
+
+    // KY: $31,110 per-person retirement income exclusion
+    case 'KY': {
+      const cap = 31_110;
+      return ssTaxable + Math.min(retirementIncome, cap);
+    }
+
+    // NY: SS exempt; $20K retirement income exempt for 59½+
+    case 'NY':
+      return ssTaxable + (age >= 60 ? Math.min(retirementIncome, 20_000) : 0);
+
+    // MI: SS exempt; $20K/$40K retirement income exempt for 67+
+    case 'MI': {
+      if (age < 67) return ssTaxable;
+      const cap = filingStatus === 'mfj' ? 40_000 : 20_000;
+      return ssTaxable + Math.min(retirementIncome, cap);
+    }
+
+    default:
+      return 0;
+  }
+}
+
 function computeStateTax(
   taxableIncome: number,
   stateCode: string,
   filingStatus: 'single' | 'mfj',
+  options: {
+    age?: number;
+    spouseAge?: number;
+    ssTaxable?: number;
+    retirementIncome?: number;
+  } = {},
 ): number {
   const code = stateCode.toUpperCase();
+
+  // Apply state retirement income exemption first — this is the single
+  // biggest source of state-tax accuracy improvement for retired users.
+  // See stateRetirementExemption() for the per-state rules.
+  const exemption =
+    options.age !== undefined
+      ? stateRetirementExemption(
+          code,
+          options.age,
+          options.spouseAge,
+          options.ssTaxable ?? 0,
+          options.retirementIncome ?? 0,
+          filingStatus,
+        )
+      : 0;
+  const adjustedTaxable = Math.max(0, taxableIncome - exemption);
+
   // Prefer graduated bracket math for the high-graduated states (CA, NY, NJ,
   // OR) — closes the $5K-$15K/yr undershoot for high earners that the flat
   // estimator showed (tester report from Fisherman Investments review).
   const graduated = STATE_GRADUATED_BRACKETS[code];
   if (graduated) {
     const brackets = filingStatus === 'mfj' ? graduated.mfj : graduated.single;
-    return Math.max(0, applyBrackets(Math.max(0, taxableIncome), brackets));
+    return Math.max(0, applyBrackets(adjustedTaxable, brackets));
   }
   // Fallback: flat effective rate for non-graduated / less-impactful states.
   const rate = STATE_TAX_RATES[code] ?? DEFAULT_STATE_TAX_RATE;
-  return Math.max(0, taxableIncome * rate);
+  return Math.max(0, adjustedTaxable * rate);
 }
 
 function computeCapitalGainsTax(
@@ -656,12 +769,20 @@ export function computeTax(input: TaxInput): TaxResult {
   // 7. NIIT — uses MAGI computed earlier for the OBBBA phase-out
   const niit = computeNIIT(capitalGains, magi, filingStatus);
 
-  // 8. State tax (applied to ordinary income + capital gains, simplified)
+  // 8. State tax — applies state-specific retirement income exemptions
+  // (PA, IL, MS, GA, SC, NY, MI, IA, AL, HI, MA, KY, NJ, OR have them).
+  // Without these, retired users in those states were over-taxed by
+  // thousands/yr (Deloitte FP&A review finding).
   const stateTaxableIncome = Math.max(
     0,
     grossOrdinaryIncome + capitalGains - deductionAmount,
   );
-  const stateTax = computeStateTax(stateTaxableIncome, stateCode, filingStatus);
+  const stateTax = computeStateTax(stateTaxableIncome, stateCode, filingStatus, {
+    age: input.age,
+    spouseAge: input.spouseAge,
+    ssTaxable, // already computed above (line 709)
+    retirementIncome: input.retirementIncome ?? 0,
+  });
 
   // 9. IRMAA (monthly Part B surcharge)
   const irmaa = computeIRMAA(magi, filingStatus);

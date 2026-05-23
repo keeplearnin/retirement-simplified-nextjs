@@ -42,7 +42,7 @@ export interface VerdictOutput {
   savingsGap: number; // benchmark - current. Positive = behind, negative = ahead.
   gapStatus: GapStatus;
   projectedBalance: number; // at retirement, at 7% growth, with current contributions
-  estimatedNeed: number; // annualIncome * 25 (4% SWR baseline)
+  estimatedNeed: number; // 4% SWR × replacement-ratio retirement spending
   shortfallAtRetirement: number; // estimatedNeed - projectedBalance. Positive = short.
   verdictText: string;
   topActions: ActionItem[];
@@ -304,7 +304,25 @@ export function computeVerdict(input: VerdictInput): VerdictOutput {
   const projectedFromContrib = futureValueStream(input.monthlyContribution, yearsToRetirement);
   const projectedBalance = Math.round(projectedFromCurrent + projectedFromContrib);
 
-  const estimatedNeed = input.annualIncome * 25; // 4% SWR baseline
+  // Replacement-ratio model — apply 4% SWR to RETIREMENT spending, not
+  // pre-retirement income. Fidelity's research uses 55-80% income
+  // replacement for retirees (lower expenses: no mortgage, no payroll tax,
+  // lower commuting/lunch, often lower healthcare with Medicare). The
+  // straight `annualIncome × 25` formula overstated need by 20-45% for
+  // high earners, which made the verdict needlessly alarming and burned
+  // trust with sophisticated users (Deloitte FP&A review finding).
+  //
+  // Tiered replacement ratio — lower-income households need MORE of their
+  // income replaced because expenses are less compressible (housing,
+  // food); higher-income households need less because more of their
+  // current income goes to taxes + savings (both drop in retirement).
+  const replacementRatio =
+    input.annualIncome < 60_000 ? 0.80 :
+    input.annualIncome < 150_000 ? 0.75 :
+    input.annualIncome < 300_000 ? 0.70 :
+    0.65;
+  const retirementSpending = input.annualIncome * replacementRatio;
+  const estimatedNeed = Math.round(retirementSpending * 25); // 4% SWR
   const shortfallAtRetirement = Math.max(0, estimatedNeed - projectedBalance);
 
   const topActions = rankActions(input);
