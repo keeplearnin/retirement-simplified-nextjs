@@ -24,8 +24,74 @@
   --sans: var(--font-inter), system-ui, sans-serif;
   --glass: rgba(17, 29, 51, 0.6);
   --glass-border: rgba(255, 255, 255, 0.06);
-  --radius: 14px;
+
+  /* ─── DESIGN TOKENS ───────────────────────────────────────────────
+     Foundation for the design system. Use these tokens everywhere
+     instead of magic numbers. See DESIGN_SYSTEM.md for the full
+     vocabulary and migration plan.
+     ───────────────────────────────────────────────────────────────── */
+
+  /* Type scale — 1.125 ratio (major second) anchored at 14px body.
+     Hierarchy: caption < small < base < lg < xl < 2xl < 3xl */
+  --text-xs:   11px;   /* labels, captions, meta */
+  --text-sm:   12px;   /* secondary text */
+  --text-base: 13px;   /* body text */
+  --text-md:   14px;   /* default ui text */
+  --text-lg:   16px;   /* emphasized body */
+  --text-xl:   20px;   /* section headings */
+  --text-2xl:  24px;   /* page headings */
+  --text-3xl:  32px;   /* hero numbers */
+  --text-4xl:  44px;   /* signature numbers (e.g. portfolio value) */
+
+  /* Weights */
+  --fw-regular: 400;
+  --fw-medium:  500;
+  --fw-semi:    600;
+  --fw-bold:    700;
+  --fw-black:   800;
+
+  /* Spacing — 4pt base, with 8pt as the dominant rhythm */
+  --space-0:  0px;
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Radii */
+  --radius:    14px;
   --radius-sm: 10px;
+  --radius-xs: 6px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
+
+  /* Shadows — subtle, dark-mode tuned (light theme overrides below) */
+  --shadow-sm:   0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md:   0 4px 12px rgba(0, 0, 0, 0.30);
+  --shadow-lg:   0 12px 32px rgba(0, 0, 0, 0.35);
+  --shadow-glow: 0 0 24px rgba(52, 211, 153, 0.18);
+
+  /* Motion — durations + easings.
+     Use --motion-fast for hovers; --motion-base for state changes;
+     --motion-slow for entrances/reveals. */
+  --motion-fast:  150ms;
+  --motion-base:  250ms;
+  --motion-slow:  500ms;
+  --ease-out:     cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-in-out:  cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Z-index scale — keeps overlays in predictable layers */
+  --z-base:     1;
+  --z-dropdown: 100;
+  --z-drawer:   200;
+  --z-modal:    300;
+  --z-toast:    1000;
 }
 
 [data-theme="light"] {
@@ -52,6 +118,11 @@
   --border-light: #CBD5E1;
   --glass: rgba(255, 255, 255, 0.7);
   --glass-border: rgba(0, 0, 0, 0.06);
+  /* Lighter shadows for light theme — same shape, softer color */
+  --shadow-sm:   0 1px 2px rgba(15, 23, 42, 0.08);
+  --shadow-md:   0 4px 12px rgba(15, 23, 42, 0.10);
+  --shadow-lg:   0 12px 32px rgba(15, 23, 42, 0.12);
+  --shadow-glow: 0 0 24px rgba(5, 150, 105, 0.20);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -292,22 +363,126 @@ input[type=range]::-moz-range-thumb {
 .onboarding-dot.active { background: var(--accent); transform: scale(1.3); }
 .onboarding-dot.done { background: var(--accent); opacity: 0.5; }
 
-/* Hover + focus states for interactive surfaces. Inline styles can't
-   easily express :hover / :focus-visible, so we apply them as classes.
-   Subtle background shift + lift on hover; clear focus ring for
-   keyboard users (a11y). Part of the "doesn't look like a basic
-   calculator" polish pass. */
-.nav-pill:hover {
-  background: var(--card-hover, rgba(255,255,255,0.04)) !important;
-  color: var(--text) !important;
+/* ─── DESIGN SYSTEM PRIMITIVES ────────────────────────────────────────
+   Class-based replacements for the inline styles scattered through the
+   app. Each component file exports a thin React wrapper around these
+   classes (see components/ui/Button, Chip, Drawer).
+
+   The migration is incremental — old inline-styled buttons still work,
+   new code uses these classes. See DESIGN_SYSTEM.md for the migration
+   guide.
+   ───────────────────────────────────────────────────────────────────── */
+
+/* ── Button ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-family: var(--sans);
+  font-weight: var(--fw-semi);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease-out),
+              color var(--motion-fast) var(--ease-out),
+              transform var(--motion-fast) var(--ease-out),
+              box-shadow var(--motion-fast) var(--ease-out);
+  white-space: nowrap;
+  border: 1px solid transparent;
+  text-decoration: none;
 }
-.nav-pill:focus-visible {
+.btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Sizes */
+.btn-sm { padding: var(--space-1) var(--space-3); font-size: var(--text-sm); }
+.btn-md { padding: var(--space-2) var(--space-4); font-size: var(--text-md); }
+.btn-lg { padding: var(--space-3) var(--space-5); font-size: var(--text-lg); }
+
+/* Variants */
+.btn-primary {
+  background: var(--accent);
+  color: var(--bg);
+}
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-glow);
+}
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+  filter: brightness(0.95);
+}
+
+.btn-secondary {
+  background: var(--bg2);
+  color: var(--text);
+  border-color: var(--border);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: var(--card-hover);
+  border-color: var(--border-light);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--card-hover);
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: var(--bg);
+}
+.btn-danger:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+/* Outlined accent variant (for "Refresh" / secondary primary calls) */
+.btn-outline {
+  background: transparent;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.btn-outline:hover:not(:disabled) {
+  background: var(--accent-dim);
+}
+
+/* ── Chip ── status pill, optionally clickable. Used in the nav
+   sub-tab row and the AI Advisor chip bar. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill);
+  font-family: var(--sans);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semi);
+  background: var(--bg2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background var(--motion-fast) var(--ease-out),
+              border-color var(--motion-fast) var(--ease-out),
+              transform var(--motion-fast) var(--ease-out),
+              filter var(--motion-fast) var(--ease-out);
 }
 .chip:hover:not(:disabled) {
   filter: brightness(1.08);
   transform: translateY(-1px);
+  border-color: var(--border-light);
 }
 .chip:focus-visible {
   outline: 2px solid var(--accent);
@@ -316,6 +491,94 @@ input[type=range]::-moz-range-thumb {
 .chip:active:not(:disabled) {
   transform: translateY(0);
 }
+.chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.chip-active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.chip-primary {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+.chip-primary:hover:not(:disabled) {
+  box-shadow: var(--shadow-glow);
+}
+
+/* Status dot inside a chip */
+.chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Drawer ── expandable panel below the chip bar. */
+.drawer {
+  margin-bottom: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg2);
+  font-family: var(--sans);
+  overflow: hidden;
+  animation: drawer-in var(--motion-base) var(--ease-out);
+}
+@keyframes drawer-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.drawer-header {
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+}
+.drawer-title {
+  font-weight: var(--fw-bold);
+  font-size: var(--text-base);
+  color: var(--text);
+}
+.drawer-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--text-lg);
+  line-height: 1;
+  padding: var(--space-1);
+  border-radius: var(--radius-xs);
+  transition: background var(--motion-fast) var(--ease-out),
+              color var(--motion-fast) var(--ease-out);
+}
+.drawer-close:hover {
+  background: var(--card-hover);
+  color: var(--text);
+}
+.drawer-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.drawer-body {
+  padding: var(--space-3) var(--space-4);
+}
+
+/* ── Hover + focus states for interactive surfaces. ── */
+.nav-pill:hover {
+  background: var(--card-hover, rgba(255,255,255,0.04)) !important;
+  color: var(--text) !important;
+}
+.nav-pill:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* .chip:hover/focus/active rules moved to the Design System Primitives
+   block above — single source of truth. */
 
 /* Nav scroll for mobile */
 .nav-scroll {

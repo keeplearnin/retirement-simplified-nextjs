@@ -8,6 +8,8 @@ import { savePlanSnapshot, loadHistory, loadHistoryFromDb } from '@/lib/planHist
 import Icon from '@/components/ui/Icon';
 import AnimatedNumber from '@/components/ui/AnimatedNumber';
 import SequencedLoader from '@/components/ui/SequencedLoader';
+import Chip from '@/components/ui/Chip';
+import Button from '@/components/ui/Button';
 import {
   isHealthCheckDue,
   markHealthCheckRan,
@@ -441,29 +443,9 @@ export default function AIAdvisor() {
     ? 'Critical'
     : 'Health';
 
-  function chipStyle(active, primary = false) {
-    return {
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: 6,
-      padding: '6px 12px',
-      borderRadius: 999,
-      background: active
-        ? 'var(--accent-dim, rgba(16,185,129,0.12))'
-        : primary
-        ? 'var(--accent)'
-        : 'var(--bg2)',
-      color: active ? 'var(--accent)' : primary ? 'var(--bg)' : 'var(--text)',
-      border: `1px solid ${active ? 'var(--accent)' : primary ? 'var(--accent)' : 'var(--border)'}`,
-      fontSize: 12,
-      fontWeight: 600,
-      fontFamily: 'var(--sans)',
-      cursor: 'pointer',
-      whiteSpace: 'nowrap',
-      flexShrink: 0,
-      transition: 'all 0.15s',
-    };
-  }
+  // chipStyle() removed — all chip styling now lives in globals.css under
+  // the design-system .chip / .chip-active / .chip-primary rules,
+  // accessed via the <Chip> component primitive.
 
   return (
     <div>
@@ -535,7 +517,10 @@ export default function AIAdvisor() {
         </p>
       </div>
 
-      {/* Status chip bar */}
+      {/* Status chip bar — migrated to the design-system <Chip> primitive.
+          Variants: 'default' (status), 'active' (drawer open), 'primary' (CTA).
+          The horizontal scroll on narrow viewports is preserved by the
+          flex container, not the chip itself. */}
       <div
         style={{
           display: 'flex',
@@ -546,46 +531,34 @@ export default function AIAdvisor() {
           WebkitOverflowScrolling: 'touch',
         }}
       >
-        <button onClick={() => togglePanel('health')} style={chipStyle(activePanel === 'health')}>
-          <span
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: '50%',
-              background: healthDot,
-              display: 'inline-block',
-            }}
-          />
+        <Chip
+          variant={activePanel === 'health' ? 'active' : 'default'}
+          dot={healthDot}
+          onClick={() => togglePanel('health')}
+        >
+          <Icon name="heart-pulse" size={14} />
           <span>Plan health: {healthLabel}</span>
-        </button>
+        </Chip>
 
         {insightCount > 0 && (
-          <button onClick={() => togglePanel('insights')} style={chipStyle(activePanel === 'insights')} className="chip">
+          <Chip
+            variant={activePanel === 'insights' ? 'active' : 'default'}
+            onClick={() => togglePanel('insights')}
+          >
             <Icon name="chart-pie" size={14} />
             <span>{insightCount} insight{insightCount === 1 ? '' : 's'}</span>
-          </button>
+          </Chip>
         )}
 
         {(reviewReport || reviewLoading) && (
-          <button
+          <Chip
+            variant={activePanel === 'review' ? 'active' : 'default'}
+            dot={!reviewSeen && reviewReport ? 'var(--accent)' : undefined}
             onClick={() => {
               togglePanel('review');
               setReviewSeen(true);
             }}
-            style={chipStyle(activePanel === 'review')}
-            className="chip"
           >
-            {!reviewSeen && reviewReport && (
-              <span
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  background: 'var(--accent)',
-                  display: 'inline-block',
-                }}
-              />
-            )}
             <Icon name="calendar" size={14} />
             <span>
               {reviewLoading
@@ -596,39 +569,37 @@ export default function AIAdvisor() {
                 ? 'Monthly review'
                 : 'Progress review'}
             </span>
-          </button>
+          </Chip>
         )}
 
         {reExcluded && (
-          <button onClick={() => togglePanel('re')} style={chipStyle(activePanel === 're')} className="chip">
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: '#f59e0b',
-                display: 'inline-block',
-              }}
-            />
+          <Chip
+            variant={activePanel === 're' ? 'active' : 'default'}
+            dot="#f59e0b"
+            onClick={() => togglePanel('re')}
+          >
             <Icon name="home" size={14} />
             <span>{reLabel} RE excluded</span>
-          </button>
+          </Chip>
         )}
 
-        <button onClick={runOptimization} style={chipStyle(false, true)} disabled={optimizeLoading} className="chip">
+        <Chip
+          variant="primary"
+          onClick={runOptimization}
+          disabled={optimizeLoading}
+        >
           <Icon name="bolt" size={14} />
           <span>{optimizeLoading ? 'Optimizing…' : 'Optimize'}</span>
-        </button>
+        </Chip>
 
-        <button
+        <Chip
+          variant={activePanel === 'settings' ? 'active' : 'default'}
           onClick={() => togglePanel('settings')}
-          style={chipStyle(activePanel === 'settings')}
           aria-label="Settings"
           title="Settings"
-          className="chip"
         >
           <Icon name="cog" size={14} />
-        </button>
+        </Chip>
       </div>
 
       {/* Active panel — single drawer below chip bar */}
