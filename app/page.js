@@ -27,6 +27,7 @@ import MyPlan from '@/components/tabs/MyPlan';
 // TaxTorpedo) still exist as components and are rendered via these wrappers.
 import RothStrategy from '@/components/tabs/RothStrategy';
 import RetirementIncome from '@/components/tabs/RetirementIncome';
+import Inheritance from '@/components/tabs/Inheritance';
 import Icon from '@/components/ui/Icon';
 
 function AppContent() {
@@ -112,6 +113,7 @@ function AppContent() {
       { id: 'advisor', label: 'AI Advisor' },
       { id: 'roth-strategy', label: 'Roth Strategy' },
       { id: 'income', label: 'Retirement Income' },
+      { id: 'inheritance', label: 'Inheritance' },
       { id: 'montecarlo', label: 'Monte Carlo' },
     ]},
     { id: 'learn', label: 'Learn', icon: 'book', tabs: [
@@ -303,6 +305,7 @@ function AppContent() {
         {tab === 'advisor' && <AIAdvisor />}
         {tab === 'roth-strategy' && <RothStrategy />}
         {tab === 'income' && <RetirementIncome />}
+        {tab === 'inheritance' && <Inheritance />}
         {tab === 'montecarlo' && <MonteCarlo />}
         {tab === 'guide' && <GettingStarted />}
       </main>
