@@ -12,6 +12,9 @@ import { GRID_FRACS } from '@/lib/constants';
 import { usePlan, getTotalSavings } from '@/components/PlanProvider';
 import { interpretMonteCarloResult } from '@/lib/monteCarloInterpret';
 import { runSimulation } from '@/lib/monteCarloEngine';
+import { runBacktest } from '@/lib/backtestEngine';
+import { HISTORICAL_START_YEAR } from '@/lib/historicalReturns';
+import MiniChart from '@/components/ui/MiniChart';
 
 // ── Portfolio-aware return/volatility profiles ──────────────────────────
 // Based on historical data: Ibbotson SBBI, Vanguard research, DFA returns matrix
@@ -26,6 +29,19 @@ const PORTFOLIO_PROFILES = [
 ];
 
 // Core simulation engine lives in lib/monteCarloEngine.js (pure + testable).
+// Historical backtesting lives in lib/backtestEngine.js.
+
+// Stock fraction per portfolio profile — drives the historical backtest's
+// stock/bond blend. Custom profiles default to 70/30.
+const PROFILE_STOCK_PCT = {
+  aggressive: 0.9,
+  growth: 0.8,
+  moderate: 0.7,
+  balanced: 0.6,
+  conservative: 0.4,
+  very_conservative: 0.2,
+  custom: 0.7,
+};
 
 export default function MonteCarlo() {
   const { plan } = usePlan();
@@ -50,6 +66,7 @@ export default function MonteCarlo() {
   const [simData, setSimData] = useState(null);
   const [running, setRunning] = useState(false);
   const [sensitivity, setSensitivity] = useState(null);
+  const [backtest, setBacktest] = useState(null);
 
   // Auto-populate from Growth Projector if navigated via bridge button
   useEffect(() => {
@@ -93,6 +110,13 @@ export default function MonteCarlo() {
         retireAge: retireAge + 2,
         annualSpend: annualSpend - 5000,
       });
+
+      // Historical backtest — same cash-flow assumptions, real return
+      // sequences since 1928 instead of random draws.
+      setBacktest(runBacktest({
+        ...simParams,
+        stockPct: PROFILE_STOCK_PCT[portfolioProfile] ?? 0.7,
+      }));
 
       setSensitivity({
         current: result.successRate,
@@ -405,6 +429,80 @@ export default function MonteCarlo() {
                       <strong>You are on track.</strong> Your success rate of {(sensitivity.current * 100).toFixed(0)}% means your plan survives the vast majority of market scenarios. The levers above show your margin of safety.
                     </div>
                   )}
+                </Card>
+              )}
+
+              {/* ── HISTORICAL BACKTEST: real market sequences since 1928 ── */}
+              {backtest && backtest.sequenceCount > 0 && (
+                <Card style={{ marginTop: 14 }}>
+                  <SectionLabel icon="📜">Historical Backtest — Would It Have Survived?</SectionLabel>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12, lineHeight: 1.5 }}>
+                    Your exact plan, replayed through every real market history since {HISTORICAL_START_YEAR} —
+                    the Great Depression, the stagflation 1970s, the dot-com bust, and 2008 included.
+                    Returns: S&amp;P 500 / 10-yr Treasury blend matching your {Math.round((PROFILE_STOCK_PCT[portfolioProfile] ?? 0.7) * 100)}/{Math.round((1 - (PROFILE_STOCK_PCT[portfolioProfile] ?? 0.7)) * 100)} profile
+                    (source: Damodaran, NYU Stern).
+                  </div>
+
+                  <div className="stats-row" style={{ display: 'flex', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+                    <Stat
+                      icon="🏛️"
+                      label="Historical Success"
+                      value={`${(backtest.successRate * 100).toFixed(0)}%`}
+                      sub={`${backtest.successCount} of ${backtest.sequenceCount} sequences since ${HISTORICAL_START_YEAR}`}
+                      color={backtest.successRate >= 0.9 ? 'var(--accent)' : backtest.successRate >= 0.75 ? 'var(--warn)' : 'var(--danger)'}
+                    />
+                    <Stat
+                      icon="🌪️"
+                      label="Worst Start Year"
+                      value={String(backtest.worst?.startYear ?? '—')}
+                      sub={backtest.worst?.success ? `Still made it: ${fmt(backtest.worst.finalBalance)} left` : `Ran out at age ${backtest.worst?.failedAtAge}`}
+                      color={backtest.worst?.success ? 'var(--accent)' : 'var(--danger)'}
+                    />
+                    <Stat
+                      icon="🚀"
+                      label="Best Start Year"
+                      value={String(backtest.best?.startYear ?? '—')}
+                      sub={`${fmt(backtest.best?.finalBalance ?? 0)} at age ${endAge}`}
+                      color="var(--blue)"
+                    />
+                  </div>
+
+                  {backtest.failures.length > 0 && (
+                    <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7 }}>
+                      <strong style={{ color: 'var(--danger)' }}>Failing start years:</strong>{' '}
+                      {backtest.failures.map((f) => `${f.startYear} (out at ${f.failedAtAge})`).join(', ')}.
+                      {' '}These are the sequence-of-returns scenarios your plan needs slack for.
+                    </div>
+                  )}
+
+                  <MiniChart
+                    height={220}
+                    data={backtest.percentiles.p50.map((_, i) => ({
+                      i,
+                      p10: backtest.percentiles.p10[i],
+                      p50: backtest.percentiles.p50[i],
+                      p90: backtest.percentiles.p90[i],
+                    }))}
+                    lines={[
+                      { key: 'p90', color: 'var(--blue)', label: 'Best decile', width: 1.5 },
+                      { key: 'p50', color: 'var(--accent)', label: 'Median history', width: 2.5 },
+                      { key: 'p10', color: 'var(--danger)', label: 'Worst decile', width: 1.5 },
+                    ]}
+                  />
+
+                  <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    {(() => {
+                      const mc = simData.successRate;
+                      const hist = backtest.successRate;
+                      const gap = Math.abs(mc - hist);
+                      if (gap < 0.05) {
+                        return <>Monte Carlo ({(mc * 100).toFixed(0)}%) and history ({(hist * 100).toFixed(0)}%) agree — the two independent methods give you the same answer.</>;
+                      }
+                      return hist < mc
+                        ? <>History is tougher than the dice: {(hist * 100).toFixed(0)}% vs Monte Carlo&apos;s {(mc * 100).toFixed(0)}%. Real markets cluster bad years together (sequence risk) in ways random draws smooth over — weight the historical number.</>
+                        : <>History is kinder than the dice: {(hist * 100).toFixed(0)}% vs Monte Carlo&apos;s {(mc * 100).toFixed(0)}%. Your volatility assumption may be more conservative than realized history for this allocation.</>;
+                    })()}
+                  </div>
                 </Card>
               )}
 

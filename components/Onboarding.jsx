@@ -97,7 +97,7 @@ export default function Onboarding({ onComplete }) {
       retireSpending,
       incomeSources,
     });
-    onComplete();
+    onComplete({ skipped: false });
   }
 
   function skip() {
@@ -107,7 +107,7 @@ export default function Onboarding({ onComplete }) {
     if (typeof window !== 'undefined') {
       localStorage.setItem('retirement-onboarding-skipped', '1');
     }
-    onComplete();
+    onComplete({ skipped: true });
   }
 
   const total = s401k + sRoth + sTaxable + sHSA + (hasSpouse ? spouseS401k + spouseSRoth : 0);

@@ -134,9 +134,15 @@ function AppContent() {
   return (
     <div style={{ opacity: loaded ? 1 : 0, transition: 'opacity .5s ease', position: 'relative', zIndex: 1 }}>
       {!onboarded && (
-        <Onboarding onComplete={() => {
+        <Onboarding onComplete={(result) => {
           localStorage.setItem('retirement-onboarded', 'true');
           setOnboarded(true);
+          // Users who finished onboarding (entered real data) land on the
+          // Decision Engine — the "here's what your numbers say to do"
+          // moment. Skippers keep the AI Advisor default. Anything without
+          // an explicit skipped flag (e.g. OnboardingChat's done button
+          // passing a click event) counts as completed.
+          if (!(result && result.skipped === true)) setTab('optimize');
         }} />
       )}
       {/* Compact header — logo + nav + actions in one row */}
