@@ -153,6 +153,7 @@ export default function Optimize() {
       <InfoBox icon="🎯" title="Decision Engine" color="var(--accent)" bgColor="var(--accent-dim, rgba(16,185,129,0.08))">
         Every recommendation below re-runs your full plan — taxes, Social Security taxability, RMDs, IRMAA,
         and the withdrawal waterfall — not a rule of thumb. Expand &ldquo;Show the math&rdquo; on any card to audit it.
+        {' '}<a href="/report" style={{ color: 'var(--accent)', fontWeight: 600 }}>Print / save the full plan as PDF →</a>
       </InfoBox>
 
       {/* Baseline strip */}

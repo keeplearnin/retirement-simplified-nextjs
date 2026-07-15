@@ -439,8 +439,9 @@ export default function MonteCarlo() {
                   <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12, lineHeight: 1.5 }}>
                     Your exact plan, replayed through every real market history since {HISTORICAL_START_YEAR} —
                     the Great Depression, the stagflation 1970s, the dot-com bust, and 2008 included.
+                    Each sequence uses the returns AND the actual CPI inflation those years delivered.
                     Returns: S&amp;P 500 / 10-yr Treasury blend matching your {Math.round((PROFILE_STOCK_PCT[portfolioProfile] ?? 0.7) * 100)}/{Math.round((1 - (PROFILE_STOCK_PCT[portfolioProfile] ?? 0.7)) * 100)} profile
-                    (source: Damodaran, NYU Stern).
+                    (sources: Damodaran/NYU Stern; BLS CPI-U).
                   </div>
 
                   <div className="stats-row" style={{ display: 'flex', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>

@@ -334,6 +334,13 @@ function AppContent() {
           <a href="/methodology" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>How the math works</a>
           <a href="https://github.com/keeplearnin/retirement-simplified-nextjs" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-dim)', textDecoration: 'none' }}>Source on GitHub</a>
           <a href="/verdict" style={{ color: 'var(--text-dim)', textDecoration: 'none' }}>Quick Verdict</a>
+          <a href="/report" style={{ color: 'var(--text-dim)', textDecoration: 'none' }}>PDF Report</a>
+        </div>
+        {/* Standalone calculators — SEO entry points that funnel into the app */}
+        <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center', gap: 18, flexWrap: 'wrap', fontSize: 11 }}>
+          <a href="/calculators/irmaa-cliff-checker" style={{ color: 'var(--text-dim)', textDecoration: 'none' }}>IRMAA Cliff Checker</a>
+          <a href="/calculators/tax-torpedo" style={{ color: 'var(--text-dim)', textDecoration: 'none' }}>Tax Torpedo</a>
+          <a href="/calculators/social-security-break-even" style={{ color: 'var(--text-dim)', textDecoration: 'none' }}>SS Break-Even</a>
         </div>
         <p style={{ color: 'var(--text-dim)', fontSize: 11, marginTop: 16, lineHeight: 1.7, opacity: 0.6 }}>
           Built independently. Not a financial advisor. Free, open source, MIT licensed. Tax + benefits data refreshed annually from the IRS, SSA, and CMS.

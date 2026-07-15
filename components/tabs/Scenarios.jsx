@@ -52,6 +52,40 @@ export default function Scenarios() {
     );
   }
 
+  // Export the current plan as a portable JSON file — backup, device moves,
+  // or sharing with a spouse/advisor. Format is versioned for future import
+  // compatibility.
+  function exportPlan() {
+    const payload = { format: 'retire-simplified-plan', version: 1, exportedAt: new Date().toISOString(), plan };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `retire-simplified-plan-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importPlan(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        const incoming = parsed?.format === 'retire-simplified-plan' ? parsed.plan : parsed;
+        if (!incoming || typeof incoming !== 'object' || typeof incoming.currentAge !== 'number') {
+          alert('That file does not look like a Retire.Simplified plan export.');
+          return;
+        }
+        // Snapshot the current plan first so the import is reversible.
+        setSaved((prev) => [...prev, { id: Date.now(), name: 'Before import (auto-backup)', savedAt: new Date().toISOString().slice(0, 10), plan: { ...plan } }]);
+        bulkUpdate(incoming);
+      } catch {
+        alert('Could not read that file — it is not valid JSON.');
+      }
+    };
+    reader.readAsText(file);
+  }
+
   // "Current plan" is always the first column; up to two saved scenarios join it.
   const compared = useMemo(() => {
     const entries = [
@@ -106,6 +140,22 @@ export default function Scenarios() {
             }}
           />
           <Button variant="primary" size="sm" onClick={saveCurrent}>Save scenario</Button>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Button variant="ghost" size="sm" onClick={exportPlan}>⬇ Export plan (JSON)</Button>
+          <label style={{ display: 'inline-block' }}>
+            <span className="btn btn-sm btn-ghost" style={{ cursor: 'pointer' }}>⬆ Import plan</span>
+            <input
+              type="file"
+              accept=".json,application/json"
+              style={{ display: 'none' }}
+              onChange={(e) => { if (e.target.files?.[0]) importPlan(e.target.files[0]); e.target.value = ''; }}
+            />
+          </label>
+          <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+            Backup, move devices, or share. Importing auto-saves your current plan as a scenario first.
+          </span>
         </div>
 
         {saved.length > 0 && (

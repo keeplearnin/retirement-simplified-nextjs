@@ -51,7 +51,7 @@ describe('runBacktest — mechanics', () => {
   });
 
   it('applies inflation from today and nets Social Security (parity with Monte Carlo)', () => {
-    // 100% inflation, SS covers part of spending from 65.
+    // 100% flat inflation (rows have no CPI → fallback), SS from 65.
     const returns = [[0, 0], [0, 0]];
     const r = runBacktest({
       ...base, endAge: 66, inflationPct: 100,
@@ -59,6 +59,16 @@ describe('runBacktest — mechanics', () => {
     });
     // Retirement year y=2: index 2^1=2 → spend 100K, SS 48K → net 52K
     expect(r.sequences[0].finalBalance).toBe(1_000_000 - 52_000);
+  });
+
+  it('uses each era\'s actual CPI when the returns rows carry one', () => {
+    // Year 1 CPI 50%, year 2 CPI 0% — user's flat assumption (0%) ignored.
+    const returns = [[0, 0, 0.5], [0, 0, 0]];
+    const r = runBacktest({
+      ...base, endAge: 66, inflationPct: 0, returns, startYearOffset: 2000,
+    });
+    // Retirement year y=2: index = 1 * (1+0.5) = 1.5 → spend 75K
+    expect(r.sequences[0].finalBalance).toBe(1_000_000 - 75_000);
   });
 
   it('blends stock/bond returns by stockPct', () => {

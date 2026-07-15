@@ -218,6 +218,9 @@ const IRMAA_MFJ: IrmaaEntry[] = [
   { magiThreshold: Infinity, monthlyPartBSurcharge: 487.00 },
 ];
 
+/** Exported for the standalone IRMAA calculator page. */
+export const IRMAA_TABLES = { single: IRMAA_SINGLE, mfj: IRMAA_MFJ };
+
 // ---------------------------------------------------------------------------
 // State Tax Rates (simplified — flat or top marginal approximation)
 // States with graduated brackets use a weighted average / top-bracket approx.
