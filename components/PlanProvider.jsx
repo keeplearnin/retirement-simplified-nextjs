@@ -207,13 +207,20 @@ export function PlanProvider({ children }) {
     }));
   }, [setPlan]);
 
-  const addIncome = useCallback((type) => {
+  const addIncome = useCallback((type, owner = 'primary') => {
     const template = INCOME_TEMPLATES[type];
     if (!template) return;
     incomeIdRef.current += 1;
     setPlan(prev => ({
       ...prev,
-      incomeSources: [...prev.incomeSources, { ...template, id: incomeIdRef.current }],
+      incomeSources: [...prev.incomeSources, {
+        ...template,
+        id: incomeIdRef.current,
+        owner,
+        // Prefix spouse-owned sources so every list (cards, AI plan summary,
+        // report) reads unambiguously.
+        label: owner === 'spouse' ? `Spouse ${template.label}` : template.label,
+      }],
     }));
   }, [setPlan]);
 

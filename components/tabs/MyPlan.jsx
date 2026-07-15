@@ -75,14 +75,49 @@ function Collapsible({ title, defaultOpen = true, children, badge }) {
 // Income Source Card
 // ---------------------------------------------------------------------------
 
-function IncomeSourceCard({ source, onChange, onRemove, retireAge }) {
+function IncomeSourceCard({ source, onChange, onRemove, retireAge, hasSpouse }) {
   const update = (key, val) => onChange({ ...source, [key]: val });
+  const owner = source.owner || 'primary';
+  // Rental is household-level in the projection engine (no owner semantics),
+  // so it gets no You/Spouse toggle.
+  const ownable = source.type !== 'rental';
+
+  const setOwner = (nextOwner) => {
+    if (nextOwner === owner) return;
+    const baseLabel = (source.label || '').replace(/^Spouse /, '');
+    onChange({
+      ...source,
+      owner: nextOwner,
+      label: nextOwner === 'spouse' ? `Spouse ${baseLabel}` : baseLabel,
+    });
+  };
 
   return (
     <div style={{ padding: 16, border: '1px solid var(--border)', borderRadius: 12, marginBottom: 12, background: 'var(--bg2)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 10, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{source.label}</span>
-        <button onClick={onRemove} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', fontSize: 18 }} title="Remove">&times;</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {hasSpouse && ownable && (
+            <div style={{ display: 'flex', borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden' }}>
+              {[['primary', 'You'], ['spouse', 'Spouse']].map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => setOwner(val)}
+                  style={{
+                    padding: '4px 12px', border: 'none', cursor: 'pointer',
+                    fontSize: 11, fontWeight: 600, fontFamily: 'var(--sans)',
+                    background: owner === val ? 'var(--accent)' : 'transparent',
+                    color: owner === val ? '#fff' : 'var(--text-dim)',
+                    transition: 'all .15s',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          <button onClick={onRemove} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', fontSize: 18 }} title="Remove">&times;</button>
+        </div>
       </div>
 
       {source.type === 'salary' && (
@@ -1478,6 +1513,23 @@ export default function MyPlan() {
         </Collapsible>
 
         <Collapsible title="Income Sources" defaultOpen={false} badge={`${plan.incomeSources.length} source${plan.incomeSources.length !== 1 ? 's' : ''}`}>
+          {/* The projection reads ONE source per (type, owner) pair — a second
+              "Your Salary" would be silently ignored. Surface it. */}
+          {(() => {
+            const seen = new Set();
+            const dupes = [];
+            for (const s of plan.incomeSources) {
+              const key = `${s.type}:${s.owner || 'primary'}`;
+              if (seen.has(key) && s.type !== 'rental') dupes.push(s.label);
+              seen.add(key);
+            }
+            return dupes.length > 0 ? (
+              <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, border: '1px solid var(--warn)', background: 'rgba(251,191,36,0.06)', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                ⚠️ Duplicate source{dupes.length > 1 ? 's' : ''} ({dupes.join(', ')}): the projection only
+                uses the first of each type per person — remove the extra or switch its owner to Spouse.
+              </div>
+            ) : null;
+          })()}
           {plan.incomeSources.map(src => (
             <IncomeSourceCard
               key={src.id}
@@ -1485,6 +1537,7 @@ export default function MyPlan() {
               onChange={updated => updateIncome(src.id, updated)}
               onRemove={() => removeIncome(src.id)}
               retireAge={plan.retireAge}
+              hasSpouse={!!plan.hasSpouse}
             />
           ))}
           <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -1503,8 +1556,11 @@ export default function MyPlan() {
               <div style={{
                 position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 20,
                 background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8,
-                padding: 4, minWidth: 200, boxShadow: '0 8px 24px rgba(0,0,0,.3)',
+                padding: 4, minWidth: 220, boxShadow: '0 8px 24px rgba(0,0,0,.3)',
               }}>
+                {plan.hasSpouse && (
+                  <div style={{ padding: '6px 14px 2px', fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700 }}>Yours</div>
+                )}
                 {Object.entries(INCOME_TEMPLATES).map(([key, tmpl]) => (
                   <button
                     key={key}
@@ -1521,6 +1577,28 @@ export default function MyPlan() {
                     {tmpl.label}
                   </button>
                 ))}
+                {plan.hasSpouse && (
+                  <>
+                    <div style={{ padding: '8px 14px 2px', fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700, borderTop: '1px solid var(--border)', marginTop: 4 }}>Spouse&apos;s</div>
+                    {/* Rental is household-level in the engine — no spouse variant. */}
+                    {Object.entries(INCOME_TEMPLATES).filter(([key]) => key !== 'rental').map(([key, tmpl]) => (
+                      <button
+                        key={`spouse-${key}`}
+                        onClick={() => { addIncome(key, 'spouse'); setShowAddMenu(false); }}
+                        style={{
+                          display: 'block', width: '100%', textAlign: 'left',
+                          padding: '10px 14px', border: 'none', cursor: 'pointer',
+                          background: 'transparent', color: 'var(--text)',
+                          fontSize: 13, fontFamily: 'var(--sans)', borderRadius: 6,
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg2)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        Spouse {tmpl.label}
+                      </button>
+                    ))}
+                  </>
+                )}
               </div>
             )}
           </div>
