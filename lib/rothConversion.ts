@@ -74,6 +74,10 @@ export interface RothLadderYear {
 export interface RothLadderScenario {
   years: RothLadderYear[];
   lifetimeTax: number;
+  /** Total IRMAA Part B surcharges paid across the projection (65+ years).
+   *  IRMAA is a Medicare premium, not a tax, so it's tracked separately from
+   *  lifetimeTax — but conversions that trip a tier are a real cash cost. */
+  lifetimeIrmaa: number;
   /** First-year RMD (age 73) in this scenario. */
   rmdAt73: number;
   /** Total balance (trad + roth) at longevityAge. */
@@ -144,6 +148,7 @@ function runScenario(input: RothLadderInput, withLadder: boolean): RothLadderSce
 
   const years: RothLadderYear[] = [];
   let lifetimeTax = 0;
+  let lifetimeIrmaa = 0;
   let rmdAt73 = 0;
 
   for (let age = input.retireAge; age <= input.longevityAge; age++) {
@@ -197,6 +202,10 @@ function runScenario(input: RothLadderInput, withLadder: boolean): RothLadderSce
 
     const totalTax = taxResult.totalTax;
     lifetimeTax += totalTax;
+    // IRMAA only applies once on Medicare (65+). taxResult.irmaa is the
+    // monthly Part B surcharge; annualize it. (Real IRMAA keys off MAGI from
+    // two years prior — same-year is the approximation used app-wide.)
+    if (age >= 65) lifetimeIrmaa += taxResult.irmaa * 12;
 
     // End-of-year growth on remaining balances. Both buckets share the same
     // return assumption (post-conversion the dollars sit in Roth and grow
@@ -222,9 +231,78 @@ function runScenario(input: RothLadderInput, withLadder: boolean): RothLadderSce
   return {
     years,
     lifetimeTax,
+    lifetimeIrmaa,
     rmdAt73,
     finalBalance: tradBal + rothBal,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Optimizer — sweep target brackets and pick the best net outcome
+// ---------------------------------------------------------------------------
+
+export interface RothOptimizerOption {
+  targetBracket: Bracket;
+  /** Lifetime tax saved vs baseline (positive = ladder better). */
+  taxSaved: number;
+  /** Extra IRMAA surcharges the ladder causes vs baseline (positive = cost). */
+  irmaaCost: number;
+  /** taxSaved - irmaaCost — the honest number to rank on. */
+  netSaved: number;
+  totalConverted: number;
+  conversionYears: number;
+  irmaaTrippedAges: number[];
+  /** Year-by-year execution schedule (only years with a conversion). */
+  schedule: Array<{ age: number; conversion: number; taxThatYear: number }>;
+  output: RothLadderOutput;
+}
+
+export interface RothOptimizerResult {
+  options: RothOptimizerOption[];
+  /** Highest netSaved option, or null if no bracket beats the baseline. */
+  best: RothOptimizerOption | null;
+  baselineLifetimeTax: number;
+}
+
+/**
+ * optimizeRothLadder — run the ladder at each candidate bracket and rank by
+ * NET savings: lifetime tax saved minus any IRMAA surcharges the conversions
+ * trigger. This is the piece competitors miss — a conversion that saves
+ * $30K of income tax but trips 8 years of IRMAA tiers can be a net loser.
+ */
+export function optimizeRothLadder(
+  input: Omit<RothLadderInput, 'targetBracket'>,
+  brackets: Bracket[] = [12, 22, 24],
+): RothOptimizerResult {
+  const baseline = runScenario({ ...input, targetBracket: 0 }, false);
+
+  const options: RothOptimizerOption[] = brackets.map((targetBracket) => {
+    const output = modelRothLadder({ ...input, targetBracket });
+    const taxSaved = Math.round(output.taxSaved);
+    const irmaaCost = Math.round(output.ladder.lifetimeIrmaa - output.baseline.lifetimeIrmaa);
+    return {
+      targetBracket,
+      taxSaved,
+      irmaaCost,
+      netSaved: taxSaved - irmaaCost,
+      totalConverted: Math.round(output.ladderConversionTotal),
+      conversionYears: output.conversionWindowYears,
+      irmaaTrippedAges: output.irmaaTrippedAges,
+      schedule: output.ladder.years
+        .filter((y) => y.conversion > 0)
+        .map((y) => ({
+          age: y.age,
+          conversion: Math.round(y.conversion),
+          taxThatYear: Math.round(y.totalTax),
+        })),
+      output,
+    };
+  });
+
+  const ranked = [...options].sort((a, b) => b.netSaved - a.netSaved);
+  const best = ranked[0] && ranked[0].netSaved > 0 ? ranked[0] : null;
+
+  return { options, best, baselineLifetimeTax: Math.round(baseline.lifetimeTax) };
 }
 
 export function modelRothLadder(input: RothLadderInput): RothLadderOutput {

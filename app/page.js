@@ -28,6 +28,11 @@ import MyPlan from '@/components/tabs/MyPlan';
 import RothStrategy from '@/components/tabs/RothStrategy';
 import RetirementIncome from '@/components/tabs/RetirementIncome';
 import Inheritance from '@/components/tabs/Inheritance';
+// Flagship additions: Optimize (Decision Engine — ranked, dollar-quantified
+// recommendations with auditable math) and Scenarios (side-by-side plan
+// comparison on the full projection engine).
+import Optimize from '@/components/tabs/Optimize';
+import Scenarios from '@/components/tabs/Scenarios';
 import Icon from '@/components/ui/Icon';
 
 function AppContent() {
@@ -97,6 +102,8 @@ function AppContent() {
   const categories = [
     { id: 'plan', label: 'Plan', icon: 'chart', tabs: [
       { id: 'myplan', label: 'My Plan' },
+      { id: 'optimize', label: 'Optimize' },
+      { id: 'scenarios', label: 'Scenarios' },
       { id: 'portfolio', label: 'Portfolio' },
     ]},
     // Coach groups the AI Advisor (chat) with the workbench drill-downs,
@@ -301,6 +308,8 @@ function AppContent() {
           </div>
         )}
         {tab === 'myplan' && <MyPlan />}
+        {tab === 'optimize' && <Optimize />}
+        {tab === 'scenarios' && <Scenarios />}
         {tab === 'portfolio' && <PortfolioBuilder />}
         {tab === 'advisor' && <AIAdvisor />}
         {tab === 'roth-strategy' && <RothStrategy />}
