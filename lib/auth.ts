@@ -31,6 +31,17 @@ export const isConfigured = (): boolean => {
   return !!(c.region && c.apiUrl && c.userPoolClientId);
 };
 
+// JWT payloads are base64url-encoded (RFC 7515): '-' and '_' instead of
+// '+' and '/', padding stripped. Plain atob() throws on those characters,
+// which made valid tokens parse as null — users looked signed out at random
+// depending on the byte content of their token. Normalize before decoding.
+function decodeJwtPayload(token: string): Record<string, any> {
+  const b64url = token.split('.')[1] ?? '';
+  const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+  return JSON.parse(atob(padded));
+}
+
 const Auth = {
   getTokens(): AuthTokens | null {
     try { return JSON.parse(sessionStorage.getItem('rs_tokens') || 'null'); } catch { return null; }
@@ -45,7 +56,7 @@ const Auth = {
     const tokens = this.getTokens();
     if (!tokens?.id_token) return null;
     try {
-      const payload = JSON.parse(atob(tokens.id_token.split('.')[1]));
+      const payload = decodeJwtPayload(tokens.id_token);
       if (payload.exp * 1000 < Date.now()) { this.clearTokens(); return null; }
       return { name: payload.name || payload.email, given_name: payload.given_name, email: payload.email, sub: payload.sub, picture: payload.picture };
     } catch { return null; }
@@ -54,7 +65,7 @@ const Auth = {
     const tokens = this.getTokens();
     if (!tokens?.access_token) return null;
     try {
-      const payload = JSON.parse(atob(tokens.access_token.split('.')[1]));
+      const payload = decodeJwtPayload(tokens.access_token);
       if (payload.exp * 1000 < Date.now()) { this.clearTokens(); return null; }
       return tokens.access_token;
     } catch { return null; }
@@ -63,7 +74,7 @@ const Auth = {
     const tokens = this.getTokens();
     if (!tokens?.id_token) return null;
     try {
-      const payload = JSON.parse(atob(tokens.id_token.split('.')[1]));
+      const payload = decodeJwtPayload(tokens.id_token);
       if (payload.exp * 1000 < Date.now()) { this.clearTokens(); return null; }
       return tokens.id_token;
     } catch { return null; }

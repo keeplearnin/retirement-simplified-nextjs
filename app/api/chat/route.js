@@ -5,6 +5,13 @@ import { TOOL_DEFINITIONS, executeTool } from '@/lib/agentTools';
 
 const MAX_TOOL_ITERATIONS = 5;
 
+// Abuse guards: the request body is client-controlled, and every message in
+// it becomes Anthropic input tokens on OUR bill. Cap conversation length and
+// total payload size so 20 req/min can't each carry a megabyte of history.
+const MAX_MESSAGES = 40;
+const MAX_BODY_BYTES = 100_000; // ~25K tokens worst case
+const ALLOWED_ROLES = new Set(['user', 'assistant']);
+
 export async function POST(request) {
   try {
     const authResult = await verifyAuth(request);
@@ -14,7 +21,21 @@ export async function POST(request) {
     const rateLimited = checkRateLimit(`chat:${ip}`, 20, 60_000);
     if (rateLimited) return rateLimited;
 
-    const { messages, plan, planHistory } = await request.json();
+    const rawBody = await request.text();
+    if (rawBody.length > MAX_BODY_BYTES) {
+      return NextResponse.json({ error: 'Request too large' }, { status: 413 });
+    }
+    const { messages: rawMessages, plan, planHistory } = JSON.parse(rawBody);
+    if (!Array.isArray(rawMessages) || rawMessages.length === 0) {
+      return NextResponse.json({ error: 'messages must be a non-empty array' }, { status: 400 });
+    }
+    if (!rawMessages.every((m) => m && ALLOWED_ROLES.has(m.role) && typeof m.content === 'string')) {
+      return NextResponse.json({ error: 'messages must be {role: user|assistant, content: string}' }, { status: 400 });
+    }
+    // Long chats: keep only the most recent window rather than rejecting.
+    // Trim any leading assistant turns — Anthropic requires user-first.
+    let messages = rawMessages.slice(-MAX_MESSAGES);
+    while (messages.length && messages[0].role !== 'user') messages = messages.slice(1);
     const apiKey = process.env.ANTHROPIC_API_KEY;
 
     if (!apiKey) {
@@ -30,7 +51,7 @@ export async function POST(request) {
       iterations++;
 
       const body = {
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-5',
         max_tokens: 2048,
         system: AI_AGENT_SYSTEM_PROMPT,
         tools: plan ? TOOL_DEFINITIONS : [],

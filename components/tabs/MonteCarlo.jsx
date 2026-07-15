@@ -11,6 +11,7 @@ import ValidationWarning from '@/components/ui/ValidationWarning';
 import { GRID_FRACS } from '@/lib/constants';
 import { usePlan, getTotalSavings } from '@/components/PlanProvider';
 import { interpretMonteCarloResult } from '@/lib/monteCarloInterpret';
+import { runSimulation } from '@/lib/monteCarloEngine';
 
 // ── Portfolio-aware return/volatility profiles ──────────────────────────
 // Based on historical data: Ibbotson SBBI, Vanguard research, DFA returns matrix
@@ -24,48 +25,7 @@ const PORTFOLIO_PROFILES = [
   { id: 'custom',        label: 'Custom',              desc: 'Set your own return & vol', avgReturn: 0.07, stdDev: 0.15, color: 'var(--text-dim)' },
 ];
 
-// ── Core simulation engine ──────────────────────────────────────────────
-function runSimulation({ savings, monthly, salaryGrowth, annualSpend, inflationPct, age, retireAge, endAge, avgReturn, stdDev, runs }) {
-  const years = retireAge - age;
-  const retirementYears = endAge - retireAge;
-  const totalYears = years + retirementYears;
-  const paths = [];
-  let successes = 0;
-  const percentiles = { p10: [], p25: [], p50: [], p75: [], p90: [] };
-  const salGrowthRate = salaryGrowth / 100;
-
-  for (let i = 0; i < runs; i++) {
-    let bal = savings;
-    const path = [bal];
-    let failed = false;
-    for (let y = 1; y <= totalYears; y++) {
-      const u1 = Math.max(1e-10, Math.random()), u2 = Math.random();
-      const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-      const r = avgReturn + stdDev * z;
-      if (y <= years) {
-        const yearlyContrib = monthly * 12 * Math.pow(1 + salGrowthRate, y - 1);
-        bal = bal * (1 + r) + yearlyContrib;
-      } else {
-        bal = bal * (1 + r) - annualSpend * Math.pow(1 + inflationPct / 100, y - years - 1);
-      }
-      if (bal < 0) { bal = 0; failed = true; }
-      path.push(bal);
-    }
-    paths.push(path);
-    if (!failed && bal > 0) successes++;
-  }
-
-  for (let y = 0; y <= totalYears; y++) {
-    const vals = paths.map(p => p[y]).sort((a, b) => a - b);
-    percentiles.p10.push(vals[Math.floor(runs * 0.1)]);
-    percentiles.p25.push(vals[Math.floor(runs * 0.25)]);
-    percentiles.p50.push(vals[Math.floor(runs * 0.5)]);
-    percentiles.p75.push(vals[Math.floor(runs * 0.75)]);
-    percentiles.p90.push(vals[Math.floor(runs * 0.9)]);
-  }
-
-  return { percentiles, successRate: successes / runs, totalYears, years, retirementYears };
-}
+// Core simulation engine lives in lib/monteCarloEngine.js (pure + testable).
 
 export default function MonteCarlo() {
   const { plan } = usePlan();
@@ -75,6 +35,12 @@ export default function MonteCarlo() {
   const [monthly, setMonthly] = useState(() => plan.monthlyContribution || 800);
   const [annualSpend, setAnnualSpend] = useState(() => plan.retireSpending || Math.round((plan.annualSpending || 50000) * 0.8));
   const [endAge, setEndAge] = useState(() => plan.longevityAge || 95);
+  // Social Security is netted against retirement spending so this tab's
+  // success rate is reconcilable with My Plan's projection (which models SS).
+  // Seeded from the plan's primary SS source; adjustable below.
+  const planSS = plan.incomeSources?.find(s => s.type === 'socialSecurity' && (s.owner || 'primary') === 'primary');
+  const [ssMonthly, setSsMonthly] = useState(() => planSS?.monthlyBenefit || 0);
+  const [ssStartAge, setSsStartAge] = useState(() => planSS?.startAge || 67);
   const [inflationPct, setInflationPct] = useState(2.5);
   const [salaryGrowth, setSalaryGrowth] = useState(3);
   const [runs, setRuns] = useState(1000);
@@ -106,7 +72,7 @@ export default function MonteCarlo() {
   const avgReturn = portfolioProfile === 'custom' ? customReturn / 100 : activeProfile.avgReturn;
   const stdDev = portfolioProfile === 'custom' ? customVol / 100 : activeProfile.stdDev;
 
-  const simParams = { savings, monthly, salaryGrowth, annualSpend, inflationPct, age, retireAge, endAge, avgReturn, stdDev, runs };
+  const simParams = { savings, monthly, salaryGrowth, annualSpend, inflationPct, age, retireAge, endAge, avgReturn, stdDev, runs, ssMonthly, ssStartAge };
 
   function runSim() {
     setRunning(true);
@@ -191,6 +157,8 @@ export default function MonteCarlo() {
       <InfoBox icon="🎲" title="Monte Carlo Simulation" color="var(--purple)" bgColor="var(--purple-dim, rgba(139,92,246,0.08))">
         Runs thousands of random market scenarios to estimate the probability your savings last through retirement.
         Each simulation uses randomized returns matching your portfolio risk profile — not a single fixed number.
+        Spending and Social Security are entered in today&apos;s dollars; both are inflation-adjusted inside the
+        simulation, and SS income is netted against your spending need.
       </InfoBox>
 
       <ValidationWarning warnings={warnings} />
@@ -245,6 +213,8 @@ export default function MonteCarlo() {
             <Slider label="Monthly Contribution" value={monthly} onChange={setMonthly} min={0} max={10000} step={50} format={fmt} />
             <Slider label="Salary Growth" value={salaryGrowth} onChange={setSalaryGrowth} min={0} max={6} step={0.5} suffix="%/yr" />
             <Slider label="Annual Spending in Retirement" value={annualSpend} onChange={setAnnualSpend} min={20000} max={200000} step={1000} format={fmt} />
+            <Slider label="Social Security (monthly)" value={ssMonthly} onChange={setSsMonthly} min={0} max={5000} step={50} format={fmt} />
+            <Slider label="SS Start Age" value={ssStartAge} onChange={setSsStartAge} min={62} max={70} suffix=" yrs" />
             <Slider label="Inflation" value={inflationPct} onChange={setInflationPct} min={1} max={5} step={0.5} suffix="%" />
             <Slider label="Simulations" value={runs} onChange={setRuns} min={100} max={5000} step={100} />
             <button

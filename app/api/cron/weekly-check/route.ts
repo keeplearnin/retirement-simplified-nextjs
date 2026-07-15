@@ -144,13 +144,30 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 503 });
   }
 
-  const users = await getUsersForWeeklyCheck();
+  // Fairness: DynamoDB scan order is stable, so slicing the raw list would
+  // email the same first N users every week and starve the rest once the
+  // opted-in count exceeds the batch cap. Prioritize never-emailed users,
+  // then least-recently-emailed.
+  const users = (await getUsersForWeeklyCheck()).sort((a, b) => {
+    if (!a.last_emailed_at) return b.last_emailed_at ? -1 : 0;
+    if (!b.last_emailed_at) return 1;
+    return a.last_emailed_at.localeCompare(b.last_emailed_at);
+  });
   const effectiveBatch = Math.min(BATCH_SIZE, HARD_CEILING);
-  const batch = users.slice(0, effectiveBatch);
+
+  // Time budget: stop before the platform kills the invocation so we always
+  // return a clean report. Users not reached stay eligible (lastEmailedAt
+  // unchanged) and are picked up by the next run — no one starves, because
+  // emailed users drop out of the next scan's filter.
+  const TIME_BUDGET_MS = Number(process.env.WEEKLY_CHECK_TIME_BUDGET_MS ?? 240_000);
+  const startedAt = Date.now();
 
   const results = { processed: 0, emailed: 0, errors: 0 };
+  let attempted = 0;
 
-  for (const user of batch) {
+  for (const user of users) {
+    if (attempted >= effectiveBatch || Date.now() - startedAt > TIME_BUDGET_MS) break;
+    attempted++;
     try {
       // Load plan and history for this user
       const planRow = await getUserPlan(user.user_id);
@@ -184,8 +201,8 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ...results,
     total: users.length,
-    batchSize: batch.length,
+    batchSize: attempted,
     batchCap: effectiveBatch,
-    remaining: Math.max(0, users.length - batch.length),
+    remaining: Math.max(0, users.length - attempted),
   });
 }

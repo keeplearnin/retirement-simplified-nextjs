@@ -39,8 +39,14 @@ export async function PUT(request: Request) {
   const rateLimited = checkRateLimit(`plan-put:${ip}`, 20, 60_000);
   if (rateLimited) return rateLimited;
 
-  const body = await request.json() as { plan: Record<string, unknown> };
-  if (!body.plan) {
+  // Plans are a few KB of scalars + small arrays; 100KB is generous headroom
+  // while keeping abusive payloads well below DynamoDB's 400KB item limit.
+  const raw = await request.text();
+  if (raw.length > 100_000) {
+    return NextResponse.json({ error: 'plan too large' }, { status: 413 });
+  }
+  const body = JSON.parse(raw) as { plan: Record<string, unknown> };
+  if (!body.plan || typeof body.plan !== 'object') {
     return NextResponse.json({ error: 'plan is required' }, { status: 400 });
   }
 
