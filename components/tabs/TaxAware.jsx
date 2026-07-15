@@ -28,6 +28,8 @@ export default function TaxAware() {
   const [annualContrib, setAnnualContrib] = useState(7000);
   const [currentBracket, setCurrentBracket] = useState(24);
   const [retireBracket, setRetireBracket] = useState(22);
+  const [showReal, setShowReal] = useState(false);
+  const inflationRate = plan.inflationRate || 2.5;
 
   // Detect SECURE 2.0 mandatory-Roth-catch-up applicability for this household.
   // Trigger: age 50+ AND salary > $150K (2026 threshold). Couples-aware: any
@@ -59,17 +61,29 @@ export default function TaxAware() {
       const taxSavingsBasis = tradTaxSaved * y; // total contributions (cost basis)
       const taxSavingsGain = Math.max(0, taxSavingsInvested - taxSavingsBasis);
       const taxSavingsAfterTax = taxSavingsInvested - (taxSavingsGain * ltcgRate);
-      pts.push({ year: y, age: age + y, roth, trad, rothNet: rothAfterTax, tradNet: tradAfterTax + taxSavingsAfterTax, taxSavings: taxSavingsInvested });
+      const tradNet = tradAfterTax + taxSavingsAfterTax;
+      // Deflate to today's purchasing power — same convention as the other
+      // tabs (divide the nominal balance by cumulative inflation to date).
+      const deflator = Math.pow(1 + inflationRate / 100, y);
+      pts.push({
+        year: y, age: age + y, roth, trad,
+        rothNet: rothAfterTax, tradNet, taxSavings: taxSavingsInvested,
+        rothNetReal: rothAfterTax / deflator, tradNetReal: tradNet / deflator,
+        taxSavingsReal: taxSavingsInvested / deflator,
+      });
       roth = roth * (1 + r) + rothContrib;
       trad = trad * (1 + r) + tradContrib;
       taxSavingsInvested = taxSavingsInvested * (1 + r) + tradTaxSaved;
     }
     return pts;
-  }, [age, retireAge, annualContrib, returnRate, currentBracket, retireBracket]);
+  }, [age, retireAge, annualContrib, returnRate, currentBracket, retireBracket, inflationRate]);
 
   const final = data[data.length - 1] || {};
-  const rothWins = final.rothNet > final.tradNet;
-  const diff = Math.abs(final.rothNet - final.tradNet);
+  const finalRothNet = showReal ? final.rothNetReal : final.rothNet;
+  const finalTradNet = showReal ? final.tradNetReal : final.tradNet;
+  const finalTaxSavings = showReal ? final.taxSavingsReal : final.taxSavings;
+  const rothWins = finalRothNet > finalTradNet;
+  const diff = Math.abs((finalRothNet || 0) - (finalTradNet || 0));
 
   return (
     <div className="fade-up">
@@ -85,9 +99,9 @@ export default function TaxAware() {
 
       <InfoBox icon="⚖️" title="Roth vs Traditional: Which Wins?" color="var(--info)" bgColor="var(--info-dim)">
         {rothWins ? (
-          <>The <strong style={{ color: 'var(--accent)' }}>Roth IRA</strong> comes out ahead by <strong style={{ color: 'var(--accent)' }}>{fmt(diff)}</strong> after taxes. With a lower tax bracket in retirement, the gap narrows — but tax-free withdrawals still win here.</>
+          <>The <strong style={{ color: 'var(--accent)' }}>Roth IRA</strong> comes out ahead by <strong style={{ color: 'var(--accent)' }}>{fmt(diff)}</strong> after taxes{showReal ? ' (today\'s dollars)' : ''}. With a lower tax bracket in retirement, the gap narrows — but tax-free withdrawals still win here.</>
         ) : (
-          <>The <strong style={{ color: 'var(--info)' }}>Traditional IRA</strong> comes out ahead by <strong style={{ color: 'var(--info)' }}>{fmt(diff)}</strong> after taxes. Your higher current bracket means the upfront deduction and reinvested tax savings give Traditional the edge.</>
+          <>The <strong style={{ color: 'var(--info)' }}>Traditional IRA</strong> comes out ahead by <strong style={{ color: 'var(--info)' }}>{fmt(diff)}</strong> after taxes{showReal ? ' (today\'s dollars)' : ''}. Your higher current bracket means the upfront deduction and reinvested tax savings give Traditional the edge.</>
         )}
       </InfoBox>
 
@@ -114,21 +128,26 @@ export default function TaxAware() {
               <div className="f11 dim upcase mb-8" style={{ letterSpacing: '.08em' }}>Retirement Bracket (withdrawals)</div>
               <BracketButtons brackets={TAX_BRACKETS} selected={retireBracket} onSelect={setRetireBracket} />
             </div>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginTop: 16, fontSize: 13, color: 'var(--text-muted)' }}>
+              <input type="checkbox" checked={showReal} onChange={e => setShowReal(e.target.checked)} style={{ accentColor: 'var(--accent)', width: 16, height: 16 }} />
+              Show inflation-adjusted ({inflationRate}%)
+            </label>
           </Card>
         </div>
 
         <div>
           <Card>
-            <SectionLabel>After-Tax Comparison at Retirement</SectionLabel>
+            <SectionLabel>After-Tax Comparison at Retirement{showReal ? " (today's $)" : ''}</SectionLabel>
             <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
-              <Stat icon="🟢" label="Roth (after-tax)" value={fmt(final.rothNet || 0)} sub="Tax-free withdrawals" color="var(--accent)" />
-              <Stat icon="🔵" label="Traditional (after-tax)" value={fmt(final.tradNet || 0)} sub={`Includes reinvested tax savings`} color="var(--info)" />
-              <Stat icon="💰" label="Tax Savings Invested" value={fmt(final.taxSavings || 0)} sub={`${fmt(annualContrib * currentBracket / 100)}/yr reinvested`} color="var(--text-muted)" />
+              <Stat icon="🟢" label="Roth (after-tax)" value={fmt(finalRothNet || 0)} sub="Tax-free withdrawals" color="var(--accent)" />
+              <Stat icon="🔵" label="Traditional (after-tax)" value={fmt(finalTradNet || 0)} sub={`Includes reinvested tax savings`} color="var(--info)" />
+              <Stat icon="💰" label="Tax Savings Invested" value={fmt(finalTaxSavings || 0)} sub={`${fmt(annualContrib * currentBracket / 100)}/yr reinvested`} color="var(--text-muted)" />
             </div>
 
             <MiniChart data={data} height={280} lines={[
-              { key: 'rothNet', color: 'var(--accent)', label: 'Roth (after-tax)', width: 2.5 },
-              { key: 'tradNet', color: 'var(--info)', label: 'Traditional (after-tax)', width: 2.5 },
+              { key: showReal ? 'rothNetReal' : 'rothNet', color: 'var(--accent)', label: 'Roth (after-tax)', width: 2.5 },
+              { key: showReal ? 'tradNetReal' : 'tradNet', color: 'var(--info)', label: 'Traditional (after-tax)', width: 2.5 },
             ]} />
           </Card>
 

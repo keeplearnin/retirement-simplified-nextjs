@@ -112,9 +112,8 @@ function phaseMultiplier(
 
 /**
  * Average long-term care need is ~28 months at end of life.
- * We model this as a gradual ramp starting at age 85, peaking at
- * $6,000/mo (today's dollars) in the final years, inflated at
- * healthcare inflation.
+ * We model this as a gradual ramp starting at age 85, inflated at a
+ * capped LTC-specific rate, peaking in the final years before longevityAge.
  */
 function longTermCareCost(
   age: number,
@@ -126,10 +125,15 @@ function longTermCareCost(
   const ltcStartAge = Math.max(85, longevityAge - 5);
   if (age < ltcStartAge) return 0;
 
-  // Probability-weighted monthly LTC cost in today's dollars.
-  // ~52% of people need some LTC; median stay 28 months; median cost ~$5K/mo.
-  // Weighted: 0.52 * $5K = ~$2,600/mo as expected cost.
-  const baseMonthlyCost = 2500;
+  // Probability-weighted monthly LTC cost in today's dollars. Genworth Cost
+  // of Care survey: 2026-equivalent median assisted living ~$5,500/mo,
+  // private nursing home room ~$9,700/mo. Unconditional lifetime incidence
+  // of needing some LTC is ~52%, but this window only fires in a person's
+  // final ~5 projected years — conditional on reaching that window, the
+  // incidence is materially higher (~65%), and duration/severity skew
+  // toward the more expensive end (nursing home, not just home health aide).
+  // Blended: 0.65 * ~$5,500 =~ $3,600/mo expected cost.
+  const baseMonthlyCost = 3600;
 
   // Ramp: increases linearly from 50% to 100% over the LTC window
   const yearsInWindow = longevityAge - ltcStartAge;
@@ -140,9 +144,14 @@ function longTermCareCost(
       : 1;
 
   const annualBase = baseMonthlyCost * 12 * rampFactor;
-  // Use general inflation (not healthcare) for LTC to keep projections realistic.
-  // Healthcare inflation on a 55-year horizon produces unrealistic numbers.
-  return inflated(annualBase, 0.03, age - currentAge);
+  // LTC costs have historically outpaced general inflation (custodial-care
+  // labor costs, not just medical technology), so a flat general-inflation
+  // rate understates real future cost — especially for young users with
+  // 55+-year horizons who compound that gap for decades. Use a rate between
+  // general and full healthcare inflation, capped at 4.5% so a very long
+  // horizon doesn't compound into an unrealistic blow-up.
+  const ltcInflationRate = Math.min(healthcareInflation, 0.045);
+  return inflated(annualBase, ltcInflationRate, age - currentAge);
 }
 
 // ---------------------------------------------------------------------------

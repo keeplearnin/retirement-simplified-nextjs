@@ -118,7 +118,6 @@ Ordered by user-impact-per-week-of-work, not by ambition.
 
 ### Known debt
 - The inline projection in `components/tabs/MyPlan.jsx` mirrors `lib/computeProjection.js`. Both are kept mathematically identical but consolidating is a multi-hour refactor; deferred until post-launch.
-- For couples with separate 401(k)s and an age gap, the RMD divisor uses primary's age on the combined household pool. Over-RMDs when spouse is younger and not yet 73. Per-spouse balance tracking is on the survivor-analysis (Phase F) work.
 - State tax uses a single effective rate per state; high earners in graduated states owe more than the estimator shows. Caveat surfaced in the State picker tooltip.
 
 ### Explicitly not on the roadmap

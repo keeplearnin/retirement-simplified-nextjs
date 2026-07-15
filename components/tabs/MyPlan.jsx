@@ -1253,7 +1253,12 @@ export default function MyPlan() {
       };
     });
 
-    // Portfolio at retirement
+    // Portfolio at retirement — the balance the day retirement begins, i.e.
+    // the start-of-year figure for the retireAge row (before that year's
+    // withdrawals/growth are applied). This is the correct number for "how
+    // much do I have to draw down from" and "how many years does this
+    // cover" — using the end-of-year figure instead would already reflect
+    // a full year of retirement spending and mislabel it as "at retirement".
     const retireRowData = combined.find(r => r.age === retireAge);
     const portfolioAtRetire = retireRowData ? retireRowData.portfolioBalance : 0;
 
@@ -1747,7 +1752,7 @@ export default function MyPlan() {
           </div>
           <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 6, fontSize: 11 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--text-dim)' }}>At retirement</span>
+              <span style={{ color: 'var(--text-dim)' }} title={`Balance the day you retire at age ${plan.retireAge}, before that year's withdrawals`}>Entering retirement</span>
               <span style={{ fontWeight: 700, color: 'var(--blue)' }}>{fmt(results.portfolioAtRetire)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
@@ -1844,7 +1849,7 @@ export default function MyPlan() {
 
       {/* Key Metrics — horizontal strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginBottom: 20 }}>
-        <MetricCard label="Portfolio at Retire" value={fmt(results.portfolioAtRetire)} color="var(--blue)" />
+        <MetricCard label="Portfolio Entering Retirement" value={fmt(results.portfolioAtRetire)} color="var(--blue)" sub={`Balance at age ${plan.retireAge}, before withdrawals`} />
         <MetricCard label="Money Lasts To" value={`Age ${results.moneyLastsAge}`} color={results.moneyLastsAge >= plan.longevityAge ? '#34d399' : '#ef4444'} />
         <MetricCard label="Lifetime Income" value={fmt(results.totalLifetimeIncome)} />
         <MetricCard label="Lifetime Taxes" value={fmt(results.totalLifetimeTax)} color="#f59e0b" />

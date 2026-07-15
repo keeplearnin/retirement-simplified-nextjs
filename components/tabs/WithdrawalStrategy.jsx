@@ -7,10 +7,10 @@ import Stat from '@/components/ui/Stat';
 import SectionLabel from '@/components/ui/SectionLabel';
 import InfoBox from '@/components/ui/InfoBox';
 import MiniChart from '@/components/ui/MiniChart';
-import BracketButtons from '@/components/ui/BracketButtons';
 import ValidationWarning from '@/components/ui/ValidationWarning';
 import { fmt, fmtFull } from '@/lib/format';
-import { RMD_TABLE, TAX_BRACKETS, SS_WAGE_CAP, SS_BEND_POINTS, SS_FACTORS, SS_FRA } from '@/lib/constants';
+import { RMD_TABLE, SS_WAGE_CAP, SS_BEND_POINTS, SS_FACTORS, SS_FRA } from '@/lib/constants';
+import { computeTax } from '@/lib/taxEngine';
 import { usePlan } from '@/components/PlanProvider';
 
 // Quick PIA estimate from current salary — used as a fallback when the user
@@ -37,6 +37,8 @@ function estimateMonthlySSFromSalary(annualSalary) {
 
 export default function WithdrawalStrategy() {
   const { plan } = usePlan();
+  const filingStatus = plan.filingStatus === 'mfj' ? 'mfj' : 'single';
+  const stateCode = plan.stateCode || 'CA';
   const [age, setAge] = useState(() => plan.retireAge || 65);
   const [lifeExpectancy, setLifeExpectancy] = useState(() => plan.longevityAge || 90);
   const [annualSpend, setAnnualSpend] = useState(() => plan.retireSpending || Math.round((plan.annualSpending || 60000) * 0.8));
@@ -68,7 +70,6 @@ export default function WithdrawalStrategy() {
     setSocialSecurity(v);
     if (ssAutoEstimated) setSsAutoEstimated(false);
   };
-  const [taxBracket, setTaxBracket] = useState(22);
   // Note: Roth conversion modeling lives on the dedicated Roth Ladder tab
   // (more accurate bracket-fill math + IRMAA cliff detection). The
   // projection here intentionally does not run conversions.
@@ -139,32 +140,20 @@ export default function WithdrawalStrategy() {
         const total = taxableBal + tradBal + rothBal;
         totalRMDs += rmd;
 
-        // Tax impact — estimate effective bracket based on total taxable income this year
-        const ordinaryIncome = fromTraditional;
-        // SS taxation: 2-tier formula (single filer thresholds: $25K / $34K)
-        const combinedIncome = ordinaryIncome + ssIncome * 0.5;
-        let ssTaxable = 0;
-        if (combinedIncome > 34000) {
-          ssTaxable = Math.min(ssIncome * 0.85, 4500 + (combinedIncome - 34000) * 0.85);
-        } else if (combinedIncome > 25000) {
-          ssTaxable = Math.min(ssIncome * 0.50, (combinedIncome - 25000) * 0.50);
-        }
-        const totalTaxableIncome = ordinaryIncome + ssTaxable;
-        // Progressive bracket estimate (2025 single filer)
-        const effectiveBracket = totalTaxableIncome <= 11925 ? 10
-          : totalTaxableIncome <= 48475 ? 12
-          : totalTaxableIncome <= 103350 ? 22
-          : totalTaxableIncome <= 197300 ? 24
-          : totalTaxableIncome <= 250525 ? 32
-          : totalTaxableIncome <= 626350 ? 35
-          : 37;
-        const ltcgRate = effectiveBracket <= 12 ? 0 : effectiveBracket >= 37 ? 0.20 : 0.15;
-        // Gains ratio: early years ~70% gains, evolves as portfolio ages
+        // Tax impact — run the same canonical engine used by My Plan and the
+        // projection library (lib/taxEngine.ts) instead of a hand-rolled,
+        // single-filer-only bracket ladder. Picks up the correct filing
+        // status, current-year brackets, and the real 2-tier SS formula.
+        // Gains ratio: early years ~30% gains, evolves as portfolio ages
         const gainsRatio = Math.min(0.8, 0.3 + y * 0.02); // Starts ~30%, grows ~2%/yr to max 80%
-        const taxOnTraditional = fromTraditional * (effectiveBracket / 100);
-        const taxOnTaxable = fromTaxable * ltcgRate * gainsRatio;
-        const taxOnSS = ssTaxable * (effectiveBracket / 100);
-        const totalTax = taxOnTraditional + taxOnTaxable + taxOnSS;
+        const capitalGains = fromTaxable * gainsRatio;
+        const taxYear = 2026 + y;
+        const taxResult = computeTax({
+          filingStatus, ordinaryIncome: fromTraditional,
+          socialSecurityBenefit: ssIncome, capitalGains,
+          stateCode, age: currentAge, taxYear,
+        });
+        const totalTax = taxResult.totalTax;
         const afterTaxIncome = (fromTaxable + fromTraditional + fromRoth + ssIncome) - totalTax;
 
         projection.push({
@@ -208,7 +197,7 @@ export default function WithdrawalStrategy() {
       yearsOfRetirement,
       totalRMDs: result.totalRMDs,
     };
-  }, [age, lifeExpectancy, annualSpend, returnRate, inflationRate, traditional, roth, taxable, socialSecurity, taxBracket]);
+  }, [age, lifeExpectancy, annualSpend, returnRate, inflationRate, traditional, roth, taxable, socialSecurity, filingStatus, stateCode]);
 
   const withdrawalColor = results.withdrawalRate < 4 ? 'var(--accent)' : results.withdrawalRate <= 5 ? 'var(--warn)' : 'var(--danger)';
   const yearsColor = results.moneyRunsOutAge ? 'var(--danger)' : 'var(--accent)';
@@ -267,9 +256,8 @@ export default function WithdrawalStrategy() {
             <Slider label="Portfolio Return" value={returnRate} onChange={setReturnRate} min={2} max={8} step={0.5} suffix="%" />
             <Slider label="Inflation Rate" value={inflationRate} onChange={setInflationRate} min={1} max={5} step={0.5} suffix="%" />
 
-            <div style={{ marginTop: 14 }}>
-              <div className="f11 dim upcase mb-8" style={{ letterSpacing: '.08em' }}>Tax Bracket</div>
-              <BracketButtons brackets={TAX_BRACKETS} selected={taxBracket} onSelect={setTaxBracket} />
+            <div style={{ marginTop: 14, fontSize: 11, color: 'var(--text-dim)' }}>
+              Taxes computed using your <strong style={{ color: 'var(--text-muted)' }}>{filingStatus === 'mfj' ? 'Married Filing Jointly' : 'Single'}</strong> filing status and <strong style={{ color: 'var(--text-muted)' }}>{stateCode}</strong> state (from My Plan) against the current-year federal brackets — not a flat rate.
             </div>
           </Card>
 

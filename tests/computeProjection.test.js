@@ -78,6 +78,33 @@ describe('computeProjection — RMDs', () => {
   });
 });
 
+describe('computeProjection — 401k gross-up accounts for bracket stacking', () => {
+  it('regression: a large withdrawal that crosses a tax bracket still nets enough to cover spending', () => {
+    // A single filer with a $5M 401k and no other income spending $200K/yr
+    // must withdraw well beyond $200K to net that much after tax — and the
+    // withdrawal itself pushes them into a higher bracket than their
+    // pre-withdrawal (zero) income would suggest. If the gross-up used only
+    // the pre-withdrawal marginal rate (the bug fixed in ebf9c74), the
+    // withdrawal would be under-grossed and leave a real shortfall despite
+    // an ample balance.
+    const result = computeProjection(basePlan({
+      currentAge: 65,
+      retireAge: 65,
+      longevityAge: 66, // only need the first retirement year
+      savings401k: 5_000_000,
+      retireSpending: 200_000,
+      annualSpending: 200_000,
+    }));
+    const firstRetireRow = result.combined.find(r => r.isRetired);
+    expect(firstRetireRow).toBeTruthy();
+    expect(firstRetireRow.withdrawal401k).toBeGreaterThan(200_000);
+    expect(firstRetireRow.totalTax).toBeGreaterThan(0);
+    // Net after tax should cover expenses — gap should not be meaningfully
+    // negative (small rounding slack only).
+    expect(firstRetireRow.gap).toBeGreaterThanOrEqual(-1000);
+  });
+});
+
 describe('computeProjection — sanity', () => {
   it('working-year income equals salary; no withdrawals before retirement', () => {
     const result = computeProjection(basePlan({

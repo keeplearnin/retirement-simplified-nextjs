@@ -21,19 +21,19 @@ Track calculation bugs, fixes, and learnings across the app.
 | 4 | GrowthProjector.jsx:79-86 | **SS early claiming reduction uses flat rate** — Uses 0.556%/month for all months early. Real formula: 5/9% for first 36 months, 5/12% for months beyond. At age 62 (60 months early), underestimates benefit by ~3.3%. | FIXED 2026-05-02 — replaced with two-tier formula matching `lib/incomeEngine.ts` and `SocialSecurity.jsx`; also capped delayed-credit accumulation at age 70. |
 | 5 | MonteCarlo.jsx:48 | **Inflation off-by-one in retirement** — First retirement year spending is already inflated by 1 year because loop is 1-indexed. Should use `y - years - 1` exponent. | FIXED 2026-04-12 |
 | 6 | MyPlan.jsx:608 | **Retirement return silently reduced to 60%** — User sets 7% return but gets 4.2% in retirement with no UI explanation. Should be separately configurable or clearly disclosed. | BY DESIGN (now `retiredReturnPct` default = 60%, surfaced as an editable assumption; documented in `/methodology`) |
-| 7 | GrowthProjector.jsx:284 | **SWR hardcodes life to 90** — `retirementYears = 90 - retireAge` ignores user's longevity setting. Overstates sustainable withdrawal rate for users planning to 95+. | todo |
+| 7 | GrowthProjector.jsx:284 | **SWR hardcodes life to 90** — `retirementYears = 90 - retireAge` ignores user's longevity setting. Overstates sustainable withdrawal rate for users planning to 95+. | FIXED 2026-04-12 — now `(plan.longevityAge \|\| 95) - retireAge`. This row was stale; the fix already shipped the same day it was logged. |
 
 ### MINOR
 
 | # | File | Issue | Status |
 |---|------|-------|--------|
 | 8 | MyPlan.jsx:616 | **Cash account growth 4.5% is high** — HY savings rates are cyclical; long-term average is 2.5-3%. Currently inflates cash balances. | FIXED 2026-04-12 (changed to 3% working, 2.5% retired) |
-| 9 | MyPlan.jsx:660 | **Portfolio balance shown is start-of-year** — "Portfolio at retirement" is the balance entering the year, before growth/withdrawals. Not wrong, but could confuse users. | todo |
-| 10 | MyPlan.jsx:563-567 | **401k gross-up doesn't account for bracket stacking** — Uses marginal rate from pre-withdrawal income. Large withdrawals push into higher brackets. Self-correcting since Pension/Roth fill the gap. | todo |
+| 9 | MyPlan.jsx:660 | **Portfolio balance shown is start-of-year** — "Portfolio at retirement" is the balance entering the year, before growth/withdrawals. Not wrong, but could confuse users. | FIXED 2026-07-15 — number is correct as-is (it's the balance the moment retirement begins; switching to end-of-year would wrongly include a full year of retirement drawdown). Relabeled "Entering Retirement" with a tooltip/sub-label explaining what the figure represents. |
+| 10 | MyPlan.jsx:563-567 | **401k gross-up doesn't account for bracket stacking** — Uses marginal rate from pre-withdrawal income. Large withdrawals push into higher brackets. Self-correcting since Pension/Roth fill the gap. | FIXED `ebf9c74` (2026-05-02) — "Fix gross-up bracket crossing" refactored the waterfall into a closure re-run at the post-withdrawal marginal rate when a bracket is crossed. Same fix applied to `lib/computeProjection.js`. This row was stale. |
 | 11 | WithdrawalStrategy.jsx:44 | **SS COLA formula confusing** — `Math.max(inflationRate - 0.5, 1) / 100` works by accident for typical inputs but mixes percentage points with decimals. | FIXED 2026-05-02 — replaced with `Math.max(0, inflationRate - 0.5) / 100` (consistent percentage-point units, floored at 0 since SS COLA can never be negative). |
-| 12 | WithdrawalStrategy.jsx:112-118 | **Uses 2024 tax brackets, not 2025** — Inconsistent with taxEngine.ts which has 2025 values. | PARTIAL — updated to 2025 brackets ($11,925 / $48,475 thresholds). Still trails the canonical 2026 figures in `lib/constants.js`; should import the constants instead of hard-coding. |
-| 13 | TaxAware.jsx | **No inflation adjustment** — Nominal returns only, no real-dollar toggle. Both sides treated same way so relative comparison is valid. | todo |
-| 14 | expenseEngine.ts:142 | **LTC cost capped at 3x base** — Unrealistically low for young users projecting 55+ years. | todo |
+| 12 | WithdrawalStrategy.jsx:112-118 | **Uses 2024 tax brackets, not 2025** — Inconsistent with taxEngine.ts which has 2025 values. | FIXED 2026-07-15 — replaced the hand-rolled, single-filer-only bracket ladder and SS-taxability formula with a direct call to `computeTax()` from `lib/taxEngine.ts` (the same engine used by MyPlan/computeProjection). Picks up current-year brackets automatically, plus MFJ and state tax which the old approximation never had. Also removed the dead "Tax Bracket" selector, which never fed into the calculation. |
+| 13 | TaxAware.jsx | **No inflation adjustment** — Nominal returns only, no real-dollar toggle. Both sides treated same way so relative comparison is valid. | FIXED 2026-07-15 — added a "Show inflation-adjusted" toggle that deflates Roth/Traditional/tax-savings balances to today's dollars using `plan.inflationRate`. |
+| 14 | expenseEngine.ts:142 | **LTC cost capped at 3x base** — Unrealistically low for young users projecting 55+ years. | FIXED 2026-07-15 — raised the probability-weighted base monthly cost ($2,500 → $3,600, reflecting current Genworth-style cost-of-care data and a higher conditional incidence once a user reaches the LTC window) and switched from a flat 3% rate to `min(healthcareInflation, 4.5%)`, so long-horizon (young) users see LTC costs that track their own inflation assumption instead of an under-stated flat rate, while still capped to avoid runaway compounding over 55+ year horizons. |
 | 15 | WithdrawalStrategy.jsx:92-94 | **Growth after withdrawal, opposite of MyPlan** — Inconsistent convention across tabs. | RESOLVED 2026-05-02 — stale note. After #2 fixed `MyPlan` to withdraw-then-grow, `WithdrawalStrategy` (which already withdraws lines 67-81 then grows lines 84-86) is now aligned with the canonical `(bal - withdrawal) * (1 + return)` convention used in `lib/computeProjection.js`. Verified: no code change needed. |
 
 ---
@@ -107,3 +107,20 @@ Bonus: pension survivor benefit was already in the data model (`PensionIncome.su
 - **Qualifying widow(er) status.** Surviving spouse with dependent children may file QW(er) for 2 years after death (effectively MFJ brackets). We assume no dependents and flip straight to single. Caveat noted on `/methodology`.
 - **Step-up in cost basis at death.** Taxable brokerage assets get a basis step-up at the deceased's death — the survivor's embedded gains effectively reset. Our `gainsRatio` curve doesn't account for this, so survivor years slightly overstate capital-gains tax on taxable withdrawals. Listed in methodology limitations.
 - **Pension survivor benefit defaults to 0.** Most users won't realize the field exists; we don't yet expose a UI input. Power users can edit `incomeSources[].survivorBenefitPct` via localStorage. UI input is on the roadmap.
+
+---
+
+## Audit #3 — 2026-07-15 (status-report follow-up)
+
+A status report flagged six items from this log as still-`todo`/`PARTIAL`. Re-checked each against the current code before touching anything — three (#7, #10, and the Phase F RMD divisor referenced from `ROADMAP.md`) turned out to already be fixed, just never marked here. Updated their rows above instead of re-fixing working code. The remaining three got real fixes:
+
+| # | File | Fix |
+|---|------|-----|
+| 9 | MyPlan.jsx | Confirmed the displayed number (start-of-year balance) is the correct one for "portfolio at retirement" — relabeled + tooltipped instead of swapping in the end-of-year figure, which would have been a regression (it'd include a full year of retirement drawdown). |
+| 12 | WithdrawalStrategy.jsx | Replaced the hand-rolled, single-filer-only, stale-bracket tax estimate with a direct `computeTax()` call from `lib/taxEngine.ts` — closes the "duplicate math drifts" pattern (see Learnings above) for this tab. Also deleted the dead "Tax Bracket" selector that never fed into the calc. |
+| 13 | TaxAware.jsx | Added a "Show inflation-adjusted" toggle, deflating both sides to today's dollars using `plan.inflationRate`. |
+| 14 | expenseEngine.ts | Raised the LTC probability-weighted base cost and switched the flat 3% rate to `min(healthcareInflation, 4.5%)` so young users' LTC provisioning scales with their own assumptions instead of a fixed low rate, while still capped against 55+-year blow-up. |
+
+Also corrected `ROADMAP.md`'s "Known debt" section, which still listed the per-spouse RMD divisor as an open bug — Phase F (2026-05-03) closed it, and `AUDIT.md` already said so; the roadmap doc just hadn't been updated to match.
+
+**Lesson reinforced:** the same drift pattern noted in Audit #2's Learnings — a fix lands in code but the audit/roadmap doc doesn't get updated — cost real time here re-verifying "known" bugs that were already closed. When closing an item, grep for every doc that mentions it (`AUDIT.md`, `ROADMAP.md`, inline comments) in the same commit.
