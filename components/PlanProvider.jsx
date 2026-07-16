@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useCallback, useMemo, useRef } from 'react';
+import { createContext, useContext, useCallback, useMemo } from 'react';
 import { useLocalState } from '@/lib/useLocalState';
 
 // ---------------------------------------------------------------------------
@@ -123,9 +123,35 @@ export const INCOME_TEMPLATES = {
  * Important: shallow merge only. Nested arrays (incomeSources, debts) come
  * from the stored plan as-is — we don't want to clobber the user's edits.
  */
+// Reassign fresh ids to any list items whose id duplicates an earlier one.
+// Heals plans saved while the old ref-based id counter was live: it reset
+// on every page load, so sources added across sessions could share an id —
+// and updateIncome(id) then edited every matching row at once.
+function dedupeIds(items) {
+  if (!Array.isArray(items) || items.length < 2) return items;
+  const seen = new Set();
+  let maxId = items.reduce((m, it) => Math.max(m, Number(it.id) || 0), 0);
+  let changed = false;
+  const out = items.map((it) => {
+    const id = Number(it.id) || 0;
+    if (seen.has(id)) {
+      maxId += 1;
+      changed = true;
+      seen.add(maxId);
+      return { ...it, id: maxId };
+    }
+    seen.add(id);
+    return it;
+  });
+  return changed ? out : items;
+}
+
 export function migratePlan(stored) {
   if (!stored || typeof stored !== 'object') return DEFAULT_PLAN;
-  return { ...DEFAULT_PLAN, ...stored };
+  const merged = { ...DEFAULT_PLAN, ...stored };
+  merged.incomeSources = dedupeIds(merged.incomeSources);
+  merged.debts = dedupeIds(merged.debts);
+  return merged;
 }
 
 // ---------------------------------------------------------------------------
@@ -178,21 +204,28 @@ export function getHouseholdMonthlyContribution(plan) {
 const PlanContext = createContext(null);
 
 export function PlanProvider({ children }) {
-  const incomeIdRef = useRef(100);
   const [storedPlan, setPlan] = useLocalState('myplan-v1', DEFAULT_PLAN);
   // Backfill any fields added since the saved plan was last written so
   // consumers downstream never encounter undefined.
   const plan = useMemo(() => migratePlan(storedPlan), [storedPlan]);
 
+  // CRITICAL: every mutator must operate on migratePlan(prev), not raw prev.
+  // The UI renders the HEALED plan (deduped ids), so the id it passes back
+  // may not exist in the raw stored plan — and worse, duplicate ids in raw
+  // storage would make `.map(s => s.id === id ? ...)` overwrite multiple
+  // rows at once (the "edit one income source, both change" bug). Healing
+  // inside the write path also persists the repair on first edit.
+  // dedupeIds is deterministic, so healed ids in the UI and here agree.
   const updatePlan = useCallback((key, val) => {
-    setPlan(prev => ({ ...prev, [key]: val }));
+    setPlan(prev => ({ ...migratePlan(prev), [key]: val }));
   }, [setPlan]);
 
   const updateIncome = useCallback((id, updated) => {
     setPlan(prev => {
-      const newSources = prev.incomeSources.map(s => s.id === id ? updated : s);
-      const next = { ...prev, incomeSources: newSources };
-      if (updated.type === 'salary' && !prev._expenseManuallySet) {
+      const cur = migratePlan(prev);
+      const newSources = cur.incomeSources.map(s => s.id === id ? updated : s);
+      const next = { ...cur, incomeSources: newSources };
+      if (updated.type === 'salary' && !cur._expenseManuallySet) {
         const salary = updated.amount || 0;
         next.annualSpending = Math.round(salary * 0.75 / 1000) * 1000;
       }
@@ -201,53 +234,60 @@ export function PlanProvider({ children }) {
   }, [setPlan]);
 
   const removeIncome = useCallback((id) => {
-    setPlan(prev => ({
-      ...prev,
-      incomeSources: prev.incomeSources.filter(s => s.id !== id),
-    }));
+    setPlan(prev => {
+      const cur = migratePlan(prev);
+      return { ...cur, incomeSources: cur.incomeSources.filter(s => s.id !== id) };
+    });
   }, [setPlan]);
+
+  // ID minting derives from the list itself, NOT a ref. A ref-based counter
+  // resets to its seed on every page load while sources persisted from a
+  // previous session keep their higher ids — the next add then reused an
+  // existing id, and updateIncome(id) edited BOTH rows ("change one, both
+  // change" bug). Max-of-list + 1 can never collide with saved data.
+  const nextId = (items, floor) =>
+    (items || []).reduce((m, it) => Math.max(m, Number(it.id) || 0), floor) + 1;
 
   const addIncome = useCallback((type, owner = 'primary') => {
     const template = INCOME_TEMPLATES[type];
     if (!template) return;
-    incomeIdRef.current += 1;
-    setPlan(prev => ({
-      ...prev,
-      incomeSources: [...prev.incomeSources, {
-        ...template,
-        id: incomeIdRef.current,
-        owner,
-        // Prefix spouse-owned sources so every list (cards, AI plan summary,
-        // report) reads unambiguously.
-        label: owner === 'spouse' ? `Spouse ${template.label}` : template.label,
-      }],
-    }));
+    setPlan(prev => {
+      const cur = migratePlan(prev);
+      return {
+        ...cur,
+        incomeSources: [...cur.incomeSources, {
+          ...template,
+          id: nextId(cur.incomeSources, 100),
+          owner,
+          // Prefix spouse-owned sources so every list (cards, AI plan summary,
+          // report) reads unambiguously.
+          label: owner === 'spouse' ? `Spouse ${template.label}` : template.label,
+        }],
+      };
+    });
   }, [setPlan]);
-
-  const debtIdRef = useRef(200);
 
   const addDebt = useCallback((type) => {
     const template = DEBT_TEMPLATES[type];
     if (!template) return;
-    debtIdRef.current += 1;
-    setPlan(prev => ({
-      ...prev,
-      debts: [...(prev.debts || []), { ...template, id: debtIdRef.current }],
-    }));
+    setPlan(prev => {
+      const cur = migratePlan(prev);
+      return { ...cur, debts: [...(cur.debts || []), { ...template, id: nextId(cur.debts, 200) }] };
+    });
   }, [setPlan]);
 
   const updateDebt = useCallback((id, updated) => {
-    setPlan(prev => ({
-      ...prev,
-      debts: (prev.debts || []).map(d => d.id === id ? updated : d),
-    }));
+    setPlan(prev => {
+      const cur = migratePlan(prev);
+      return { ...cur, debts: (cur.debts || []).map(d => d.id === id ? updated : d) };
+    });
   }, [setPlan]);
 
   const removeDebt = useCallback((id) => {
-    setPlan(prev => ({
-      ...prev,
-      debts: (prev.debts || []).filter(d => d.id !== id),
-    }));
+    setPlan(prev => {
+      const cur = migratePlan(prev);
+      return { ...cur, debts: (cur.debts || []).filter(d => d.id !== id) };
+    });
   }, [setPlan]);
 
   const bulkUpdate = useCallback((updates) => {
