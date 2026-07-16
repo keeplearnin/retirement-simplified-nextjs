@@ -1,4 +1,4 @@
-import { Inter, DM_Sans } from 'next/font/google';
+import { Inter, Fraunces } from 'next/font/google';
 import './globals.css';
 
 const inter = Inter({
@@ -7,10 +7,14 @@ const inter = Inter({
   display: 'swap',
 });
 
-const dmSans = DM_Sans({
+// Display face — carries the product's personality. Fraunces is an
+// editorial serif with optical sizing: warm and characterful at hero-number
+// sizes, quiet at heading sizes. Deliberately NOT the geometric-sans that
+// every generated dashboard ships with. Inter stays for UI text.
+const fraunces = Fraunces({
   subsets: ['latin'],
-  variable: '--font-dm-sans',
-  weight: ['400', '500', '600', '700'],
+  variable: '--font-fraunces',
+  axes: ['opsz'],
   display: 'swap',
 });
 
@@ -25,7 +29,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${inter.variable} ${dmSans.variable}`}>
+    <html lang="en" className={`${inter.variable} ${fraunces.variable}`}>
       <body>{children}</body>
     </html>
   );

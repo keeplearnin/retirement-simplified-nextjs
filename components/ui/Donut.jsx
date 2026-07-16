@@ -13,7 +13,7 @@ export default function Donut({ segs, label, size = 160, strokeWidth = 28, radiu
           if (eA <= sA) return null;
           return <path key={i} d={descArc(center, center, radius, sA, eA)} fill="none" stroke={seg.color} strokeWidth={strokeWidth} strokeLinecap="round" />;
         })}
-        {label && <text x={center} y={center + 5} textAnchor="middle" fill="var(--text-muted)" fontSize="12" fontFamily="Outfit" fontWeight="600">{label}</text>}
+        {label && <text x={center} y={center + 5} textAnchor="middle" fill="var(--text-muted)" fontSize="12" fontFamily="var(--sans)" fontWeight="600">{label}</text>}
       </svg>
     </div>
   );

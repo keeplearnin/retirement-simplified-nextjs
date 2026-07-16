@@ -338,8 +338,22 @@ export default function MonteCarlo() {
 
                       <path d={chartElements.makeBand(chartElements.percentiles.p90, chartElements.percentiles.p10)} fill="var(--accent)" opacity={0.08} />
                       <path d={chartElements.makeBand(chartElements.percentiles.p75, chartElements.percentiles.p25)} fill="var(--accent)" opacity={0.12} />
-                      <path d={chartElements.makePath(chartElements.percentiles.p50)} fill="none" stroke="var(--accent)" strokeWidth={2.5} />
+                      <path d={chartElements.makePath(chartElements.percentiles.p50)} fill="none" stroke="var(--accent)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
                       <path d={chartElements.makePath(chartElements.percentiles.p10)} fill="none" stroke="var(--danger)" strokeWidth={1} strokeDasharray="4 3" />
+                      {/* House chart voice: median terminates in a dot with its end value annotated */}
+                      <circle
+                        cx={chartElements.xScale(chartElements.totalYears)}
+                        cy={chartElements.yScale(chartElements.percentiles.p50[chartElements.totalYears])}
+                        r={3.5} fill="var(--accent)"
+                      />
+                      <text
+                        x={chartElements.xScale(chartElements.totalYears) - 6}
+                        y={chartElements.yScale(chartElements.percentiles.p50[chartElements.totalYears]) - 8}
+                        textAnchor="end" fill="var(--accent)" fontSize={10} fontWeight={600}
+                        fontFamily="var(--sans)" style={{ fontVariantNumeric: 'tabular-nums' }}
+                      >
+                        {fmt(chartElements.percentiles.p50[chartElements.totalYears])}
+                      </text>
 
                       <g transform={`translate(${pad.left + 8}, ${pad.top + 6})`}>
                         <rect x={0} y={0} width={8} height={8} fill="var(--accent)" opacity={0.1} rx={1} />
