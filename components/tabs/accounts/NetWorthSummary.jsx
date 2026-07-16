@@ -14,17 +14,17 @@ export default function NetWorthSummary({
     <>
       {/* Aggregated stats */}
       <div style={{ display: 'flex', gap: 12, marginTop: 16, marginBottom: 14, flexWrap: 'wrap' }}>
-        <Stat icon="💰" label="Total Net Worth" value={fmt(totalNetWorth)} color="var(--accent)"
+        <Stat label="Total Net Worth" value={fmt(totalNetWorth)} color="var(--accent)"
           sub={<span style={{ color: monthChange.amount >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
             {monthChange.amount >= 0 ? '+' : ''}{fmtFull(monthChange.amount)} ({monthChange.pct}%) this month
           </span>}
         />
-        <Stat icon="🏦" label="Retirement" value={fmt(retirementTotal)} color="var(--accent)"
+        <Stat label="Retirement" value={fmt(retirementTotal)} color="var(--accent)"
           sub={`${linked.length} institution${linked.length !== 1 ? 's' : ''} linked`}
         />
-        <Stat icon="📈" label="Taxable Investments" value={fmt(taxableTotal)} color="var(--blue)" />
-        <Stat icon="💵" label="Cash & Savings" value={fmt(cashTotal)} color="var(--purple)" />
-        {debtTotal > 0 && <Stat icon="💳" label="Debt" value={`-${fmt(debtTotal)}`} color="var(--danger)" />}
+        <Stat label="Taxable Investments" value={fmt(taxableTotal)} color="var(--blue)" />
+        <Stat label="Cash & Savings" value={fmt(cashTotal)} color="var(--purple)" />
+        {debtTotal > 0 && <Stat label="Debt" value={`-${fmt(debtTotal)}`} color="var(--danger)" />}
       </div>
 
       {/* Charts row */}

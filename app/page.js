@@ -33,6 +33,7 @@ import Inheritance from '@/components/tabs/Inheritance';
 // comparison on the full projection engine).
 import Optimize from '@/components/tabs/Optimize';
 import Scenarios from '@/components/tabs/Scenarios';
+import LinkedAccounts from '@/components/tabs/LinkedAccounts';
 import Icon from '@/components/ui/Icon';
 
 function AppContent() {
@@ -104,6 +105,7 @@ function AppContent() {
       { id: 'myplan', label: 'My Plan' },
       { id: 'optimize', label: 'Optimize' },
       { id: 'scenarios', label: 'Scenarios' },
+      { id: 'accounts', label: 'Accounts' },
       { id: 'portfolio', label: 'Portfolio' },
     ]},
     // Coach groups the AI Advisor (chat) with the workbench drill-downs,
@@ -316,6 +318,7 @@ function AppContent() {
         {tab === 'myplan' && <MyPlan />}
         {tab === 'optimize' && <Optimize />}
         {tab === 'scenarios' && <Scenarios />}
+        {tab === 'accounts' && <LinkedAccounts />}
         {tab === 'portfolio' && <PortfolioBuilder />}
         {tab === 'advisor' && <AIAdvisor />}
         {tab === 'roth-strategy' && <RothStrategy />}

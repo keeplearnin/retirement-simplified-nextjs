@@ -33,6 +33,7 @@ const TABLES = {
   userPlans: `${TABLE_PREFIX}user_plans`,
   planSnapshots: `${TABLE_PREFIX}plan_snapshots`,
   userPreferences: `${TABLE_PREFIX}user_preferences`,
+  plaidItems: `${TABLE_PREFIX}plaid_items`,
 };
 
 let client: DynamoDBDocumentClient | null = null;
@@ -306,5 +307,88 @@ export async function getUsersForWeeklyCheck(): Promise<UserForWeeklyCheck[]> {
   } catch (e) {
     console.error('DynamoDB getUsersForWeeklyCheck error:', e);
     return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// plaid_items — linked-institution access tokens. SERVER-ONLY SECRETS.
+//
+// PK userId, SK itemId. `accessToken` is a bearer credential for the user's
+// bank connection: it must never be returned to the client, logged, or placed
+// in any client-readable response. Only the server routes below read it, and
+// only to call Plaid on the user's behalf.
+// ---------------------------------------------------------------------------
+
+export interface PlaidItem {
+  user_id: string;
+  item_id: string;
+  access_token: string;
+  institution_name: string;
+  created_at: string;
+}
+
+export async function savePlaidItem(
+  userId: string,
+  itemId: string,
+  accessToken: string,
+  institutionName: string
+): Promise<void> {
+  const c = getClient();
+  if (!c) return;
+  try {
+    await c.send(
+      new PutCommand({
+        TableName: TABLES.plaidItems,
+        Item: {
+          userId,
+          itemId,
+          accessToken,
+          institutionName,
+          createdAt: new Date().toISOString(),
+        },
+      })
+    );
+  } catch (e) {
+    console.error('DynamoDB savePlaidItem error:', e);
+  }
+}
+
+export async function getPlaidItems(userId: string): Promise<PlaidItem[]> {
+  const c = getClient();
+  if (!c) return [];
+  try {
+    const res = await c.send(
+      new QueryCommand({
+        TableName: TABLES.plaidItems,
+        KeyConditionExpression: 'userId = :u',
+        ExpressionAttributeValues: { ':u': userId },
+      })
+    );
+    return (res.Items ?? []).map((it) => ({
+      user_id: it.userId as string,
+      item_id: it.itemId as string,
+      access_token: it.accessToken as string,
+      institution_name: (it.institutionName as string) ?? 'Linked institution',
+      created_at: (it.createdAt as string) ?? '',
+    }));
+  } catch (e) {
+    console.error('DynamoDB getPlaidItems error:', e);
+    return [];
+  }
+}
+
+export async function deletePlaidItem(userId: string, itemId: string): Promise<void> {
+  const c = getClient();
+  if (!c) return;
+  try {
+    const { DeleteCommand } = await import('@aws-sdk/lib-dynamodb');
+    await c.send(
+      new DeleteCommand({
+        TableName: TABLES.plaidItems,
+        Key: { userId, itemId },
+      })
+    );
+  } catch (e) {
+    console.error('DynamoDB deletePlaidItem error:', e);
   }
 }
