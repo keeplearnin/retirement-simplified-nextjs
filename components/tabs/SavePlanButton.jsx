@@ -88,7 +88,7 @@ export default function SavePlanButton({ getCurrentSettings, tabName }) {
           whiteSpace: 'nowrap',
         }}
       >
-        {saved ? '✓ Saved!' : saving ? 'Saving...' : '💾 Save Plan'}
+        {saved ? 'Saved!' : saving ? 'Saving...' : 'Save Plan'}
       </button>
     </div>
   );

@@ -88,7 +88,7 @@ export default function RothLadder() {
 
   return (
     <div>
-      <InfoBox icon="🪜" title="Roth Conversion Ladder" color="var(--purple)" bgColor="rgba(139,92,246,0.08)">
+      <InfoBox title="Roth Conversion Ladder" color="var(--purple)" bgColor="rgba(139,92,246,0.08)">
         Between retirement and age 73 (when RMDs begin), you can convert traditional 401(k)/IRA dollars to Roth — paying tax now to avoid forced withdrawals at higher rates later. This planner shows whether filling a target bracket each year actually saves money over a lifetime.
       </InfoBox>
 
@@ -96,11 +96,11 @@ export default function RothLadder() {
           Closes the loop the Tax Torpedo / Roth Ladder pair otherwise leaves
           open ("you've shown me the problem; what's the optimal answer?"). */}
       {optimizer.recommended === 0 ? (
-        <InfoBox icon="🤖" title="Optimizer: skip conversions for your situation" color="var(--text-muted)" bgColor="var(--bg2)" style={{ marginTop: 14 }}>
+        <InfoBox title="Optimizer: skip conversions for your situation" color="var(--text-muted)" bgColor="var(--bg2)" style={{ marginTop: 14 }}>
           We ran every target bracket (12%, 22%, 24%, 32%) against your numbers and none of them save money over the baseline. Your projected retirement income is modest enough that future RMDs stay in the 10–12% bracket — paying 22%+ today to convert is a net loss. The math is doing you a favor here: keep the dollars in the traditional account and let them compound.
         </InfoBox>
       ) : (
-        <InfoBox icon="🤖" title={`Optimizer recommends filling the ${optimizer.label} bracket — saves ${fmt(optimizer.taxSaved)} lifetime`} color="var(--purple)" bgColor="rgba(139,92,246,0.10)" style={{ marginTop: 14 }}>
+        <InfoBox title={`Optimizer recommends filling the ${optimizer.label} bracket — saves ${fmt(optimizer.taxSaved)} lifetime`} color="var(--purple)" bgColor="rgba(139,92,246,0.10)" style={{ marginTop: 14 }}>
           <div style={{ marginBottom: 8 }}>
             We ran your numbers against every target bracket. Filling the <strong>{optimizer.label}</strong> bracket each year between ages {conversionStartAge} and {conversionEndAge} produces the largest lifetime tax saving.
             {optimizer.irmaaTrippedYears > 0 && (
@@ -177,21 +177,18 @@ export default function RothLadder() {
       {/* Headline outcome */}
       <div className="stats-row" style={{ display: 'flex', gap: 12, marginTop: 14 }}>
         <Stat
-          icon="💰"
           label="Lifetime tax saved"
           value={result.taxSaved >= 0 ? `+${fmt(result.taxSaved)}` : fmt(result.taxSaved)}
           sub={targetBracket === 0 ? 'No conversions configured' : `${result.conversionWindowYears} years of conversions`}
           color={taxSavedColor}
         />
         <Stat
-          icon="📦"
           label="Total converted"
           value={fmt(result.ladderConversionTotal)}
           sub="From Traditional → Roth"
           color="var(--blue)"
         />
         <Stat
-          icon="📉"
           label="RMD at 73"
           value={`${fmt(result.ladder.rmdAt73)}`}
           sub={`Was ${fmt(result.baseline.rmdAt73)} without ladder`}
@@ -207,20 +204,20 @@ export default function RothLadder() {
         const saved = result.taxSaved;
         if (saved > 1000) {
           return (
-            <InfoBox icon="✅" title={`This ladder saves you ${fmt(saved)} over your lifetime`} color="var(--accent)" bgColor="var(--accent-dim)" style={{ marginTop: 14 }}>
+            <InfoBox title={`This ladder saves you ${fmt(saved)} over your lifetime`} color="var(--accent)" bgColor="var(--accent-dim)" style={{ marginTop: 14 }}>
               Converting Traditional dollars to Roth at today's {result.targetBracketLabel || `${targetBracket}%`} bracket beats paying tax on those dollars later — your projection has them taxed at a higher rate down the road (RMDs stacked with Social Security, possibly with IRMAA). Locking in the lower rate now is the win.
             </InfoBox>
           );
         }
         if (saved < -1000) {
           return (
-            <InfoBox icon="⚠️" title={`This ladder costs you ${fmt(Math.abs(saved))} — skip it or lower the target bracket`} color="var(--warn)" bgColor="var(--warn-dim)" style={{ marginTop: 14 }}>
+            <InfoBox title={`This ladder costs you ${fmt(Math.abs(saved))} — skip it or lower the target bracket`} color="var(--warn)" bgColor="var(--warn-dim)" style={{ marginTop: 14 }}>
               The ladder is paying tax now at the {result.targetBracketLabel || `${targetBracket}%`} bracket on dollars that would have been taxed at a <em>lower</em> rate later. That happens when your retirement income is modest enough to keep you in the 10–12% bracket without conversions, so paying 22%+ today to convert is a net loss. Try a lower target bracket (12% or "no conversions"), or accept that conversions don't help your situation. This isn't a bug — it's the math telling you the strategy doesn't fit.
             </InfoBox>
           );
         }
         return (
-          <InfoBox icon="ℹ️" title="Ladder is roughly tax-neutral for your situation" color="var(--blue)" bgColor="var(--blue-dim)" style={{ marginTop: 14 }}>
+          <InfoBox icon="ℹ" title="Ladder is roughly tax-neutral for your situation" color="var(--blue)" bgColor="var(--blue-dim)" style={{ marginTop: 14 }}>
             Converting at today's bracket and paying that tax later land in roughly the same place for your projection. Conversions can still help for non-tax reasons (no RMDs at 73, more flexibility for heirs), but the headline lifetime-tax number is close to zero either way.
           </InfoBox>
         );
@@ -247,7 +244,7 @@ export default function RothLadder() {
 
       {/* IRMAA warning */}
       {result.irmaaTrippedAges.length > 0 && (
-        <InfoBox icon="⚠️" title="IRMAA tripped by conversions" color="var(--warn)" bgColor="rgba(251,191,36,0.08)" style={{ marginTop: 14 }}>
+        <InfoBox title="IRMAA tripped by conversions" color="var(--warn)" bgColor="rgba(251,191,36,0.08)" style={{ marginTop: 14 }}>
           The ladder pushes MAGI above an IRMAA threshold in {result.irmaaTrippedAges.length} year{result.irmaaTrippedAges.length === 1 ? '' : 's'} (ages: {result.irmaaTrippedAges.slice(0, 6).join(', ')}{result.irmaaTrippedAges.length > 6 ? '…' : ''}). Each Medicare beneficiary pays a higher Part B premium for two years after each high-income year. Consider stopping conversions a couple of years before age 65 to avoid the two-year lookback hitting Medicare premiums.
         </InfoBox>
       )}

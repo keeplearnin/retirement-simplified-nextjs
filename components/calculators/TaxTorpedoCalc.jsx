@@ -62,21 +62,18 @@ export default function TaxTorpedoCalc() {
 
       <div className="stats-row" style={{ display: 'flex', gap: 12, marginTop: 16, flexWrap: 'wrap' }}>
         <Stat
-          icon={result.inTorpedoZone ? '🚨' : '🎯'}
           label="Effective Marginal Rate"
           value={`${(result.effectiveMarginalRate * 100).toFixed(1)}%`}
           sub="Federal tax on your NEXT $1,000 withdrawn"
           color={result.inTorpedoZone ? 'var(--danger)' : 'var(--accent)'}
         />
         <Stat
-          icon="🧾"
           label="SS Currently Taxable"
           value={`${result.ssTaxablePercent}%`}
           sub={`Provisional income: ${fmt(Math.round(result.provisionalIncome))}`}
           color="var(--blue)"
         />
         <Stat
-          icon="🌊"
           label="Peak Torpedo Rate"
           value={`${(peak.effectiveMarginalRate * 100).toFixed(1)}%`}
           sub={`At ~${fmt(Math.round(peak.withdrawal))} withdrawn`}

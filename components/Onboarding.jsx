@@ -5,6 +5,7 @@ import Slider from '@/components/ui/Slider';
 import { usePlan } from '@/components/PlanProvider';
 import { fmt } from '@/lib/format';
 import OnboardingChat from '@/components/OnboardingChat';
+import Icon from '@/components/ui/Icon';
 
 const STEPS = ['Welcome', 'Age & Timeline', 'Income', 'Savings'];
 
@@ -194,7 +195,7 @@ export default function Onboarding({ onComplete }) {
                 onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
                 onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
               >
-                <span style={{ fontSize: 28 }}>🤖</span>
+                <Icon name="sparkles" size={22} />
                 <span style={{ flex: 1 }}>
                   <div style={{ fontSize: 15, fontWeight: 700 }}>Chat with the AI</div>
                   <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>5 questions, about 3 minutes</div>
@@ -218,7 +219,7 @@ export default function Onboarding({ onComplete }) {
                   gap: 14,
                 }}
               >
-                <span style={{ fontSize: 28 }}>📝</span>
+                <Icon name="pencil" size={22} />
                 <span style={{ flex: 1 }}>
                   <div style={{ fontSize: 15, fontWeight: 700 }}>Fill in the form myself</div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>4 steps, about 5 minutes</div>

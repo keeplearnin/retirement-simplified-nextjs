@@ -94,7 +94,7 @@ export default function BridgeOptionsCard({
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: usingRE ? 'var(--accent)' : 'var(--text)' }}>
-                🏠 Sell or downsize real estate
+                Sell or downsize real estate
               </div>
               {usingRE && <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>active</span>}
             </div>
@@ -119,7 +119,7 @@ export default function BridgeOptionsCard({
         {realEstateBalance > 200_000 && (
           <div style={{ padding: '14px 16px', borderRadius: 10, background: 'var(--bg2)', border: '1px solid var(--border)' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>
-              🏦 Reverse mortgage (HECM)
+              Reverse mortgage (HECM)
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
               Available at age 62+. You keep the home; the lender pays you. On your projected RE value, an HECM at age 70 yields roughly <strong>{fmt(hecmAnnualIncome)}/yr</strong> in tenure payments — non-taxable, no monthly mortgage payment required (you stay in the home).
@@ -134,7 +134,7 @@ export default function BridgeOptionsCard({
         {spendingCutPct > 0 && (
           <div style={{ padding: '14px 16px', borderRadius: 10, background: 'var(--bg2)', border: '1px solid var(--border)' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>
-              ✂️ Reduce retirement spending
+              Reduce retirement spending
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
               Cutting your retirement spending by approximately <strong>{spendingCutPct}%</strong> ({fmt(retireSpending)} → {fmt(Math.round(retireSpending * (1 - spendingCutPct / 100)))}/yr) closes the cash-flow gap without touching your assets. Drag the &quot;Retirement Spending&quot; slider on My Plan to see the effect.

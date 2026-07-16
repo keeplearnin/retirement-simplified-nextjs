@@ -106,7 +106,7 @@ export default function OnboardingChat({ onComplete, onSwitchToForm }) {
       <div style={{ marginBottom: 12 }}>
         <div style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
           <span>
-            🤖 Setup with AI
+            Setup with AI
             {!isDone && (() => {
               // Count user replies as completed questions. Clamp display
               // to 5 so a follow-up doesn't read "Question 7 of 5" — the

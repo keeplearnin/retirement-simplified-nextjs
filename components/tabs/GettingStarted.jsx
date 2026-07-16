@@ -7,7 +7,7 @@ import InfoBox from '@/components/ui/InfoBox';
 
 const steps = [
   {
-    icon: '🏦',
+    icon: '',
     title: 'Open a Brokerage Account',
     content: (
       <div>
@@ -35,7 +35,7 @@ const steps = [
     ),
   },
   {
-    icon: '🎯',
+    icon: '',
     title: 'Pick Your Strategy',
     content: (
       <div>
@@ -64,7 +64,7 @@ const steps = [
     ),
   },
   {
-    icon: '🛒',
+    icon: '',
     title: 'Buy Your Funds',
     content: (
       <div>
@@ -100,7 +100,7 @@ const steps = [
     ),
   },
   {
-    icon: '🔄',
+    icon: '',
     title: 'Automate & Forget',
     content: (
       <div>
@@ -117,7 +117,7 @@ const steps = [
     ),
   },
   {
-    icon: '🤝',
+    icon: '',
     title: 'When You DO Need an Advisor',
     content: (
       <div>
@@ -151,7 +151,7 @@ export default function GettingStarted() {
 
   return (
     <div className="fade-up">
-      <InfoBox icon="🚀" title="Your 5-Step Investing Starter Kit" color="var(--accent)" bgColor="var(--accent-dim)">
+      <InfoBox title="Your 5-Step Investing Starter Kit" color="var(--accent)" bgColor="var(--accent-dim)">
         Everything you need to start investing for retirement in under an hour. Follow these five steps in order and you&apos;ll be ahead of 90% of people.
       </InfoBox>
 

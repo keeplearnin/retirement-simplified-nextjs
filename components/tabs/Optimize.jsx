@@ -90,7 +90,7 @@ function ActionCard({ action, rank, onApply, applied }) {
         )}
         {action.apply && applied && (
           <span style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600, fontFamily: 'var(--sans)' }}>
-            ✓ Applied
+            Applied
           </span>
         )}
       </div>
@@ -138,7 +138,7 @@ export default function Optimize() {
   if (!result) {
     return (
       <div className="fade-up">
-        <InfoBox icon="⚠️" title="Optimizer unavailable" color="var(--warn)">
+        <InfoBox title="Optimizer unavailable" color="var(--warn)">
           The decision engine hit an error with the current plan inputs. Check that your plan has valid ages and at least one income source.
         </InfoBox>
       </div>
@@ -150,7 +150,7 @@ export default function Optimize() {
 
   return (
     <div className="fade-up">
-      <InfoBox icon="🎯" title="Decision Engine" color="var(--accent)" bgColor="var(--accent-dim, rgba(16,185,129,0.08))">
+      <InfoBox title="Decision Engine" color="var(--accent)" bgColor="var(--accent-dim, rgba(16,185,129,0.08))">
         Every recommendation below re-runs your full plan — taxes, Social Security taxability, RMDs, IRMAA,
         and the withdrawal waterfall — not a rule of thumb. Expand &ldquo;Show the math&rdquo; on any card to audit it.
         {' '}<a href="/report" style={{ color: 'var(--accent)', fontWeight: 600 }}>Print / save the full plan as PDF →</a>
@@ -159,16 +159,16 @@ export default function Optimize() {
       {/* Baseline strip */}
       <div className="stats-row" style={{ display: 'flex', gap: 12, marginTop: 16, flexWrap: 'wrap' }}>
         <Stat
-          icon={covered ? '✅' : '⚠️'}
           label="Money Lasts To"
           value={`Age ${baseline.moneyLastsAge}`}
           sub={covered ? `Covers your plan to ${baseline.longevityAge}` : `Plan runs to ${baseline.longevityAge} — gap to close`}
           color={covered ? 'var(--accent)' : 'var(--danger)'}
         />
-        <Stat icon="🏔️" label="At Retirement" value={fmt(baseline.portfolioAtRetire)} sub="Projected portfolio" color="var(--blue)" />
-        <Stat icon="🧾" label="Lifetime Tax" value={fmt(baseline.lifetimeTax)} sub="Baseline projection" color="var(--warn)" />
+        {/* Color only where it encodes status — neutral facts stay in text
+            color so the one green "opportunity" number actually pops. */}
+        <Stat label="At Retirement" value={fmt(baseline.portfolioAtRetire)} sub="Projected portfolio" color="var(--text)" />
+        <Stat label="Lifetime Tax" value={fmt(baseline.lifetimeTax)} sub="Baseline projection" color="var(--text)" />
         <Stat
-          icon="💡"
           label="Opportunity Found"
           value={totalOpportunity > 0 ? `+${fmt(totalOpportunity)}` : '$0'}
           sub={`${actions.length} recommendation${actions.length === 1 ? '' : 's'}`}
@@ -179,7 +179,6 @@ export default function Optimize() {
       {/* Ranked actions */}
       {actions.length === 0 ? (
         <Card style={{ marginTop: 16, textAlign: 'center', padding: '48px 32px' }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🏆</div>
           <div style={{ fontSize: 18, fontFamily: 'var(--serif)', color: 'var(--text)' }}>
             No material optimizations found
           </div>

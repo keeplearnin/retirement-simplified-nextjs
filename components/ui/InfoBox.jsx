@@ -1,14 +1,25 @@
 'use client';
 
-export default function InfoBox({ icon, title, children, color = 'var(--accent)', bgColor = 'var(--accent-dim)', style }) {
+/**
+ * Design note: this used to be a tinted, emoji-led callout (20px glyph +
+ * colored serif title on a colored wash). Repeated at the top of every tab
+ * it read as template noise. Now: quiet surface, one colored rule carrying
+ * the accent, title in heading color. The `icon` prop is accepted for
+ * backward compatibility but intentionally not rendered.
+ */
+export default function InfoBox({ icon, title, children, color = 'var(--accent)', bgColor, style }) {
   return (
     <div
       className="info-box"
-      style={{ background: bgColor, border: `1px solid ${color}22`, ...style }}
+      style={{
+        background: 'var(--bg2)',
+        border: '1px solid var(--border)',
+        borderLeft: `3px solid ${color}`,
+        ...style,
+      }}
     >
-      <div className="flex items-center gap-10 mb-8">
-        <span className="f20">{icon}</span>
-        <span className="serif f18" style={{ color }}>{title}</span>
+      <div className="mb-8">
+        <span className="serif f16" style={{ color: 'var(--heading, var(--text))', fontWeight: 600 }}>{title}</span>
       </div>
       <div className="muted f13 lh-loose">{children}</div>
     </div>

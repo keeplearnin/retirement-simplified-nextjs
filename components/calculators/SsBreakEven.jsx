@@ -35,21 +35,18 @@ export default function SsBreakEven() {
 
       <div className="stats-row" style={{ display: 'flex', gap: 12, marginTop: 16, flexWrap: 'wrap' }}>
         <Stat
-          icon="🏆"
           label="Best Claiming Age"
           value={`Age ${best.claimAge}`}
           sub={`${fmt(best.lifetimeToLongevity)} lifetime to ${longevity}`}
           color="var(--accent)"
         />
         <Stat
-          icon="⚖️"
           label="62 vs 70 Difference"
           value={fmt(Math.abs(at70.lifetimeToLongevity - at62.lifetimeToLongevity))}
           sub={at70.lifetimeToLongevity > at62.lifetimeToLongevity ? 'Waiting until 70 collects more' : 'Claiming at 62 collects more'}
           color="var(--blue)"
         />
         <Stat
-          icon="📈"
           label="Check Size: 62 → 70"
           value={`${fmt(at62.monthlyBenefit)} → ${fmt(at70.monthlyBenefit)}`}
           sub="Monthly benefit range"
@@ -74,7 +71,7 @@ export default function SsBreakEven() {
                 return (
                   <tr key={o.claimAge} style={{ borderTop: '1px solid var(--border)', background: isBest ? 'var(--accent-dim, rgba(16,185,129,0.07))' : 'transparent' }}>
                     <td style={{ padding: '9px 12px 9px 0', fontWeight: isBest ? 700 : 500, color: 'var(--text)' }}>
-                      {o.claimAge}{o.claimAge === SS_FRA ? ' (FRA)' : ''}{isBest ? ' 🏆' : ''}
+                      {o.claimAge}{o.claimAge === SS_FRA ? ' (FRA)' : ''}{isBest ? ' ' : ''}
                     </td>
                     <td style={{ textAlign: 'right', padding: '9px 0 9px 12px', color: 'var(--text)' }}>{fmt(o.monthlyBenefit)}</td>
                     <td style={{ textAlign: 'right', padding: '9px 0 9px 12px', color: 'var(--text-muted)' }}>{Math.round(o.factor * 100)}%</td>

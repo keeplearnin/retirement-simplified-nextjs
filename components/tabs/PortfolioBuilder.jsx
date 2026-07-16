@@ -37,9 +37,9 @@ const ALTERNATIVES = {
 
 // Location colors/labels
 const LOCATION_META = {
-  'taxable':      { label: 'Taxable', color: 'var(--accent)', icon: '💰' },
-  'tax-deferred': { label: '401(k) / IRA', color: 'var(--warn)', icon: '🏦' },
-  'either':       { label: 'Either', color: 'var(--blue)', icon: '↔️' },
+  'taxable':      { label: 'Taxable', color: 'var(--accent)', icon: '' },
+  'tax-deferred': { label: '401(k) / IRA', color: 'var(--warn)', icon: '' },
+  'either':       { label: 'Either', color: 'var(--blue)', icon: '↔' },
 };
 
 // ── Research-backed glide path (Vanguard TDF methodology) ──────────────
@@ -386,7 +386,7 @@ export default function PortfolioBuilder() {
 
       {/* ── ASSET LOCATION GUIDE ── */}
       <Card variant="output" style={{ marginBottom: 20 }}>
-        <SectionLabel icon="🧭">Where to Hold Each ETF (Tax-Efficient Placement)</SectionLabel>
+        <SectionLabel>Where to Hold Each ETF (Tax-Efficient Placement)</SectionLabel>
         <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 14, lineHeight: 1.5 }}>
           Asset location can add 0.1-0.5% annually to after-tax returns. Place tax-inefficient assets (bonds, gold) in tax-sheltered accounts, and tax-efficient assets (US/intl stocks) in taxable.
         </div>
@@ -394,7 +394,7 @@ export default function PortfolioBuilder() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }} className="grid-2">
           {/* Taxable column */}
           <div style={{ background: 'rgba(52,211,153,0.04)', border: '1px solid rgba(52,211,153,0.15)', borderRadius: 8, padding: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 }}>💰 Taxable Brokerage</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 }}>Taxable Brokerage</div>
             {taxable.length > 0 ? taxable.map(f => (
               <div key={f.ticker} style={{ marginBottom: 8, padding: '8px 10px', background: 'var(--card)', borderRadius: 6, border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -408,7 +408,7 @@ export default function PortfolioBuilder() {
 
           {/* Tax-deferred column */}
           <div style={{ background: 'rgba(251,191,36,0.04)', border: '1px solid rgba(251,191,36,0.15)', borderRadius: 8, padding: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--warn)', marginBottom: 8 }}>🏦 401(k) / Traditional IRA</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--warn)', marginBottom: 8 }}>401(k) / Traditional IRA</div>
             {deferred.length > 0 ? deferred.map(f => (
               <div key={f.ticker} style={{ marginBottom: 8, padding: '8px 10px', background: 'var(--card)', borderRadius: 6, border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -422,7 +422,7 @@ export default function PortfolioBuilder() {
 
           {/* Either column */}
           <div style={{ background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.15)', borderRadius: 8, padding: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue)', marginBottom: 8 }}>↔️ Either / Roth IRA</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue)', marginBottom: 8 }}>↔Either / Roth IRA</div>
             {either.length > 0 ? either.map(f => (
               <div key={f.ticker} style={{ marginBottom: 8, padding: '8px 10px', background: 'var(--card)', borderRadius: 6, border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -437,7 +437,7 @@ export default function PortfolioBuilder() {
       </Card>
 
       {/* One Fund tip */}
-      <InfoBox icon="💡" title="Even Simpler: One Fund" color="var(--accent)" style={{ marginBottom: 20 }}>
+      <InfoBox title="Even Simpler: One Fund" color="var(--accent)" style={{ marginBottom: 20 }}>
         Buy a single <strong style={{ color: 'var(--text)' }}>Vanguard Target Retirement {targetYr} Fund (VTTVX)</strong> — it holds a similar mix and <strong style={{ color: 'var(--text)' }}>auto-rebalances as you age</strong>. Expense ratio: 0.08%. Perfect if you want zero maintenance.
       </InfoBox>
 
@@ -446,12 +446,12 @@ export default function PortfolioBuilder() {
         <SectionLabel>Why This Works</SectionLabel>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
           {[
-            { icon: '🌍', title: 'Global diversification', desc: `${intlBias}% international equity — ${intlBias >= 35 ? 'Vanguard-aligned' : 'US-tilted home bias'} approach` },
-            { icon: '💸', title: 'Ultra-low fees', desc: `Blended ${blendedExpense.toFixed(3)}% vs 1%+ advisor — ${fmtFull(Math.round(portfolioSize * 0.01 - portfolioSize * blendedExpense / 100))}/yr saved` },
-            { icon: '📈', title: 'Research-backed', desc: 'Glide path based on Vanguard TDF methodology, not folk rules' },
-            { icon: '🏆', title: 'Small-cap tilt', desc: age < 40 ? `${alloc.VXF || 0}% extended market for higher growth when young` : 'Balanced large/small cap for stability' },
-            { icon: '🛡️', title: includeGold ? 'Gold hedge' : 'Bond stability', desc: includeGold ? `${totalGold}% gold — uncorrelated to stocks in crashes (2022: stocks -18%, gold +1%)` : `${totalBond}% bonds cushion drawdowns` },
-            { icon: '🧭', title: 'Tax-optimized placement', desc: 'Asset location guide saves 0.1-0.5% annually after-tax' },
+            { icon: '', title: 'Global diversification', desc: `${intlBias}% international equity — ${intlBias >= 35 ? 'Vanguard-aligned' : 'US-tilted home bias'} approach` },
+            { icon: '', title: 'Ultra-low fees', desc: `Blended ${blendedExpense.toFixed(3)}% vs 1%+ advisor — ${fmtFull(Math.round(portfolioSize * 0.01 - portfolioSize * blendedExpense / 100))}/yr saved` },
+            { icon: '', title: 'Research-backed', desc: 'Glide path based on Vanguard TDF methodology, not folk rules' },
+            { icon: '', title: 'Small-cap tilt', desc: age < 40 ? `${alloc.VXF || 0}% extended market for higher growth when young` : 'Balanced large/small cap for stability' },
+            { icon: '', title: includeGold ? 'Gold hedge' : 'Bond stability', desc: includeGold ? `${totalGold}% gold — uncorrelated to stocks in crashes (2022: stocks -18%, gold +1%)` : `${totalBond}% bonds cushion drawdowns` },
+            { icon: '', title: 'Tax-optimized placement', desc: 'Asset location guide saves 0.1-0.5% annually after-tax' },
           ].map((r, i) => (
             <div key={i} style={{ textAlign: 'center', padding: '16px 8px', borderRadius: 'var(--radius-sm)', background: 'var(--bg2)', border: '1px solid var(--border)' }}>
               <div style={{ fontSize: 24, marginBottom: 8 }}>{r.icon}</div>
@@ -472,7 +472,7 @@ export default function PortfolioBuilder() {
           cursor: 'pointer', transition: 'all .25s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
         }}
       >
-        <span style={{ fontSize: 22 }}>📊</span>
+        <span style={{ fontSize: 22 }}></span>
         <div style={{ textAlign: 'left' }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--sans)' }}>
             {showAnalytics ? 'Hide' : 'Show'} Deep Portfolio Analytics

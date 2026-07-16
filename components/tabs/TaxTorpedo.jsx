@@ -62,7 +62,7 @@ export default function TaxTorpedo() {
 
   return (
     <div>
-      <InfoBox icon="🚀" title="When pulling from your IRA spikes your tax rate" color="var(--purple)" bgColor="rgba(139,92,246,0.08)">
+      <InfoBox title="When pulling from your IRA spikes your tax rate" color="var(--purple)" bgColor="rgba(139,92,246,0.08)">
         <strong>The short version:</strong> in retirement, every $1 you withdraw from a 401(k) or traditional IRA can drag $0.50–$0.85 of your Social Security check into taxable income too. In that zone, your <em>effective</em> marginal rate spikes to 40%+ even while you're nominally in the 22% federal bracket. The industry calls it the <strong>Social Security Tax Torpedo</strong>. Move the slider below to see where your numbers fall.
       </InfoBox>
 
@@ -87,21 +87,18 @@ export default function TaxTorpedo() {
 
       <div className="stats-row" style={{ display: 'flex', gap: 12, marginTop: 14 }}>
         <Stat
-          icon="📊"
           label="Effective Marginal Rate"
           value={`${(result.effectiveMarginalRate * 100).toFixed(1)}%`}
           sub="On next $1,000 of withdrawal"
           color={result.inTorpedoZone ? 'var(--danger)' : 'var(--accent)'}
         />
         <Stat
-          icon="💵"
           label="Taxable SS"
           value={`${result.ssTaxablePercent}%`}
           sub={`of ${fmt(ssAnnual)} in ${result.ssTaxablePercent === 0 ? 'no' : 'taxable'} base`}
           color="var(--blue)"
         />
         <Stat
-          icon="📈"
           label="Provisional Income"
           value={fmt(result.provisionalIncome)}
           sub={`Threshold: ${fmt(result.torpedoZone.end)}`}
@@ -152,7 +149,7 @@ export default function TaxTorpedo() {
       </Card>
 
       {result.inTorpedoZone && (
-        <InfoBox icon="⚠️" title="You're in the torpedo zone" color="var(--danger)" bgColor="rgba(239,68,68,0.08)" style={{ marginTop: 14 }}>
+        <InfoBox title="You're in the torpedo zone" color="var(--danger)" bgColor="rgba(239,68,68,0.08)" style={{ marginTop: 14 }}>
           At your current withdrawal of {fmt(iraWithdrawal)}, the next $1,000 of IRA money costs {fmt(Math.round(1000 * result.effectiveMarginalRate))} in extra tax — an effective rate of {(result.effectiveMarginalRate * 100).toFixed(1)}%. Strategies to consider: Roth conversions in low-income years before claiming SS, drawing from taxable accounts first, or partial-year withdrawals timed around income.
         </InfoBox>
       )}

@@ -88,7 +88,7 @@ export default function TaxAware() {
   return (
     <div className="fade-up">
       {showSecure2Banner && (
-        <InfoBox icon="📌" title="SECURE 2.0: your catch-up contribution must be Roth" color="var(--warn)" bgColor="rgba(251,191,36,.08)">
+        <InfoBox title="SECURE 2.0: your catch-up contribution must be Roth" color="var(--warn)" bgColor="rgba(251,191,36,.08)">
           {primaryHighEarner50 && spouseHighEarner50
             ? "Both of you are over 50 with FICA wages above $150K, so under SECURE 2.0 (effective 2026) every age-50+ catch-up dollar you contribute to a 401(k) / 403(b) / 457(b) must go to the Roth side, not pre-tax. The Traditional side of this comparison is for the regular contribution; the catch-up portion ($8,000/yr at 50+, or $11,250/yr at 60–63) is Roth-only by law."
             : (primaryHighEarner50
@@ -97,7 +97,7 @@ export default function TaxAware() {
         </InfoBox>
       )}
 
-      <InfoBox icon="⚖️" title="Roth vs Traditional: Which Wins?" color="var(--info)" bgColor="var(--info-dim)">
+      <InfoBox title="Roth vs Traditional: Which Wins?" color="var(--info)" bgColor="var(--info-dim)">
         {rothWins ? (
           <>The <strong style={{ color: 'var(--accent)' }}>Roth IRA</strong> comes out ahead by <strong style={{ color: 'var(--accent)' }}>{fmt(diff)}</strong> after taxes{showReal ? ' (today\'s dollars)' : ''}. With a lower tax bracket in retirement, the gap narrows — but tax-free withdrawals still win here.</>
         ) : (
@@ -140,9 +140,9 @@ export default function TaxAware() {
           <Card>
             <SectionLabel>After-Tax Comparison at Retirement{showReal ? " (today's $)" : ''}</SectionLabel>
             <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
-              <Stat icon="🟢" label="Roth (after-tax)" value={fmt(finalRothNet || 0)} sub="Tax-free withdrawals" color="var(--accent)" />
-              <Stat icon="🔵" label="Traditional (after-tax)" value={fmt(finalTradNet || 0)} sub={`Includes reinvested tax savings`} color="var(--info)" />
-              <Stat icon="💰" label="Tax Savings Invested" value={fmt(finalTaxSavings || 0)} sub={`${fmt(annualContrib * currentBracket / 100)}/yr reinvested`} color="var(--text-muted)" />
+              <Stat label="Roth (after-tax)" value={fmt(finalRothNet || 0)} sub="Tax-free withdrawals" color="var(--accent)" />
+              <Stat label="Traditional (after-tax)" value={fmt(finalTradNet || 0)} sub={`Includes reinvested tax savings`} color="var(--info)" />
+              <Stat label="Tax Savings Invested" value={fmt(finalTaxSavings || 0)} sub={`${fmt(annualContrib * currentBracket / 100)}/yr reinvested`} color="var(--text-muted)" />
             </div>
 
             <MiniChart data={data} height={280} lines={[

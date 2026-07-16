@@ -1059,7 +1059,7 @@ export default function MyPlan() {
             }
             return dupes.length > 0 ? (
               <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, border: '1px solid var(--warn)', background: 'rgba(251,191,36,0.06)', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                ⚠️ Duplicate source{dupes.length > 1 ? 's' : ''} ({dupes.join(', ')}): the projection only
+                Duplicate source{dupes.length > 1 ? 's' : ''} ({dupes.join(', ')}): the projection only
                 uses the first of each type per person — remove the extra or switch its owner to Spouse.
               </div>
             ) : null;
@@ -1519,7 +1519,6 @@ export default function MyPlan() {
           const survivorYears = widowedRows.length;
           return (
             <InfoBox
-              icon="🕊️"
               title={`Survivor analysis: ${primaryDied ? 'spouse outlives you' : 'you outlive spouse'} by ${survivorYears} year${survivorYears === 1 ? '' : 's'}`}
               color="var(--purple)"
               bgColor="rgba(139,92,246,0.08)"
@@ -1589,7 +1588,7 @@ export default function MyPlan() {
           if (!hasHighIncomeYear) return null;
           const stateNames = { HI: 'Hawaii', MN: 'Minnesota', MA: 'Massachusetts', WI: 'Wisconsin' };
           return (
-            <InfoBox icon="🏛️" title={`${stateNames[plan.stateCode]} state tax is likely understated`} color="var(--warn)" bgColor="rgba(251,191,36,.08)">
+            <InfoBox title={`${stateNames[plan.stateCode]} state tax is likely understated`} color="var(--warn)" bgColor="rgba(251,191,36,.08)">
               At your income level, your state's graduated brackets push the marginal rate above the single effective rate this tool uses. Real {stateNames[plan.stateCode]} liability is likely higher than the projection shows — possibly several thousand dollars per year. Graduated-bracket modeling for {stateNames[plan.stateCode]} is on the roadmap; CA, NY, NJ, and OR are already on full graduated brackets.
             </InfoBox>
           );

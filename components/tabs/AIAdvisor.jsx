@@ -344,7 +344,7 @@ export default function AIAdvisor() {
       });
 
       // Register an undo entry. Lives for 30s, then auto-expires and the
-      // change becomes permanent (button settles to "✓ Applied").
+      // change becomes permanent (button settles to "Applied").
       setPendingUndo((prev) => {
         const next = new Map(prev);
         next.set(proposal.id, { previousValue, target: proposal.target });
@@ -470,7 +470,7 @@ export default function AIAdvisor() {
           }}
         >
           <span>
-            ✨ <strong>New here?</strong>{' '}
+            <strong>New here?</strong>{' '}
             <button
               onClick={() => setActivePanel('tour')}
               style={{
@@ -635,7 +635,7 @@ export default function AIAdvisor() {
                   ? 'Monthly Progress'
                   : 'Progress Review')}
               {activePanel === 'settings' && 'Settings'}
-              {activePanel === 'tour' && '✨ AI Advisor — 30-second tour'}
+              {activePanel === 'tour' && 'AI Advisor — 30-second tour'}
             </span>
             <button
               onClick={() => setActivePanel(null)}
@@ -701,7 +701,7 @@ export default function AIAdvisor() {
                       <ul style={{ margin: '0 0 10px', paddingLeft: 18, fontSize: 12, color: 'var(--text)' }}>
                         {healthReport.alerts.slice(0, 3).map((a, i) => (
                           <li key={i} style={{ marginBottom: 2 }}>
-                            {a.severity === 'high' ? '🔴' : a.severity === 'medium' ? '🟡' : '🟢'} {a.message}
+                            {a.severity === 'high' ? '' : a.severity === 'medium' ? '' : ''} {a.message}
                           </li>
                         ))}
                       </ul>
@@ -750,7 +750,7 @@ export default function AIAdvisor() {
                   </div>
                 )}
                 {insights?.recommendations?.map((rec, i) => {
-                  const dot = rec.severity === 'high' ? '🔴' : rec.severity === 'medium' ? '🟡' : '🟢';
+                  const dot = rec.severity === 'high' ? '' : rec.severity === 'medium' ? '' : '';
                   return (
                     <div
                       key={rec.id}
@@ -999,7 +999,7 @@ export default function AIAdvisor() {
                 {optimizeError && !optimizeLoading && (
                   <div>
                     <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8 }}>
-                      <strong>⚠️ Optimization failed.</strong> {optimizeError.message}
+                      <strong>Optimization failed.</strong> {optimizeError.message}
                       {optimizeError.status > 0 && (
                         <span style={{ color: 'var(--text-muted)', fontSize: 11, marginLeft: 6 }}>
                           (HTTP {optimizeError.status})
@@ -1197,7 +1197,7 @@ export default function AIAdvisor() {
                 </p>
                 <ol style={{ margin: '0 0 12px', paddingLeft: 20 }}>
                   <li><strong>Real plan calculations</strong> — Ask "am I on track" or "what if I retire at 62" and the AI runs the actual projection engine, not a generic answer.</li>
-                  <li><strong>⚡ Optimize My Plan</strong> — Click the green chip above for a multi-step analysis (SS timing + Roth conversion + withdrawal order) with dollar impact per change.</li>
+                  <li><strong>Optimize My Plan</strong> — Click the green chip above for a multi-step analysis (SS timing + Roth conversion + withdrawal order) with dollar impact per change.</li>
                   <li><strong>Plan health</strong> — Color-coded chip auto-runs every 7 days. Green = on track, yellow = needs attention.</li>
                   <li><strong>Portfolio insights</strong> — Proactive recommendations on tax diversification, concentration, cash drag, etc.</li>
                   <li><strong>Apply to My Plan</strong> — When the AI suggests a specific change ("claim SS at 70"), an inline button writes it to your plan with one click.</li>
@@ -1226,11 +1226,11 @@ export default function AIAdvisor() {
                       cursor: 'pointer',
                     }}
                   >
-                    ✨ Show tour
+                    Show tour
                   </button>
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
-                  📬 Weekly email digest
+                  Weekly email digest
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
                   Get your plan health report in your inbox every Monday.
@@ -1269,7 +1269,7 @@ export default function AIAdvisor() {
 
                 <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
-                    🤖 Replay setup
+                    Replay setup
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
                     Re-open the onboarding chooser to walk through plan setup again. Your existing plan stays — you can update fields conversationally instead of editing the form.
@@ -1416,7 +1416,7 @@ export default function AIAdvisor() {
                               title={drift ? `You changed this to ${String(liveValue)} since the AI suggested it.` : p.rationale}
                             >
                               <span>
-                                {applied ? '✓ Applied: ' : 'Apply: '}
+                                {applied ? 'Applied: ' : 'Apply: '}
                                 {p.applyLabel}
                                 {liveValue != null && !applied && (
                                   <span style={{ color: drift ? 'var(--warn, #f59e0b)' : 'var(--text-muted)', fontWeight: 500, marginLeft: 6 }}>

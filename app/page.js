@@ -195,8 +195,8 @@ function AppContent() {
               whiteSpace: 'nowrap',
             }}
           >
-            <span className="quick-verdict-text">⚡ Quick Verdict</span>
-            <span className="quick-verdict-icon-only" aria-label="Quick Verdict">⚡</span>
+            <span className="quick-verdict-text" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Icon name="bolt" size={12} />Quick Verdict</span>
+            <span className="quick-verdict-icon-only" aria-label="Quick Verdict"><Icon name="bolt" size={13} /></span>
           </a>
           {authLoading ? null : user ? (
             <>
@@ -211,12 +211,12 @@ function AppContent() {
             aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             style={{
               width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--border)',
-              background: 'transparent', cursor: 'pointer', fontSize: 14,
+              background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all .25s',
             }}
           >
-            {theme === 'dark' ? '☀️' : '🌙'}
+            <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={15} />
           </button>
         </div>
       </header>
@@ -269,7 +269,7 @@ function AppContent() {
             }}
           >
             <span>
-              👋 <strong>Finish setting up your plan</strong> — you skipped onboarding earlier. Takes ~3 minutes.
+              <strong>Finish setting up your plan</strong> — you skipped onboarding earlier. Takes ~3 minutes.
             </span>
             <div style={{ display: 'flex', gap: 8 }}>
               <button
@@ -327,7 +327,7 @@ function AppContent() {
 
       <footer style={{ maxWidth: 700, margin: '0 auto', textAlign: 'center', padding: '28px 24px 40px', borderTop: '1px solid var(--border)' }}>
         <p style={{ color: 'var(--text-dim)', fontSize: 11, lineHeight: 1.8, maxWidth: 580, margin: '0 auto' }}>
-          ⚖️ <strong>Disclaimer:</strong> This tool is for educational purposes only and does not constitute financial advice. Past performance does not guarantee future results. All projections are hypothetical. Consult a qualified financial professional for advice specific to your situation.
+          <strong>Disclaimer:</strong> This tool is for educational purposes only and does not constitute financial advice. Past performance does not guarantee future results. All projections are hypothetical. Consult a qualified financial professional for advice specific to your situation.
         </p>
         {/* Trust links — methodology, source, license — kept low-key but discoverable */}
         <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 18, flexWrap: 'wrap', fontSize: 11 }}>

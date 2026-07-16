@@ -47,14 +47,12 @@ export default function IrmaaChecker() {
 
       <div className="stats-row" style={{ display: 'flex', gap: 12, marginTop: 16, flexWrap: 'wrap' }}>
         <Stat
-          icon={cliff.annualSurcharge > 0 ? '💸' : '✅'}
           label="Your Current Tier"
           value={cliff.annualSurcharge > 0 ? `${fmt(cliff.annualSurcharge * perPerson)}/yr` : 'No surcharge'}
           sub={cliff.annualSurcharge > 0 ? `Part B surcharge${perPerson === 2 ? ' (both spouses)' : ''}` : 'Below the first IRMAA threshold'}
           color={cliff.annualSurcharge > 0 ? 'var(--warn)' : 'var(--accent)'}
         />
         <Stat
-          icon={cliff.atRisk ? '⚠️' : '📏'}
           label="Distance to Next Cliff"
           value={isFinite(cliff.nextThreshold) ? fmt(cliff.distanceToNextCliff) : 'Top tier'}
           sub={isFinite(cliff.nextThreshold) ? `Next tier starts above ${fmt(cliff.nextThreshold)}` : 'No higher tier exists'}

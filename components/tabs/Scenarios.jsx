@@ -118,14 +118,14 @@ export default function Scenarios() {
 
   return (
     <div className="fade-up">
-      <InfoBox icon="🔀" title="Scenario Comparison" color="var(--blue)" bgColor="rgba(96,165,250,0.08)">
+      <InfoBox title="Scenario Comparison" color="var(--blue)" bgColor="rgba(96,165,250,0.08)">
         Snapshot your plan, change anything (retire earlier, sell the rental, move states), snapshot again,
         and compare futures side-by-side. Every column runs your full tax-aware projection — not a simplified curve.
       </InfoBox>
 
       {/* Save + manage */}
       <Card style={{ marginTop: 16 }}>
-        <SectionLabel icon="📸">Snapshot Current Plan</SectionLabel>
+        <SectionLabel>Snapshot Current Plan</SectionLabel>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <input
             type="text"
@@ -143,9 +143,9 @@ export default function Scenarios() {
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Button variant="ghost" size="sm" onClick={exportPlan}>⬇ Export plan (JSON)</Button>
+          <Button variant="ghost" size="sm" onClick={exportPlan}>Export plan (JSON)</Button>
           <label style={{ display: 'inline-block' }}>
-            <span className="btn btn-sm btn-ghost" style={{ cursor: 'pointer' }}>⬆ Import plan</span>
+            <span className="btn btn-sm btn-ghost" style={{ cursor: 'pointer' }}>Import plan</span>
             <input
               type="file"
               accept=".json,application/json"
@@ -177,7 +177,7 @@ export default function Scenarios() {
                     </span>
                   </label>
                   <Button variant="ghost" size="sm" onClick={() => { bulkUpdate(s.plan); }}>Load into plan</Button>
-                  <Button variant="ghost" size="sm" onClick={() => removeScenario(s.id)} aria-label={`Delete ${s.name}`}>✕</Button>
+                  <Button variant="ghost" size="sm" onClick={() => removeScenario(s.id)} aria-label={`Delete ${s.name}`}></Button>
                 </div>
               );
             })}
@@ -192,7 +192,7 @@ export default function Scenarios() {
       {compared.length > 1 && (
         <>
           <Card style={{ marginTop: 16 }}>
-            <SectionLabel icon="⚖️">Side by Side</SectionLabel>
+            <SectionLabel>Side by Side</SectionLabel>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 480, fontFamily: 'var(--sans)' }}>
                 <thead>
@@ -234,7 +234,6 @@ export default function Scenarios() {
 
       {saved.length === 0 && (
         <Card style={{ marginTop: 16, textAlign: 'center', padding: '40px 32px' }}>
-          <div style={{ fontSize: 36, marginBottom: 10 }}>🔀</div>
           <div style={{ fontSize: 16, fontFamily: 'var(--serif)', color: 'var(--text-muted)' }}>
             No saved scenarios yet
           </div>

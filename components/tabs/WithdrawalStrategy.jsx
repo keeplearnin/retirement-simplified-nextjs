@@ -222,7 +222,7 @@ export default function WithdrawalStrategy() {
 
   return (
     <div className="fade-up">
-      <InfoBox icon="🏦" title="Retirement Withdrawal Strategy" color="var(--blue)" bgColor="var(--blue-dim)">
+      <InfoBox title="Retirement Withdrawal Strategy" color="var(--blue)" bgColor="var(--blue-dim)">
         The accumulation phase gets all the attention, but how you draw down is just as important. The right withdrawal order and Roth conversion strategy can save you tens of thousands in taxes.
       </InfoBox>
 
@@ -239,7 +239,7 @@ export default function WithdrawalStrategy() {
             <Slider label="Social Security (monthly)" value={socialSecurity} onChange={handleSocialSecurityChange} min={0} max={5000} step={100} prefix="$" suffix="/mo" />
             {ssAutoEstimated && (
               <div style={{ marginTop: -6, marginBottom: 10, padding: '6px 10px', borderRadius: 6, background: 'var(--blue-dim)', border: '1px solid var(--blue)', fontSize: 11, color: 'var(--blue)', lineHeight: 1.5 }}>
-                ℹ️ Auto-estimated from your salary at FRA (age 67) using the 2026 SSA PIA formula. For early/delayed claiming or per-spouse benefits, refine on the <strong>Social Security</strong> tab.
+                ℹAuto-estimated from your salary at FRA (age 67) using the 2026 SSA PIA formula. For early/delayed claiming or per-spouse benefits, refine on the <strong>Social Security</strong> tab.
               </div>
             )}
             <div style={{ marginTop: 14, padding: '10px 14px', background: 'var(--bg)', borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -292,10 +292,10 @@ export default function WithdrawalStrategy() {
         <div>
           {/* Stats Row */}
           <div style={{ display: 'flex', gap: 14, marginBottom: 14 }}>
-            <Stat icon="💰" label="Total Nest Egg" value={fmt(results.totalNestEgg)} sub="Starting portfolio" color="var(--accent)" />
-            <Stat icon="📊" label="Withdrawal Rate" value={`${results.withdrawalRate.toFixed(1)}%`} sub={results.withdrawalRate < 4 ? 'Sustainable' : results.withdrawalRate <= 5 ? 'Caution zone' : 'High risk'} color={withdrawalColor} />
-            <Stat icon="📅" label="Years Funded" value={results.yearsOfRetirement} sub={results.moneyRunsOutAge ? 'Money runs out early' : 'Fully funded'} color={yearsColor} />
-            <Stat icon="🎯" label="Money Lasts Until" value={`Age ${age + results.yearsOfRetirement}`} sub={results.moneyRunsOutAge ? 'Consider reducing spend' : 'On track'} color={yearsColor} />
+            <Stat label="Total Nest Egg" value={fmt(results.totalNestEgg)} sub="Starting portfolio" color="var(--accent)" />
+            <Stat label="Withdrawal Rate" value={`${results.withdrawalRate.toFixed(1)}%`} sub={results.withdrawalRate < 4 ? 'Sustainable' : results.withdrawalRate <= 5 ? 'Caution zone' : 'High risk'} color={withdrawalColor} />
+            <Stat label="Years Funded" value={results.yearsOfRetirement} sub={results.moneyRunsOutAge ? 'Money runs out early' : 'Fully funded'} color={yearsColor} />
+            <Stat label="Money Lasts Until" value={`Age ${age + results.yearsOfRetirement}`} sub={results.moneyRunsOutAge ? 'Consider reducing spend' : 'On track'} color={yearsColor} />
           </div>
 
           {/* Tax Impact Summary */}

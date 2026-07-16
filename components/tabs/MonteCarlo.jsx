@@ -178,7 +178,7 @@ export default function MonteCarlo() {
 
   return (
     <div className="fade-up">
-      <InfoBox icon="🎲" title="Monte Carlo Simulation" color="var(--purple)" bgColor="var(--purple-dim, rgba(139,92,246,0.08))">
+      <InfoBox title="Monte Carlo Simulation" color="var(--purple)" bgColor="var(--purple-dim, rgba(139,92,246,0.08))">
         Runs thousands of random market scenarios to estimate the probability your savings last through retirement.
         Each simulation uses randomized returns matching your portfolio risk profile — not a single fixed number.
         Spending and Social Security are entered in today&apos;s dollars; both are inflation-adjusted inside the
@@ -189,7 +189,7 @@ export default function MonteCarlo() {
 
       {/* Portfolio Risk Profile Selector */}
       <Card style={{ marginTop: 16, marginBottom: 20 }}>
-        <SectionLabel icon="📊">Portfolio Risk Profile</SectionLabel>
+        <SectionLabel>Portfolio Risk Profile</SectionLabel>
         <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12, lineHeight: 1.5 }}>
           Select a profile matching your Portfolio Builder allocation. Each profile uses historically accurate return and volatility assumptions.
         </div>
@@ -260,7 +260,6 @@ export default function MonteCarlo() {
         <div>
           {!simData ? (
             <Card style={{ textAlign: 'center', padding: '60px 32px' }}>
-              <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>🎲</div>
               <div style={{ fontSize: 20, fontFamily: 'var(--serif)', color: 'var(--text-muted)', marginBottom: 8 }}>Ready to Simulate</div>
               <div style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6 }}>
                 Select your portfolio risk profile above, adjust parameters, and click Run.
@@ -305,11 +304,11 @@ export default function MonteCarlo() {
 
               {/* Stats */}
               <div className="stats-row" style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
-                <Stat icon="🎯" label="Success Rate" value={`${(simData.successRate * 100).toFixed(1)}%`}
+                <Stat label="Success Rate" value={`${(simData.successRate * 100).toFixed(1)}%`}
                   sub={`${Math.round(simData.successRate * runs)} of ${runs}`} color={successColor} />
-                <Stat icon="💰" label="Median at Retirement" value={fmt(simData.percentiles.p50[simData.years])}
+                <Stat label="Median at Retirement" value={fmt(simData.percentiles.p50[simData.years])}
                   sub={`After ${simData.years} years`} color="var(--blue)" />
-                <Stat icon="🏁" label="Median at End" value={fmt(simData.percentiles.p50[simData.totalYears])}
+                <Stat label="Median at End" value={fmt(simData.percentiles.p50[simData.totalYears])}
                   sub={`Age ${endAge}`} color="var(--purple, var(--accent))" />
               </div>
 
@@ -360,7 +359,7 @@ export default function MonteCarlo() {
               {/* ── SENSITIVITY ANALYSIS: What Levers Can You Pull? ── */}
               {sensitivity && (
                 <Card style={{ marginTop: 14 }}>
-                  <SectionLabel icon="🎛️">What Levers Can You Pull?</SectionLabel>
+                  <SectionLabel>What Levers Can You Pull?</SectionLabel>
                   <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 14, lineHeight: 1.5 }}>
                     Your current success rate is <strong style={{ color: successColor }}>{(sensitivity.current * 100).toFixed(1)}%</strong>.
                     Here is how each change would impact your odds:
@@ -383,7 +382,7 @@ export default function MonteCarlo() {
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                             <div>
                               <span style={{ fontSize: 13, fontWeight: 700, color: isCombined ? 'var(--accent)' : 'var(--text)' }}>
-                                {isCombined ? '🚀 ' : ''}{lever.label}
+                                {isCombined ? '' : ''}{lever.label}
                               </span>
                               {lever.detail && <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 8 }}>{lever.detail}</span>}
                             </div>
@@ -435,7 +434,7 @@ export default function MonteCarlo() {
               {/* ── HISTORICAL BACKTEST: real market sequences since 1928 ── */}
               {backtest && backtest.sequenceCount > 0 && (
                 <Card style={{ marginTop: 14 }}>
-                  <SectionLabel icon="📜">Historical Backtest — Would It Have Survived?</SectionLabel>
+                  <SectionLabel>Historical Backtest — Would It Have Survived?</SectionLabel>
                   <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12, lineHeight: 1.5 }}>
                     Your exact plan, replayed through every real market history since {HISTORICAL_START_YEAR} —
                     the Great Depression, the stagflation 1970s, the dot-com bust, and 2008 included.
@@ -446,21 +445,18 @@ export default function MonteCarlo() {
 
                   <div className="stats-row" style={{ display: 'flex', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
                     <Stat
-                      icon="🏛️"
                       label="Historical Success"
                       value={`${(backtest.successRate * 100).toFixed(0)}%`}
                       sub={`${backtest.successCount} of ${backtest.sequenceCount} sequences since ${HISTORICAL_START_YEAR}`}
                       color={backtest.successRate >= 0.9 ? 'var(--accent)' : backtest.successRate >= 0.75 ? 'var(--warn)' : 'var(--danger)'}
                     />
                     <Stat
-                      icon="🌪️"
                       label="Worst Start Year"
                       value={String(backtest.worst?.startYear ?? '—')}
                       sub={backtest.worst?.success ? `Still made it: ${fmt(backtest.worst.finalBalance)} left` : `Ran out at age ${backtest.worst?.failedAtAge}`}
                       color={backtest.worst?.success ? 'var(--accent)' : 'var(--danger)'}
                     />
                     <Stat
-                      icon="🚀"
                       label="Best Start Year"
                       value={String(backtest.best?.startYear ?? '—')}
                       sub={`${fmt(backtest.best?.finalBalance ?? 0)} at age ${endAge}`}
