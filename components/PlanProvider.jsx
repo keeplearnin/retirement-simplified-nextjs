@@ -226,8 +226,13 @@ export function PlanProvider({ children }) {
       const newSources = cur.incomeSources.map(s => s.id === id ? updated : s);
       const next = { ...cur, incomeSources: newSources };
       if (updated.type === 'salary' && !cur._expenseManuallySet) {
-        const salary = updated.amount || 0;
-        next.annualSpending = Math.round(salary * 0.75 / 1000) * 1000;
+        // Auto-estimate spending from HOUSEHOLD salary, not just the source
+        // being edited — otherwise a couple's expense estimate lurches to
+        // whichever spouse's salary was last touched (ignoring the other).
+        const householdSalary = newSources
+          .filter(s => s.type === 'salary')
+          .reduce((sum, s) => sum + (s.amount || 0), 0);
+        next.annualSpending = Math.round(householdSalary * 0.75 / 1000) * 1000;
       }
       return next;
     });
