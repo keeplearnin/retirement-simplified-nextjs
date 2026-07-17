@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { migratePlan } from '@/components/PlanProvider';
+import { migratePlan, mintId } from '@/components/PlanProvider';
 
 describe('migratePlan — duplicate id healing', () => {
   it('reassigns fresh ids when income sources share an id (the "edit one, both change" bug)', () => {
@@ -40,5 +40,31 @@ describe('migratePlan — duplicate id healing', () => {
     });
     const ids = plan.debts.map(d => d.id);
     expect(new Set(ids).size).toBe(2);
+  });
+});
+
+describe('mintId — collision-free id minting', () => {
+  it('returns max existing id + 1 (never length + 1)', () => {
+    // length+1 would return 3 here and collide with the id-100 item.
+    const items = [{ id: 1 }, { id: 100 }];
+    expect(mintId(items)).toBe(101);
+  });
+
+  it('does not collide after a middle item is removed', () => {
+    const items = [{ id: 1 }, { id: 3 }]; // id 2 was removed
+    const next = mintId(items);
+    expect(items.some(i => i.id === next)).toBe(false);
+    expect(next).toBe(4);
+  });
+
+  it('respects the floor for empty lists', () => {
+    expect(mintId([], 100)).toBe(101);
+    expect(mintId(undefined, 200)).toBe(201);
+    expect(mintId([])).toBe(1);
+  });
+
+  it('ignores stray non-numeric ids instead of poisoning the max', () => {
+    const items = [{ id: 5 }, { id: 'abc' }, { id: undefined }];
+    expect(mintId(items)).toBe(6);
   });
 });

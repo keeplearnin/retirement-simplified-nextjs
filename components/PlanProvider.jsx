@@ -146,6 +146,24 @@ function dedupeIds(items) {
   return changed ? out : items;
 }
 
+/**
+ * Mint a collision-free numeric id for a list item: max existing id + 1,
+ * floored so different lists (income ≥100, debts ≥200) never overlap.
+ *
+ * This is the ONLY correct way to mint ids here. `list.length + 1` (used in
+ * a couple of older call sites) collides the moment any item was removed or
+ * ids don't start at 1 — and a duplicate id makes `.map(x => x.id === id …)`
+ * edit multiple rows at once (the "change one, both change" bug). Coerces
+ * ids defensively so a stray string/NaN id can't poison the max.
+ */
+export function mintId(items, floor = 0) {
+  const max = (items || []).reduce((m, it) => {
+    const n = Number(it?.id);
+    return Number.isFinite(n) && n > m ? n : m;
+  }, floor);
+  return max + 1;
+}
+
 export function migratePlan(stored) {
   if (!stored || typeof stored !== 'object') return DEFAULT_PLAN;
   const merged = { ...DEFAULT_PLAN, ...stored };
@@ -245,13 +263,10 @@ export function PlanProvider({ children }) {
     });
   }, [setPlan]);
 
-  // ID minting derives from the list itself, NOT a ref. A ref-based counter
-  // resets to its seed on every page load while sources persisted from a
-  // previous session keep their higher ids — the next add then reused an
-  // existing id, and updateIncome(id) edited BOTH rows ("change one, both
-  // change" bug). Max-of-list + 1 can never collide with saved data.
-  const nextId = (items, floor) =>
-    (items || []).reduce((m, it) => Math.max(m, Number(it.id) || 0), floor) + 1;
+  // ID minting derives from the list itself, NOT a ref (a ref-based counter
+  // resets on reload while persisted sources keep higher ids → reuse → the
+  // "change one, both change" bug). See mintId above.
+  const nextId = mintId;
 
   const addIncome = useCallback((type, owner = 'primary') => {
     const template = INCOME_TEMPLATES[type];

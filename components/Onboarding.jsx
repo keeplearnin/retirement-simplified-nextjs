@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Slider from '@/components/ui/Slider';
-import { usePlan } from '@/components/PlanProvider';
+import { usePlan, mintId } from '@/components/PlanProvider';
 import { fmt } from '@/lib/format';
 import OnboardingChat from '@/components/OnboardingChat';
 import Icon from '@/components/ui/Icon';
@@ -64,16 +64,17 @@ export default function Onboarding({ onComplete }) {
         { id: 4, type: 'socialSecurity', label: 'Spouse Social Security', monthlyBenefit: 2200, startAge: 67, owner: 'spouse' },
       );
     }
-    let nextId = incomeSources.length + 1;
+    // Mint from the actual max id, not list length — length+1 collides the
+    // moment the base ids aren't a clean 1..n run (see mintId).
     if (hasPension) {
       incomeSources.push({
-        id: nextId++, type: 'pension', label: 'Pension',
+        id: mintId(incomeSources), type: 'pension', label: 'Pension',
         monthlyAmount: pensionMonthly, startAge: pensionStartAge, cola: true, owner: 'primary',
       });
     }
     if (hasSpouse && hasSpousePension) {
       incomeSources.push({
-        id: nextId++, type: 'pension', label: 'Spouse Pension',
+        id: mintId(incomeSources), type: 'pension', label: 'Spouse Pension',
         monthlyAmount: spousePensionMonthly, startAge: spousePensionStartAge, cola: true, owner: 'spouse',
       });
     }

@@ -120,10 +120,16 @@ function monthsBetween(from: Date, to: Date): number {
   return (to.getTime() - from.getTime()) / MS_PER_MONTH;
 }
 
-/** Project a share price `months` from now under compounding annual growth. */
+/** Project a share price `months` from now under compounding annual growth.
+ *  Defensive: a growth rate below −100% would make the base negative and a
+ *  fractional exponent yield NaN — clamp the base to 0 (price floors at $0,
+ *  never goes imaginary). Non-finite inputs collapse to the current price. */
 export function projectPrice(currentPrice: number, annualGrowth: number, months: number): number {
+  if (!Number.isFinite(currentPrice)) return 0;
+  if (!Number.isFinite(annualGrowth) || !Number.isFinite(months)) return currentPrice;
   const years = months / 12;
-  return currentPrice * Math.pow(1 + annualGrowth, years);
+  const base = Math.max(0, 1 + annualGrowth);
+  return currentPrice * Math.pow(base, years);
 }
 
 // ---------------------------------------------------------------------------

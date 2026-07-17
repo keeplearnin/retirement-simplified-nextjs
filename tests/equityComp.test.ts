@@ -33,6 +33,17 @@ describe('projectPrice', () => {
     expect(projectPrice(100, 0.1, 24)).toBeCloseTo(121, 6);
     expect(projectPrice(100, 0, 60)).toBe(100);
   });
+
+  it('never returns NaN, even for pathological inputs', () => {
+    // Growth below −100% would make the base negative → NaN under a
+    // fractional exponent. Must floor at $0 instead.
+    expect(Number.isFinite(projectPrice(100, -2, 18))).toBe(true);
+    expect(projectPrice(100, -2, 18)).toBe(0);
+    // Non-finite inputs must not propagate.
+    expect(projectPrice(NaN, 0.1, 12)).toBe(0);
+    expect(projectPrice(100, NaN, 12)).toBe(100);
+    expect(projectPrice(100, 0.1, Infinity)).toBe(100);
+  });
 });
 
 describe('projectVesting', () => {
