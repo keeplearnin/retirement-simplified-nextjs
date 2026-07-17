@@ -34,6 +34,8 @@ import Inheritance from '@/components/tabs/Inheritance';
 import Optimize from '@/components/tabs/Optimize';
 import Scenarios from '@/components/tabs/Scenarios';
 import LinkedAccounts from '@/components/tabs/LinkedAccounts';
+import EquityComp from '@/components/tabs/EquityComp';
+import CollegePlanner from '@/components/tabs/CollegePlanner';
 import Icon from '@/components/ui/Icon';
 
 function AppContent() {
@@ -106,6 +108,8 @@ function AppContent() {
       { id: 'optimize', label: 'Optimize' },
       { id: 'scenarios', label: 'Scenarios' },
       { id: 'accounts', label: 'Accounts' },
+      { id: 'equity', label: 'Equity Comp' },
+      { id: 'college', label: 'College' },
       { id: 'portfolio', label: 'Portfolio' },
     ]},
     // Coach groups the AI Advisor (chat) with the workbench drill-downs,
@@ -319,6 +323,8 @@ function AppContent() {
         {tab === 'optimize' && <Optimize />}
         {tab === 'scenarios' && <Scenarios />}
         {tab === 'accounts' && <LinkedAccounts />}
+        {tab === 'equity' && <EquityComp />}
+        {tab === 'college' && <CollegePlanner />}
         {tab === 'portfolio' && <PortfolioBuilder />}
         {tab === 'advisor' && <AIAdvisor />}
         {tab === 'roth-strategy' && <RothStrategy />}
