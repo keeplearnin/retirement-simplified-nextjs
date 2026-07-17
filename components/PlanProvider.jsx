@@ -310,8 +310,15 @@ export function PlanProvider({ children }) {
     });
   }, [setPlan]);
 
+  // bulkUpdate takes wholesale field patches — scenario "Load into plan",
+  // onboarding, Plaid sync — whose incomeSources/debts may carry ids that were
+  // never minted through mintId (duplicates, or none at all). Run the result
+  // through migratePlan so ids are HEALED ON WRITE, not just on the next read:
+  // otherwise a loaded plan with colliding ids persists dirty until something
+  // re-reads it, and any edit in between could match two rows ("change one,
+  // both change"). Same healer the read path uses, so results stay consistent.
   const bulkUpdate = useCallback((updates) => {
-    setPlan(prev => ({ ...prev, ...updates }));
+    setPlan(prev => migratePlan({ ...prev, ...updates }));
   }, [setPlan]);
 
   // Stable identity prevents every usePlan() consumer from re-rendering on
