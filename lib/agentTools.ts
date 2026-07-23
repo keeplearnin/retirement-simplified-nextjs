@@ -10,6 +10,7 @@
  */
 
 import { computeProjection } from '@/lib/computeProjection';
+import { ssClaimingFactor, SS_FRA } from '@/lib/ssClaiming';
 import { computeVerdict } from '@/lib/verdict';
 import { modelRothLadder } from '@/lib/rothConversion';
 import { computeTax } from '@/lib/taxEngine';
@@ -476,19 +477,7 @@ function executeCompareScenarios(
 // recommendation on when to claim.
 // ---------------------------------------------------------------------------
 
-const SS_FRA = 67;
-
-function ssClaimingFactor(claimAge: number): number {
-  const monthsDiff = (claimAge - SS_FRA) * 12;
-  if (monthsDiff === 0) return 1;
-  if (monthsDiff < 0) {
-    const monthsEarly = Math.abs(monthsDiff);
-    const first36 = Math.min(monthsEarly, 36);
-    const beyond36 = Math.max(monthsEarly - 36, 0);
-    return 1 - (first36 * (5 / 900) + beyond36 * (5 / 1200));
-  }
-  return 1 + monthsDiff * (2 / 300);
-}
+// SS_FRA + claiming factor consolidated into lib/ssClaiming.js (dedup pass).
 
 const optimizeSsClaimingDefinition: ToolDefinition = {
   name: 'optimize_ss_claiming',

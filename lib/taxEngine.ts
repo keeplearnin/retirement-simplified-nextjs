@@ -221,6 +221,25 @@ const IRMAA_MFJ: IrmaaEntry[] = [
 /** Exported for the standalone IRMAA calculator page. */
 export const IRMAA_TABLES = { single: IRMAA_SINGLE, mfj: IRMAA_MFJ };
 
+/**
+ * Bracket upper-edges keyed by rate-% and the standard deductions — exported
+ * so consumers that do "fill the X% bracket" math (rothConversion) share the
+ * SAME numbers as the tax engine instead of keeping a private copy that can
+ * drift when January constants are updated.
+ */
+export const FEDERAL_BRACKET_TOPS: Record<'single' | 'mfj', Record<number, number>> = {
+  single: Object.fromEntries(
+    FEDERAL_BRACKETS_SINGLE.filter(b => Number.isFinite(b.max)).map(b => [Math.round(b.rate * 100), b.max])
+  ),
+  mfj: Object.fromEntries(
+    FEDERAL_BRACKETS_MFJ.filter(b => Number.isFinite(b.max)).map(b => [Math.round(b.rate * 100), b.max])
+  ),
+};
+export const STANDARD_DEDUCTIONS = {
+  single: STANDARD_DEDUCTION_SINGLE,
+  mfj: STANDARD_DEDUCTION_MFJ,
+} as const;
+
 // ---------------------------------------------------------------------------
 // State Tax Rates (simplified — flat or top marginal approximation)
 // States with graduated brackets use a weighted average / top-bracket approx.

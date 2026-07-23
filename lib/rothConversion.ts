@@ -13,7 +13,7 @@
  * federal+state+SS-taxability math.
  */
 
-import { computeTax } from './taxEngine';
+import { computeTax, FEDERAL_BRACKET_TOPS, STANDARD_DEDUCTIONS } from './taxEngine';
 import { RMD_TABLE } from './constants';
 
 export type Bracket = 0 | 12 | 22 | 24 | 32;
@@ -99,25 +99,12 @@ export interface RothLadderOutput {
 
 const RMD_START_AGE = 73;
 
-// 2026 federal-bracket UPPER edges for taxable income (i.e. after std deduction).
-const BRACKET_TOPS_SINGLE: Record<number, number> = {
-  10: 12_400,
-  12: 50_400,
-  22: 105_700,
-  24: 201_775,
-  32: 256_225,
-  35: 640_600,
-};
-const BRACKET_TOPS_MFJ: Record<number, number> = {
-  10: 24_800,
-  12: 100_800,
-  22: 211_400,
-  24: 403_550,
-  32: 512_450,
-  35: 768_700,
-};
-const STD_DEDUCTION_SINGLE = 16_100;
-const STD_DEDUCTION_MFJ = 32_200;
+// Bracket tops + standard deductions come from taxEngine (single source —
+// a private copy here drifted risk every January constant refresh).
+const BRACKET_TOPS_SINGLE = FEDERAL_BRACKET_TOPS.single;
+const BRACKET_TOPS_MFJ = FEDERAL_BRACKET_TOPS.mfj;
+const STD_DEDUCTION_SINGLE = STANDARD_DEDUCTIONS.single;
+const STD_DEDUCTION_MFJ = STANDARD_DEDUCTIONS.mfj;
 
 function rmdDivisor(age: number): number | null {
   if (age < RMD_START_AGE) return null;

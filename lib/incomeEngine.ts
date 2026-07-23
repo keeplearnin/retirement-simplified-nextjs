@@ -4,6 +4,8 @@
  */
 
 import { SS_FRA, RMD_START_AGE, RMD_TABLE } from '@/lib/constants';
+// SSA claiming factor — single implementation (was duplicated in 3 files).
+import { ssClaimingFactor } from './ssClaiming';
 
 // ---------------------------------------------------------------------------
 // Income source interfaces
@@ -182,33 +184,6 @@ export interface YearlyProjection {
 // Social Security claiming adjustment
 // ---------------------------------------------------------------------------
 
-/**
- * Compute the adjustment factor for claiming Social Security at a given age
- * relative to Full Retirement Age (FRA).
- *
- * - Before FRA: reduction of 5/9 of 1% per month for first 36 months early,
- *   then 5/12 of 1% per month for additional months.
- * - After FRA: delayed retirement credits of 8% per year (2/3% per month).
- */
-function ssClaimingFactor(claimAge: number, fra: number): number {
-  const monthsDiff = (claimAge - fra) * 12;
-
-  if (monthsDiff === 0) return 1;
-
-  if (monthsDiff < 0) {
-    // Early claiming -- reduction
-    const monthsEarly = Math.abs(monthsDiff);
-    const first36 = Math.min(monthsEarly, 36);
-    const beyond36 = Math.max(monthsEarly - 36, 0);
-    const reduction = first36 * (5 / 900) + beyond36 * (5 / 1200);
-    return 1 - reduction;
-  }
-
-  // Delayed claiming -- credits
-  const monthsLate = monthsDiff;
-  const credit = monthsLate * (2 / 300); // 8% per year = 2/3% per month
-  return 1 + credit;
-}
 
 // ---------------------------------------------------------------------------
 // Projection engine
