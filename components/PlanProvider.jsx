@@ -164,6 +164,49 @@ export function mintId(items, floor = 0) {
   return max + 1;
 }
 
+/**
+ * The You/Spouse toggle on an income card. THE REAL BUG behind "change one,
+ * both change": this used to REASSIGN the existing record's owner in place —
+ * so a household with only one salary entry, toggled to "Spouse", just
+ * relabeled that SAME record. Toggling back to "You" showed the identical
+ * number, because there was only ever one number. No id collision, no
+ * storage corruption — the toggle simply never created a second, separate
+ * entry the way "You" and "Spouse" fields implied it would.
+ *
+ * Fix: if no sibling of this type already belongs to the target owner,
+ * DUPLICATE this source for them (new id, same starting values, editable
+ * independently) and leave the original untouched. Only reassign in place
+ * when a sibling already exists for the target owner (the "I picked the
+ * wrong owner by mistake" case, where duplicating would be wrong).
+ */
+export function applyIncomeOwnerSwitch(incomeSources, id, nextOwner) {
+  const src = (incomeSources || []).find(s => s.id === id);
+  if (!src) return incomeSources;
+  const currentOwner = src.owner || 'primary';
+  if (currentOwner === nextOwner) return incomeSources;
+
+  const siblingExists = incomeSources.some(
+    s => s.id !== id && s.type === src.type && (s.owner || 'primary') === nextOwner
+  );
+  const baseLabel = (src.label || '').replace(/^Spouse /, '');
+
+  if (siblingExists) {
+    // A source for the target owner already exists — reassigning this one in
+    // place is the only sensible interpretation (duplicating would create
+    // two sources for the same person).
+    const reassigned = { ...src, owner: nextOwner, label: nextOwner === 'spouse' ? `Spouse ${baseLabel}` : baseLabel };
+    return incomeSources.map(s => s.id === id ? reassigned : s);
+  }
+
+  const duplicate = {
+    ...src,
+    id: mintId(incomeSources, 100),
+    owner: nextOwner,
+    label: nextOwner === 'spouse' ? `Spouse ${baseLabel}` : baseLabel,
+  };
+  return [...incomeSources, duplicate];
+}
+
 export function migratePlan(stored) {
   if (!stored || typeof stored !== 'object') return DEFAULT_PLAN;
   const merged = { ...DEFAULT_PLAN, ...stored };
@@ -263,6 +306,13 @@ export function PlanProvider({ children }) {
     });
   }, [setPlan]);
 
+  const switchIncomeOwner = useCallback((id, nextOwner) => {
+    setPlan(prev => {
+      const cur = migratePlan(prev);
+      return { ...cur, incomeSources: applyIncomeOwnerSwitch(cur.incomeSources, id, nextOwner) };
+    });
+  }, [setPlan]);
+
   // ID minting derives from the list itself, NOT a ref (a ref-based counter
   // resets on reload while persisted sources keep higher ids → reuse → the
   // "change one, both change" bug). See mintId above.
@@ -324,8 +374,8 @@ export function PlanProvider({ children }) {
   // Stable identity prevents every usePlan() consumer from re-rendering on
   // unrelated PlanProvider renders. Callbacks below are already memoized.
   const value = useMemo(
-    () => ({ plan, updatePlan, updateIncome, removeIncome, addIncome, addDebt, updateDebt, removeDebt, bulkUpdate }),
-    [plan, updatePlan, updateIncome, removeIncome, addIncome, addDebt, updateDebt, removeDebt, bulkUpdate]
+    () => ({ plan, updatePlan, updateIncome, removeIncome, addIncome, switchIncomeOwner, addDebt, updateDebt, removeDebt, bulkUpdate }),
+    [plan, updatePlan, updateIncome, removeIncome, addIncome, switchIncomeOwner, addDebt, updateDebt, removeDebt, bulkUpdate]
   );
 
   return (

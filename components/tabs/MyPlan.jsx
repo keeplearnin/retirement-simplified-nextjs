@@ -74,40 +74,24 @@ function Collapsible({ title, defaultOpen = true, children, badge }) {
 // Income Source Card
 // ---------------------------------------------------------------------------
 
-function IncomeSourceCard({ source, onChange, onRemove, retireAge, hasSpouse }) {
+function IncomeSourceCard({ source, onChange, onRemove, onSwitchOwner, retireAge, hasSpouse }) {
   const update = (key, val) => onChange({ ...source, [key]: val });
   const owner = source.owner || 'primary';
   // Rental is household-level in the projection engine (no owner semantics),
   // so it gets no You/Spouse toggle.
   const ownable = source.type !== 'rental';
 
-  const setOwner = (nextOwner) => {
-    if (nextOwner === owner) return;
-    const baseLabel = (source.label || '').replace(/^Spouse /, '');
-    onChange({
-      ...source,
-      owner: nextOwner,
-      label: nextOwner === 'spouse' ? `Spouse ${baseLabel}` : baseLabel,
-    });
-  };
-
   return (
     <div style={{ padding: 16, border: '1px solid var(--border)', borderRadius: 12, marginBottom: 12, background: 'var(--bg2)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 10, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
-          {source.label}
-          {/* Temporary debug marker — shows each card's internal id so a
-              screenshot can immediately reveal an id collision if one exists.
-              Safe to remove once the reported bug is confirmed resolved. */}
-          <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 8, fontWeight: 400 }}>#{source.id}</span>
-        </span>
+        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{source.label}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {hasSpouse && ownable && (
-            <div style={{ display: 'flex', borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden' }} title="Switching to the other person adds a separate, independent entry for them — this one stays as-is.">
               {[['primary', 'You'], ['spouse', 'Spouse']].map(([val, label]) => (
                 <button
                   key={val}
-                  onClick={() => setOwner(val)}
+                  onClick={() => onSwitchOwner(val)}
                   style={{
                     padding: '4px 12px', border: 'none', cursor: 'pointer',
                     fontSize: 11, fontWeight: 600, fontFamily: 'var(--sans)',
@@ -871,7 +855,7 @@ function RmdProjectionTable({ rows }) {
 // ---------------------------------------------------------------------------
 
 export default function MyPlan() {
-  const { plan, updatePlan, updateIncome, removeIncome, addIncome, addDebt, updateDebt, removeDebt, bulkUpdate } = usePlan();
+  const { plan, updatePlan, updateIncome, removeIncome, addIncome, switchIncomeOwner, addDebt, updateDebt, removeDebt, bulkUpdate } = usePlan();
 
   // Dismissed suggestions (read from localStorage after mount to avoid hydration mismatch)
   const [dismissedSuggestions, setDismissedSuggestions] = useState([]);
@@ -1076,6 +1060,7 @@ export default function MyPlan() {
               source={src}
               onChange={updated => updateIncome(src.id, updated)}
               onRemove={() => removeIncome(src.id)}
+              onSwitchOwner={nextOwner => switchIncomeOwner(src.id, nextOwner)}
               retireAge={plan.retireAge}
               hasSpouse={!!plan.hasSpouse}
             />
