@@ -94,7 +94,13 @@ function IncomeSourceCard({ source, onChange, onRemove, retireAge, hasSpouse }) 
   return (
     <div style={{ padding: 16, border: '1px solid var(--border)', borderRadius: 12, marginBottom: 12, background: 'var(--bg2)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 10, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{source.label}</span>
+        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
+          {source.label}
+          {/* Temporary debug marker — shows each card's internal id so a
+              screenshot can immediately reveal an id collision if one exists.
+              Safe to remove once the reported bug is confirmed resolved. */}
+          <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 8, fontWeight: 400 }}>#{source.id}</span>
+        </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {hasSpouse && ownable && (
             <div style={{ display: 'flex', borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden' }}>
