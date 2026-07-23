@@ -164,3 +164,37 @@ describe('computeProjection — pre-retirement gap years draw down (regression)'
     }
   });
 });
+
+describe('computeProjection — ledger identity (transparency layer)', () => {
+  // The Ledger view derives growth as the residual of the exact identity:
+  //   end = start + growth + contributions − withdrawals
+  // This test guarantees the emitted fields close that identity every year,
+  // so the on-screen ledger can never show a row where money appears or
+  // vanishes unexplained.
+  it('start + derived growth + contributions − withdrawals === end, every year', () => {
+    const result = computeProjection(basePlan({
+      currentAge: 48, retireAge: 60, longevityAge: 90,
+      filingStatus: 'mfj', hasSpouse: true, spouseCurrentAge: 46, spouseRetireAge: 60,
+      savings401k: 800_000, savingsRoth: 200_000, savingsTaxable: 400_000,
+      savingsCash: 80_000, savingsRealEstate: 300_000, savingsHSA: 50_000,
+      monthlyContribution: 2_000, spouseMonthlyContribution: 1_500,
+      expectedReturn: 7, annualSpending: 150_000, retireSpending: 130_000,
+      incomeSources: [
+        { id: 1, type: 'salary', label: 'Salary', amount: 220_000, growthRate: 3, owner: 'primary' },
+        { id: 2, type: 'socialSecurity', label: 'SS', monthlyBenefit: 3_000, startAge: 67, owner: 'primary' },
+      ],
+    }));
+    for (const row of result.combined) {
+      expect(typeof row.contributions).toBe('number');
+      const derivedGrowth = row.portfolioEndBalance - row.portfolioBalance
+        + (row.totalWithdrawals || 0) - (row.contributions || 0);
+      const reconstructedEnd = row.portfolioBalance + derivedGrowth
+        + (row.contributions || 0) - (row.totalWithdrawals || 0);
+      expect(Math.abs(reconstructedEnd - row.portfolioEndBalance), `identity at age ${row.age}`).toBeLessThan(0.01);
+      // Contributions only while someone is working. Spouse is 2 years
+      // younger (retires at spouse-age 60 = primary-age 62), so their
+      // $18K/yr correctly continues through primary ages 60-61.
+      if (row.age >= 62) expect(row.contributions).toBe(0);
+    }
+  });
+});

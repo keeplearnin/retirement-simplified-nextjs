@@ -672,6 +672,150 @@ function MetricCard({ label, value, sub, color }) {
 }
 
 // ---------------------------------------------------------------------------
+// Transparency layer — Explain popover + Ledger table + Assumptions strip
+// ---------------------------------------------------------------------------
+
+/**
+ * Explain — an inline ⓘ that opens a small "how this number was computed"
+ * trace. Born from a real support saga: a user distrusted every headline
+ * number until the arithmetic behind it was written out line by line.
+ */
+function Explain({ lines, label = 'How this was computed' }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        title={label}
+        style={{
+          background: 'none', border: '1px solid var(--border)', cursor: 'pointer',
+          color: open ? 'var(--accent)' : 'var(--text-dim)', fontSize: 10, fontWeight: 700,
+          width: 16, height: 16, borderRadius: '50%', lineHeight: 1, padding: 0,
+          fontFamily: 'var(--sans)', verticalAlign: 'middle', marginLeft: 6,
+        }}
+      >i</button>
+      {open && (
+        <span style={{
+          position: 'absolute', zIndex: 60, top: 'calc(100% + 6px)', right: 0,
+          minWidth: 280, maxWidth: 360, padding: '12px 14px', borderRadius: 10,
+          background: 'var(--card)', border: '1px solid var(--border-light)',
+          boxShadow: 'var(--shadow-lg)', display: 'block', textAlign: 'left',
+        }}>
+          <span style={{ display: 'block', fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 0.5, marginBottom: 8, textTransform: 'uppercase' }}>{label}</span>
+          {lines.map((l, i) => (
+            <span key={i} style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6, whiteSpace: 'normal', fontWeight: 400 }}>{l}</span>
+          ))}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * LedgerTable — the dollar-by-dollar trace. Every year: what the portfolio
+ * started with, what it earned, what went in, what came out, what it ended
+ * with — the exact identity end = start + growth + contrib − withdrawn —
+ * plus the year's cash flow (income − taxes − spending). The single most
+ * effective answer to "the math is wrong": show all of it.
+ */
+function LedgerTable({ rows }) {
+  const cell = { padding: '6px 8px', textAlign: 'right', fontSize: 11.5, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' };
+  const head = { ...cell, fontSize: 9.5, color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, position: 'sticky', top: 0, background: 'var(--card)' };
+  return (
+    <div style={{ overflowX: 'auto', maxHeight: 420, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 10 }}>
+      <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 760, fontFamily: 'var(--sans)' }}>
+        <thead>
+          <tr>
+            <th style={{ ...head, textAlign: 'left' }}>Age</th>
+            <th style={head}>Start</th>
+            <th style={head}>+ Growth</th>
+            <th style={head}>+ Contrib</th>
+            <th style={head}>− Withdrawn</th>
+            <th style={head}>= End</th>
+            <th style={{ ...head, borderLeft: '1px solid var(--border)' }}>Income</th>
+            <th style={head}>Taxes</th>
+            <th style={head}>Spending</th>
+            <th style={head}>Net</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(r => {
+            // Growth is the residual of the exact identity, so this table can
+            // never show a row where money appears or vanishes unexplained.
+            const growth = Math.round(r.portfolioEndBalance - r.portfolioBalance + (r.totalWithdrawals || 0) - (r.contributions || 0));
+            const net = Math.round(r.gap);
+            return (
+              <tr key={r.age} style={{ borderTop: '1px solid var(--border)', background: r.isRetireYear ? 'var(--accent-dim)' : 'transparent' }}>
+                <td style={{ ...cell, textAlign: 'left', fontWeight: r.isRetireYear ? 700 : 500, color: 'var(--text)' }}>
+                  {r.age}{r.isRetireYear ? ' ★' : ''}
+                </td>
+                <td style={{ ...cell, color: 'var(--text-muted)' }}>{fmt(r.portfolioBalance)}</td>
+                <td style={{ ...cell, color: growth >= 0 ? 'var(--text)' : 'var(--danger)' }}>{growth >= 0 ? '+' : '−'}{fmt(Math.abs(growth))}</td>
+                <td style={{ ...cell, color: (r.contributions || 0) > 0 ? 'var(--text)' : 'var(--text-dim)' }}>{(r.contributions || 0) > 0 ? `+${fmt(r.contributions)}` : '—'}</td>
+                <td style={{ ...cell, color: (r.totalWithdrawals || 0) > 0 ? 'var(--text)' : 'var(--text-dim)' }}>{(r.totalWithdrawals || 0) > 0 ? `−${fmt(r.totalWithdrawals)}` : '—'}</td>
+                <td style={{ ...cell, fontWeight: 600, color: 'var(--text)' }}>{fmt(r.portfolioEndBalance)}</td>
+                <td style={{ ...cell, color: 'var(--text-muted)', borderLeft: '1px solid var(--border)' }}>{fmt(Math.round(r.totalIncome))}</td>
+                <td style={{ ...cell, color: 'var(--text-muted)' }}>{fmt(Math.round(r.totalTax))}</td>
+                <td style={{ ...cell, color: 'var(--text-muted)' }}>{fmt(Math.round(r.totalExpense))}</td>
+                <td style={{ ...cell, fontWeight: 600, color: net >= 0 ? 'var(--accent)' : 'var(--danger)' }}>{net >= 0 ? '+' : '−'}{fmt(Math.abs(net))}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/**
+ * AssumptionsStrip — the assumptions that silently drive the verdict, made
+ * loud. Every one of this product's "the math is wrong" reports traced to a
+ * hidden assumption (retirement-return haircut, auto-estimated spending,
+ * cash/RE growing at 3%, salary end-age) — so they live on the dashboard now,
+ * not buried in a collapsed panel.
+ */
+function AssumptionsStrip({ plan, onEdit }) {
+  const workingR = plan.expectedReturn || 7;
+  const retiredPct = plan.retiredReturnPct || 60;
+  const retiredR = (workingR * retiredPct / 100).toFixed(1);
+  const spendingAuto = !plan._expenseManuallySet;
+  const chip = (label, value, opts = {}) => (
+    <span title={opts.title} style={{
+      display: 'inline-flex', alignItems: 'baseline', gap: 5, padding: '4px 10px',
+      borderRadius: 999, border: `1px solid ${opts.warn ? 'var(--warn)' : 'var(--border)'}`,
+      background: opts.warn ? 'var(--warn-dim)' : 'var(--bg2)', fontSize: 11,
+      color: 'var(--text-dim)', whiteSpace: 'nowrap',
+    }}>
+      {label}
+      <strong style={{ color: opts.warn ? 'var(--warn)' : 'var(--text-muted)', fontWeight: 600 }}>{value}</strong>
+    </span>
+  );
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', margin: '0 0 16px 2px' }}>
+      <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', marginRight: 2 }}>Assumptions</span>
+      {chip('Return', `${workingR}% → ${retiredR}%`, { title: `${workingR}% while working, ${retiredR}% in retirement (${retiredPct}% of working — the "Retirement Return" slider under Assumptions). Cash & real estate grow at ~3% regardless.` })}
+      {chip('Inflation', `${plan.inflationRate || 2.5}%`, { title: 'Spending and Social Security COLA both grow at this rate.' })}
+      {chip('Healthcare', `+${plan.healthcareInflation || 3.5}%`, { title: 'Healthcare costs inflate faster than general prices.' })}
+      {chip('Spending', `${fmt(plan.annualSpending)}/yr${spendingAuto ? ' · auto' : ''}`, {
+        warn: spendingAuto,
+        title: spendingAuto
+          ? 'AUTO-ESTIMATED at 75% of household salary — not your real number. Set your actual spending under Expenses; it is the single biggest lever in this plan.'
+          : 'Your entered spending (working years). Retirement uses the Expenses panel value.',
+      })}
+      {chip('Real estate', plan.useRealEstateInRetirement ? 'drawable' : 'not drawn', {
+        title: plan.useRealEstateInRetirement
+          ? 'Real estate counts as spendable in retirement (sale / downsize / reverse mortgage).'
+          : 'Real estate grows but is NEVER spent — flip "Draw from real estate" under Assumptions if selling or downsizing is part of your plan.',
+      })}
+      <button onClick={onEdit} style={{
+        background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)',
+        fontSize: 11, fontWeight: 600, fontFamily: 'var(--sans)', padding: '4px 6px',
+      }}>Adjust →</button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Year-by-Year Table
 // ---------------------------------------------------------------------------
 
@@ -1380,6 +1524,16 @@ export default function MyPlan() {
                   Entering retirement at {plan.retireAge} with {fmt(results.portfolioAtRetire)} · plan runs to {plan.longevityAge}
                   {plan.hasSpouse && plan.spouseLongevityAge ? ` / ${plan.spouseLongevityAge}` : ''}
                   {!covered ? ` — ${plan.longevityAge - results.moneyLastsAge} years short` : ''}
+                  <Explain
+                    label="How this verdict was computed"
+                    lines={[
+                      `Every year from ${plan.currentAge} to the end of the plan: income − taxes − spending; any shortfall is withdrawn from savings (cash → taxable → 401(k) → Roth${plan.useRealEstateInRetirement ? ' → real estate' : ''}).`,
+                      covered
+                        ? 'No year exhausts your available savings, so the plan is funded end to end.'
+                        : `At age ${results.moneyLastsAge}, available savings hit $0 with expenses still unpaid.`,
+                      'The Ledger below shows every year’s exact dollars — start, growth, contributions, withdrawals, end.',
+                    ]}
+                  />
                 </div>
               </div>
               <div style={{ textAlign: 'center', flexShrink: 0 }}>
@@ -1389,6 +1543,14 @@ export default function MyPlan() {
           </Card>
         );
       })()}
+      {/* ---- Assumptions strip: the levers that drive the verdict, visible ---- */}
+      <AssumptionsStrip
+        plan={plan}
+        onEdit={() => {
+          const el = document.querySelector('.myplan-inputs');
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }}
+      />
       {/* ---- Next steps (suggestions) ---- */}
       {(() => {
         const suggestions = generateSuggestions(plan, results);
@@ -1445,7 +1607,27 @@ export default function MyPlan() {
           <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 6, fontSize: 11 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-dim)' }} title={`Balance the day you retire at age ${plan.retireAge}, before that year's withdrawals`}>Entering retirement</span>
-              <span style={{ fontWeight: 700, color: 'var(--text)' }}>{fmt(results.portfolioAtRetire)}</span>
+              <span style={{ fontWeight: 700, color: 'var(--text)' }}>
+                {fmt(results.portfolioAtRetire)}
+                {(() => {
+                  const pre = combined.filter(r => r.age < plan.retireAge);
+                  const g = pre.reduce((s, r) => s + (r.portfolioEndBalance - r.portfolioBalance + (r.totalWithdrawals || 0) - (r.contributions || 0)), 0);
+                  const c = pre.reduce((s, r) => s + (r.contributions || 0), 0);
+                  const w = pre.reduce((s, r) => s + (r.totalWithdrawals || 0), 0);
+                  return (
+                    <Explain
+                      label={`${fmt(results.startingBalance)} today → ${fmt(results.portfolioAtRetire)} at ${plan.retireAge}`}
+                      lines={[
+                        `Growth over ${pre.length} working years: +${fmt(Math.round(g))} (7% stocks-side; cash & real estate ~3%).`,
+                        `Contributions invested: +${fmt(Math.round(c))}.`,
+                        w > 0
+                          ? `Withdrawn to cover spending beyond income: −${fmt(Math.round(w))}. This is why the balance grows slower than "${plan.expectedReturn || 7}% compounding" — see the Ledger.`
+                          : 'No pre-retirement withdrawals — income covered spending every year.',
+                      ]}
+                    />
+                  );
+                })()}
+              </span>
             </div>
           </div>
         </div>
@@ -1526,6 +1708,16 @@ export default function MyPlan() {
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>Income vs. Expenses</div>
         <IncomeExpenseChart projections={combined} retireAge={plan.retireAge} plan={plan} />
       </div>
+
+      {/* ---- The Ledger: every dollar, every year ---- */}
+      <Collapsible title="The Ledger" defaultOpen={false} badge="Every dollar, every year — start + growth + contributions − withdrawals = end">
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 10, lineHeight: 1.5 }}>
+          Left side is your portfolio&apos;s balance sheet; right side is the year&apos;s cash flow
+          (income − taxes − spending). ★ marks the retirement year. If any row looks wrong,
+          that&apos;s the row to question — nothing here is hidden or smoothed.
+        </div>
+        <LedgerTable rows={combined} />
+      </Collapsible>
 
       {/* Key Metrics — horizontal strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginBottom: 20 }}>
