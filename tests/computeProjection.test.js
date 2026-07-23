@@ -124,3 +124,43 @@ describe('computeProjection — sanity', () => {
     }
   });
 });
+
+describe('computeProjection — pre-retirement gap years draw down (regression)', () => {
+  // User-reported: salary "stops at age 50" while user is 52 and retireAge is
+  // 60 → ages 52-59 had income $0 and expenses ~$200K, but the old waterfall
+  // only ran in retirement years, so NOTHING was withdrawn: expenses were
+  // paid from nowhere while balances compounded — incoherent tables and an
+  // overstated money-lasts age.
+  it('a gap year before retirement withdraws to cover expenses', () => {
+    const result = computeProjection(basePlan({
+      currentAge: 52, retireAge: 60, longevityAge: 90,
+      savingsCash: 400_000, savingsTaxable: 800_000, savings401k: 1_200_000,
+      annualSpending: 150_000, retireSpending: 150_000,
+      incomeSources: [
+        // Salary already ended — the trap input
+        { id: 1, type: 'salary', label: 'Salary', amount: 165_000, growthRate: 3, endAge: 50, owner: 'primary' },
+      ],
+    }));
+    const gapYears = result.combined.filter(r => r.age >= 52 && r.age < 60);
+    for (const row of gapYears) {
+      expect(row.salary, `salary at ${row.age}`).toBe(0);
+      // Expenses must actually be funded by withdrawals now.
+      expect(row.totalWithdrawals, `withdrawals at ${row.age}`).toBeGreaterThan(0);
+      expect(row.gap, `gap at ${row.age}`).toBeGreaterThanOrEqual(-1_500);
+    }
+  });
+
+  it('working years with income covering expenses still withdraw nothing', () => {
+    const result = computeProjection(basePlan({
+      currentAge: 45, retireAge: 60, longevityAge: 90,
+      savingsTaxable: 500_000,
+      annualSpending: 80_000, retireSpending: 80_000,
+      incomeSources: [
+        { id: 1, type: 'salary', label: 'Salary', amount: 200_000, growthRate: 3, owner: 'primary' },
+      ],
+    }));
+    for (const row of result.combined.filter(r => !r.isRetired)) {
+      expect(row.totalWithdrawals, `withdrawals at ${row.age}`).toBe(0);
+    }
+  });
+});

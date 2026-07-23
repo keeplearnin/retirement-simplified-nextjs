@@ -249,6 +249,22 @@ function generateSuggestions(plan, results) {
   if (highDebt) {
     suggestions.push({ id: 'high-debt', severity: 'danger', title: `Pay off ${highDebt.name} (${highDebt.interestRate}%)`, detail: 'High-interest debt costs more than investment returns. Prioritize paying this off.' });
   }
+  // Ended-salary trap: a salary whose "stops at age" is below the person's
+  // CURRENT age silently zeroes their income while they're still pre-
+  // retirement — the single most misleading input state we've seen (a $3M
+  // plan "running out" because the salary quietly ended two years ago).
+  for (const s of plan.incomeSources || []) {
+    if (s.type !== 'salary' || s.endAge == null) continue;
+    const ownerAge = (s.owner === 'spouse') ? (plan.spouseCurrentAge ?? plan.currentAge) : plan.currentAge;
+    const ownerRetire = (s.owner === 'spouse') ? (plan.spouseRetireAge ?? plan.retireAge) : plan.retireAge;
+    if (s.endAge < ownerAge && ownerAge < ownerRetire) {
+      suggestions.push({
+        id: `salary-ended-${s.id}`, severity: 'danger',
+        title: `${s.label} ended at ${s.endAge} — but ${s.owner === 'spouse' ? 'your spouse is' : "you're"} ${ownerAge}`,
+        detail: `This plan currently models $0 from ${s.label.toLowerCase()} from today onward, years before the retirement age of ${ownerRetire}. If ${s.owner === 'spouse' ? 'they are' : "you're"} still working, raise "Salary stops at age"; if work really ended at ${s.endAge}, lower the retirement age to match so the projection reads clearly.`,
+      });
+    }
+  }
   if (results.moneyLastsAge < plan.longevityAge) {
     const gap = results.moneyLastsAge;
     // If they hold real estate but haven't opted to draw on it, that's the
@@ -1345,7 +1361,13 @@ export default function MyPlan() {
                 </div>
                 <div style={{ fontFamily: 'var(--serif)', fontSize: 26, lineHeight: 1.25, color: covered ? 'var(--heading, var(--text))' : 'var(--text)', fontWeight: 600, textWrap: 'balance', maxWidth: 520 }}>
                   {covered
-                    ? <>On track — money lasts to age {results.moneyLastsAge}</>
+                    // "Funded through the full plan" not "lasts to age N" —
+                    // for couples the plan extends past the primary's
+                    // longevity into the survivor's years, and quoting the
+                    // primary-frame age (audit: "lasts to 92" on a plan
+                    // funded through the spouse's 94) undersells and
+                    // confuses. The subline carries the exact ages.
+                    ? <>On track — funded through your full plan</>
                     : <>Money runs out at age <span style={{ color: 'var(--danger)' }}>{results.moneyLastsAge}</span></>}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
