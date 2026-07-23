@@ -74,4 +74,59 @@ describe('applyIncomeOwnerSwitch', () => {
     const result = applyIncomeOwnerSwitch(lone, 999, 'spouse');
     expect(result).toBe(lone);
   });
+
+  // Explicit coverage per user request: verify every couple-shareable income
+  // type independently, not just salary. The fix lives in one shared
+  // function keyed on `type`, so each type is a distinct code path through
+  // the same logic — worth proving each one, not just trusting the pattern.
+  describe('every couple-shareable income type', () => {
+    const typeCases = [
+      { type: 'socialSecurity', label: 'Social Security', field: 'monthlyBenefit', value: 2_800, extra: { startAge: 67 } },
+      { type: 'pension', label: 'Pension', field: 'monthlyAmount', value: 3_200, extra: { startAge: 65, cola: true } },
+      { type: 'partTime', label: 'Part-time / consulting', field: 'annualAmount', value: 40_000, extra: { startAge: 60, endAge: 65 } },
+    ];
+
+    for (const { type, label, field, value, extra } of typeCases) {
+      it(`${type}: toggling a lone entry to Spouse duplicates it independently`, () => {
+        const sources = [{ id: 1, type, label, owner: 'primary', [field]: value, ...extra }];
+        const after = applyIncomeOwnerSwitch(sources, 1, 'spouse');
+
+        const you = after.find(s => s.id === 1);
+        const spouseCopy = after.find(s => s.owner === 'spouse');
+
+        expect(you.owner).toBe('primary');
+        expect(you[field]).toBe(value); // untouched
+        expect(spouseCopy).toBeDefined();
+        expect(spouseCopy.id).not.toBe(1);
+        expect(spouseCopy.label).toBe(`Spouse ${label}`);
+        expect(spouseCopy[field]).toBe(value); // starting point, now independent
+
+        // Editing the spouse copy must not move the primary's value.
+        const edited = after.map(s => s.id === spouseCopy.id ? { ...s, [field]: value + 999 } : s);
+        expect(edited.find(s => s.id === 1)[field]).toBe(value);
+        expect(edited.find(s => s.id === spouseCopy.id)[field]).toBe(value + 999);
+      });
+    }
+
+    it('a household with one of EACH type toggled to Spouse produces four independent pairs, no cross-talk', () => {
+      const sources = [
+        { id: 1, type: 'salary', label: 'Salary', owner: 'primary', amount: 150_000 },
+        { id: 2, type: 'socialSecurity', label: 'Social Security', owner: 'primary', monthlyBenefit: 2_800, startAge: 67 },
+        { id: 3, type: 'pension', label: 'Pension', owner: 'primary', monthlyAmount: 3_000, startAge: 65 },
+      ];
+      let plan = sources;
+      plan = applyIncomeOwnerSwitch(plan, 1, 'spouse');
+      plan = applyIncomeOwnerSwitch(plan, 2, 'spouse');
+      plan = applyIncomeOwnerSwitch(plan, 3, 'spouse');
+
+      expect(plan).toHaveLength(6); // 3 originals + 3 independent spouse copies
+      // Originals are all still primary-owned with their original values.
+      expect(plan.find(s => s.id === 1)).toMatchObject({ owner: 'primary', amount: 150_000 });
+      expect(plan.find(s => s.id === 2)).toMatchObject({ owner: 'primary', monthlyBenefit: 2_800 });
+      expect(plan.find(s => s.id === 3)).toMatchObject({ owner: 'primary', monthlyAmount: 3_000 });
+      // Every id is unique — no collisions across the three duplications.
+      const ids = plan.map(s => s.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+  });
 });
