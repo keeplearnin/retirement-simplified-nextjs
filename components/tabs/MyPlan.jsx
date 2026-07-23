@@ -1072,8 +1072,14 @@ export default function MyPlan() {
               <Slider label="Spouse Monthly Investment" value={plan.spouseMonthlyContribution || 0} onChange={v => updatePlan('spouseMonthlyContribution', v)} min={0} max={10000} step={100} format={fmt} />
             )}
             <Slider label="Expected Return" value={plan.expectedReturn} onChange={v => updatePlan('expectedReturn', v)} min={3} max={12} step={0.5} suffix="%" />
+            {/* This caption used to hardcode "60% of working" even when the
+                user had changed the assumption — actively hiding the single
+                most consequential lever in the plan (user found their "$5M
+                isn't enough?!" verdict was entirely this default). Now
+                dynamic, and it names where to change it. */}
             <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -16, marginBottom: 8 }}>
-              Retirement return: {((plan.expectedReturn || 7) * 0.6).toFixed(1)}% (60% of working)
+              In retirement: {((plan.expectedReturn || 7) * (plan.retiredReturnPct || 60) / 100).toFixed(1)}%
+              {' '}({plan.retiredReturnPct || 60}% of working — adjustable under Assumptions)
             </div>
           </div>
         </Collapsible>
