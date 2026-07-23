@@ -625,3 +625,6 @@ input[type=range]::-moz-range-thumb {
   .myplan-inputs{position:static;max-height:none;overflow:visible;order:2}
   .myplan-results{order:1}
 }
+
+/* Inputs panel — flat collapsible rows share one card; last row drops its hairline */
+.input-section:last-child { border-bottom: none !important; }

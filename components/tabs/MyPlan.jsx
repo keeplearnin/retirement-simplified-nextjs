@@ -42,29 +42,53 @@ const EXPENSE_CATEGORIES = [
 // Collapsible Section
 // ---------------------------------------------------------------------------
 
-function Collapsible({ title, defaultOpen = true, children, badge }) {
+/**
+ * Collapsible — two variants:
+ *   default: standalone Card (used for the results-column tables)
+ *   "row":   flat hairline row for use INSIDE a shared container card.
+ *            The inputs column previously stacked six identical Cards —
+ *            six boxes of equal visual weight carrying ten words between
+ *            them, out-ranking the actual results. As flat rows in one
+ *            quiet panel, inputs read as secondary — which they are.
+ */
+function Collapsible({ title, defaultOpen = true, children, badge, variant }) {
   const [open, setOpen] = useState(defaultOpen);
+  const isRow = variant === 'row';
+
+  const header = (
+    <button
+      onClick={() => setOpen(!open)}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+        padding: 0, color: 'var(--text)', fontFamily: 'var(--sans)',
+        gap: 8,
+      }}
+    >
+      {/* Title + badge wrap as a flex group so the badge sits below the title
+          on narrow screens instead of orphaning to the next line mid-word. */}
+      <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 10, rowGap: 2, textAlign: 'left' }}>
+        <span style={{ fontFamily: 'var(--serif)', fontSize: isRow ? 16 : 18, fontWeight: 500 }}>{title}</span>
+        {badge && <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--sans)', fontWeight: 500, whiteSpace: 'nowrap' }}>{badge}</span>}
+      </span>
+      <span style={{ fontSize: 12, color: 'var(--text-dim)', transition: 'transform .2s', transform: open ? 'rotate(180deg)' : 'rotate(0)', flexShrink: 0 }}>
+        &#9660;
+      </span>
+    </button>
+  );
+
+  if (isRow) {
+    return (
+      <div className="input-section" style={{ padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
+        {header}
+        {open && <div style={{ marginTop: 14 }}>{children}</div>}
+      </div>
+    );
+  }
+
   return (
     <Card style={{ marginBottom: 16 }}>
-      <button
-        onClick={() => setOpen(!open)}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          width: '100%', background: 'none', border: 'none', cursor: 'pointer',
-          padding: 0, color: 'var(--text)', fontFamily: 'var(--sans)',
-          gap: 8,
-        }}
-      >
-        {/* Title + badge wrap as a flex group so the badge sits below the title
-            on narrow screens instead of orphaning to the next line mid-word. */}
-        <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 10, rowGap: 2, textAlign: 'left' }}>
-          <span style={{ fontFamily: 'var(--serif)', fontSize: 18, fontWeight: 500 }}>{title}</span>
-          {badge && <span style={{ fontSize: 12, color: 'var(--accent)', fontFamily: 'var(--sans)', fontWeight: 600, whiteSpace: 'nowrap' }}>{badge}</span>}
-        </span>
-        <span style={{ fontSize: 14, color: 'var(--text-dim)', transition: 'transform .2s', transform: open ? 'rotate(180deg)' : 'rotate(0)', flexShrink: 0 }}>
-          &#9660;
-        </span>
-      </button>
+      {header}
       {open && <div style={{ marginTop: 16 }}>{children}</div>}
     </Card>
   );
@@ -907,7 +931,9 @@ export default function MyPlan() {
     <div className="slide-in myplan-layout">
       {/* ============ INPUTS SIDEBAR ============ */}
       <div className="myplan-inputs">
-        <Collapsible title="Personal Info" defaultOpen={false} badge={plan.hasSpouse ? `Couple, ages ${plan.currentAge}/${plan.spouseCurrentAge}` : `Age ${plan.currentAge}, retire ${plan.retireAge}`}>
+        {/* One quiet panel for all inputs — flat rows, not six stacked cards */}
+        <Card style={{ padding: '4px 18px' }}>
+        <Collapsible variant="row" title="Personal Info" defaultOpen={false} badge={plan.hasSpouse ? `Couple, ages ${plan.currentAge}/${plan.spouseCurrentAge}` : `Age ${plan.currentAge}, retire ${plan.retireAge}`}>
           {/* Household-type toggle — lets a single user enable couples mode after onboarding */}
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -990,7 +1016,7 @@ export default function MyPlan() {
           </div>
         </Collapsible>
 
-        <Collapsible title="Savings & Portfolio" defaultOpen={false} badge={fmt(results.startingBalance)}>
+        <Collapsible variant="row" title="Savings & Portfolio" defaultOpen={false} badge={fmt(results.startingBalance)}>
           <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, fontWeight: 600 }}>{plan.hasSpouse ? 'Your retirement accounts' : 'Retirement Accounts'}</div>
           <Slider label="401(k) / 403(b)" value={plan.savings401k} onChange={v => updatePlan('savings401k', v)} min={0} max={3000000} step={5000} format={fmt} />
           <Slider label="Roth IRA" value={plan.savingsRoth} onChange={v => updatePlan('savingsRoth', v)} min={0} max={1000000} step={5000} format={fmt} />
@@ -1036,7 +1062,7 @@ export default function MyPlan() {
           </div>
         </Collapsible>
 
-        <Collapsible title="Income Sources" defaultOpen={false} badge={`${plan.incomeSources.length} source${plan.incomeSources.length !== 1 ? 's' : ''}`}>
+        <Collapsible variant="row" title="Income Sources" defaultOpen={false} badge={`${plan.incomeSources.length} source${plan.incomeSources.length !== 1 ? 's' : ''}`}>
           {/* The projection reads ONE source per (type, owner) pair — a second
               "Your Salary" would be silently ignored. Surface it. */}
           {(() => {
@@ -1130,7 +1156,7 @@ export default function MyPlan() {
         </Collapsible>
 
         {/* ---- Debts ---- */}
-        <Collapsible title="Debts" defaultOpen={false} badge={(plan.debts || []).length > 0 ? `${fmt((plan.debts || []).reduce((s, d) => s + d.monthlyPayment, 0))}/mo` : 'None'}>
+        <Collapsible variant="row" title="Debts" defaultOpen={false} badge={(plan.debts || []).length > 0 ? `${fmt((plan.debts || []).reduce((s, d) => s + d.monthlyPayment, 0))}/mo` : 'None'}>
           {(plan.debts || []).map(debt => (
             <DebtCard
               key={debt.id}
@@ -1179,7 +1205,7 @@ export default function MyPlan() {
           </div>
         </Collapsible>
 
-        <Collapsible title="Expenses" defaultOpen={false} badge={expenseMode === 'simple' ? fmt(plan.annualSpending) + '/yr' : fmt(detailedTotal) + '/yr'}>
+        <Collapsible variant="row" title="Expenses" defaultOpen={false} badge={expenseMode === 'simple' ? fmt(plan.annualSpending) + '/yr' : fmt(detailedTotal) + '/yr'}>
           <div style={{ display: 'flex', gap: 2, background: 'var(--bg)', borderRadius: 20, padding: 2, marginBottom: 16, width: 'fit-content' }}>
             {['simple', 'detailed'].map(mode => (
               <button key={mode} onClick={() => updatePlan('expenseMode', mode)} style={{
@@ -1255,7 +1281,7 @@ export default function MyPlan() {
         </Collapsible>
 
         {/* ---- Assumptions ---- */}
-        <Collapsible title="Assumptions" defaultOpen={false} badge={`${plan.inflationRate || 2.5}% infl`}>
+        <Collapsible variant="row" title="Assumptions" defaultOpen={false} badge={`${plan.inflationRate || 2.5}% infl`}>
           <Slider label="General Inflation" value={plan.inflationRate || 2.5} onChange={v => updatePlan('inflationRate', v)} min={1} max={5} step={0.25} suffix="%" />
           <Slider label="Healthcare Inflation" value={plan.healthcareInflation || 3.5} onChange={v => updatePlan('healthcareInflation', v)} min={2} max={7} step={0.25} suffix="%" />
           <Slider
@@ -1299,20 +1325,55 @@ export default function MyPlan() {
             </label>
           </div>
         </Collapsible>
+        </Card>
       </div>
 
       {/* ============ RESULTS COLUMN ============ */}
       <div className="myplan-results">
-      {/* ---- Action Items (suggestions) ---- */}
+      {/* ============ VERDICT HERO ============
+          The one question users come here to answer, answered once, first,
+          large — with the score ring folded in instead of floating in its
+          own card below the fold. */}
+      {(() => {
+        const covered = results.moneyLastsAge >= plan.longevityAge;
+        return (
+          <Card style={{ marginBottom: 16, padding: '22px 26px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 280 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, letterSpacing: 0.3, marginBottom: 6 }}>
+                  Your plan today
+                </div>
+                <div style={{ fontFamily: 'var(--serif)', fontSize: 26, lineHeight: 1.25, color: covered ? 'var(--heading, var(--text))' : 'var(--text)', fontWeight: 600, textWrap: 'balance', maxWidth: 520 }}>
+                  {covered
+                    ? <>On track — money lasts to age {results.moneyLastsAge}</>
+                    : <>Money runs out at age <span style={{ color: 'var(--danger)' }}>{results.moneyLastsAge}</span></>}
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
+                  Entering retirement at {plan.retireAge} with {fmt(results.portfolioAtRetire)} · plan runs to {plan.longevityAge}
+                  {plan.hasSpouse && plan.spouseLongevityAge ? ` / ${plan.spouseLongevityAge}` : ''}
+                  {!covered ? ` — ${plan.longevityAge - results.moneyLastsAge} years short` : ''}
+                </div>
+              </div>
+              <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                <SuccessScore projections={combined} />
+              </div>
+            </div>
+          </Card>
+        );
+      })()}
+      {/* ---- Next steps (suggestions) ---- */}
       {(() => {
         const suggestions = generateSuggestions(plan, results);
         const active = suggestions.filter(s => !dismissedSuggestions.includes(s.id));
         if (active.length === 0) return null;
         const colors = { danger: 'var(--danger)', warn: 'var(--warn)', info: 'var(--blue)' };
+        // Alarm styling only when something is actually alarming — a benign
+        // tip shouldn't ship with a warning-yellow bar.
+        const hasDanger = active.some(s => s.severity === 'danger');
         return (
-          <Card style={{ marginBottom: 16, borderLeft: '3px solid var(--warn)' }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 12, fontFamily: 'var(--serif)' }}>
-              Action Items ({active.length})
+          <Card style={{ marginBottom: 16, ...(hasDanger ? { borderLeft: '3px solid var(--danger)' } : {}) }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 10, fontFamily: 'var(--serif)' }}>
+              Next steps ({active.length})
             </div>
             {active.map(s => (
               <div key={s.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
@@ -1335,10 +1396,10 @@ export default function MyPlan() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 20 }} className="grid-2">
         {/* Current Savings */}
         <div className="glass-card" style={{ padding: '16px 20px' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 2, fontWeight: 600, marginBottom: 10 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: 0.3, fontWeight: 600, marginBottom: 10 }}>
             My Savings
           </div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--accent)', fontFamily: 'var(--sans)', marginBottom: 6 }}>
+          <div style={{ fontSize: 28, fontWeight: 600, color: 'var(--heading, var(--text))', fontFamily: 'var(--serif)', marginBottom: 6 }}>
             {fmt(results.startingBalance)}
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 11 }}>
@@ -1356,25 +1417,19 @@ export default function MyPlan() {
           <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 6, fontSize: 11 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-dim)' }} title={`Balance the day you retire at age ${plan.retireAge}, before that year's withdrawals`}>Entering retirement</span>
-              <span style={{ fontWeight: 700, color: 'var(--blue)' }}>{fmt(results.portfolioAtRetire)}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
-              <span style={{ color: 'var(--text-dim)' }}>Money lasts to</span>
-              <span style={{ fontWeight: 700, color: results.moneyLastsAge >= plan.longevityAge ? 'var(--accent)' : 'var(--danger)' }}>
-                Age {results.moneyLastsAge}
-              </span>
+              <span style={{ fontWeight: 700, color: 'var(--text)' }}>{fmt(results.portfolioAtRetire)}</span>
             </div>
           </div>
         </div>
 
         {/* Today */}
         <div className="glass-card" style={{ padding: '16px 20px' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 2, fontWeight: 600, marginBottom: 10 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: 0.3, fontWeight: 600, marginBottom: 10 }}>
             Today (Age {plan.currentAge})
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
             <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Income</span>
-            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent)' }}>{fmtFull(nowMonthlyIncome)}/mo</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{fmtFull(nowMonthlyIncome)}/mo</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
             <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Expenses</span>
@@ -1395,12 +1450,12 @@ export default function MyPlan() {
 
         {/* At Retirement */}
         <div className="glass-card" style={{ padding: '16px 20px' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 2, fontWeight: 600, marginBottom: 10 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: 0.3, fontWeight: 600, marginBottom: 10 }}>
             Retirement (Age {plan.retireAge})
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
             <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Income</span>
-            <span style={{ fontSize: 15, fontWeight: 700, color: retireMonthlyIncome > 0 ? 'var(--blue)' : 'var(--text-dim)' }}>{fmtFull(retireMonthlyIncome)}/mo</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: retireMonthlyIncome > 0 ? 'var(--text)' : 'var(--text-dim)' }}>{fmtFull(retireMonthlyIncome)}/mo</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
             <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Expenses</span>
@@ -1416,7 +1471,7 @@ export default function MyPlan() {
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>From Savings</span>
-                  <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--blue)' }}>{fmtFull(Math.abs(retireMonthlyNet))}/mo</span>
+                  <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>{fmtFull(Math.abs(retireMonthlyNet))}/mo</span>
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'right', marginTop: 2 }}>
                   {fmt(results.portfolioAtRetire)} portfolio covers {Math.abs(retireMonthlyNet) > 0 ? Math.round(results.portfolioAtRetire / (Math.abs(retireMonthlyNet) * 12)) : '∞'} years
@@ -1437,27 +1492,21 @@ export default function MyPlan() {
         </div>
       </div>
 
-      {/* ============ SCORE + CHART ============ */}
-      <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 20, marginBottom: 20, alignItems: 'start' }} className="grid-2">
-        <div className="glass-card" style={{ textAlign: 'center', padding: '20px 24px' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 6, fontWeight: 600 }}>Plan Score</div>
-          <SuccessScore projections={combined} />
-        </div>
-
-        <div className="glass-card" style={{ padding: '16px 20px' }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>Income vs. Expenses</div>
-          <IncomeExpenseChart projections={combined} retireAge={plan.retireAge} plan={plan} />
-        </div>
+      {/* ============ CHART ============
+          (Plan Score ring moved into the verdict hero — one home, not two.) */}
+      <div className="glass-card" style={{ padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>Income vs. Expenses</div>
+        <IncomeExpenseChart projections={combined} retireAge={plan.retireAge} plan={plan} />
       </div>
 
       {/* Key Metrics — horizontal strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginBottom: 20 }}>
-        <MetricCard label="Portfolio Entering Retirement" value={fmt(results.portfolioAtRetire)} color="var(--blue)" sub={`Balance at age ${plan.retireAge}, before withdrawals`} />
-        <MetricCard label="Money Lasts To" value={`Age ${results.moneyLastsAge}`} color={results.moneyLastsAge >= plan.longevityAge ? '#34d399' : '#ef4444'} />
+        {/* De-duplicated (portfolio + money-lasts live in the hero) and
+            de-rainbowed — lifetime facts are facts, not statuses. */}
         <MetricCard label="Lifetime Income" value={fmt(results.totalLifetimeIncome)} />
-        <MetricCard label="Lifetime Taxes" value={fmt(results.totalLifetimeTax)} color="#f59e0b" />
+        <MetricCard label="Lifetime Taxes" value={fmt(results.totalLifetimeTax)} />
         <MetricCard label="Lifetime Expenses" value={fmt(results.totalLifetimeExpense)} />
-        <MetricCard label="Avg Tax Rate" value={`${(results.avgEffectiveRate * 100).toFixed(1)}%`} color="#a78bfa" />
+        <MetricCard label="Avg Tax Rate" value={`${(results.avgEffectiveRate * 100).toFixed(1)}%`} />
       </div>
 
       {/* Year-by-Year & Tax */}
