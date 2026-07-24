@@ -781,9 +781,17 @@ export function computeTax(input: TaxInput): TaxResult {
     filingStatus === 'single' ? FEDERAL_BRACKETS_SINGLE : FEDERAL_BRACKETS_MFJ;
   const federalTax = applyBrackets(federalTaxableOrdinary, brackets);
 
-  // 6. Capital gains tax
+  // 6. Capital gains tax. The deduction applies to TOTAL taxable income:
+  // when it exceeds ordinary income, the leftover absorbs capital gains
+  // before any of them are taxed (taxable income = max(0, ordinary + gains
+  // − deduction), and the gains portion is what remains). Without this, a
+  // retiree with $10K ordinary + $60K gains was taxed on all $60K of gains
+  // instead of the correct $53.9K — ~$900+ overstated for taxable-heavy
+  // early retirees.
+  const leftoverDeduction = Math.max(0, deductionAmount - grossOrdinaryIncome);
+  const taxableGains = Math.max(0, capitalGains - leftoverDeduction);
   const capitalGainsTax = computeCapitalGainsTax(
-    capitalGains,
+    taxableGains,
     federalTaxableOrdinary,
     filingStatus,
   );

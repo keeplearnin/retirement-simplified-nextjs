@@ -191,10 +191,14 @@ describe('computeProjection — ledger identity (transparency layer)', () => {
       const reconstructedEnd = row.portfolioBalance + derivedGrowth
         + (row.contributions || 0) - (row.totalWithdrawals || 0);
       expect(Math.abs(reconstructedEnd - row.portfolioEndBalance), `identity at age ${row.age}`).toBeLessThan(0.01);
-      // Contributions only while someone is working. Spouse is 2 years
-      // younger (retires at spouse-age 60 = primary-age 62), so their
-      // $18K/yr correctly continues through primary ages 60-61.
-      if (row.age >= 62) expect(row.contributions).toBe(0);
+      // After both are retired (spouse is 2 years younger, so primary-age
+      // 62), Monthly Investing stops — contributions in those years are
+      // exactly the retirement surplus swept into taxable (max(0, gap)):
+      // forced RMDs beyond spending and SS/pension above expenses no longer
+      // evaporate from the ledger.
+      if (row.age >= 62) {
+        expect(Math.abs(row.contributions - Math.max(0, row.gap))).toBeLessThanOrEqual(1);
+      }
     }
   });
 });

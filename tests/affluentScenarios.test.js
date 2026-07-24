@@ -123,18 +123,19 @@ describe('survivor transition (Phase F)', () => {
 
   it('filing status flips MFJ → single after the year of death (IRS rule)', () => {
     const r = computeProjection(widowPlan());
-    // Both alive (through primary's longevity 80): MFJ.
+    // Both alive (through primary's longevity 80): MFJ. Death occurs at the
+    // END of the last both-alive row, so that row IS the calendar year of
+    // death — and it's MFJ, which is exactly the IRS year-of-death rule.
     for (const row of r.combined.filter(x => x.primaryAlive && x.spouseAlive)) {
       expect(row.filingStatus).toBe('mfj');
     }
-    // First widowed row (year of death) keeps MFJ per the IRS rule; every
-    // widowed row after it flips to single. This proves the transition
-    // actually happens and does not get stuck on MFJ.
+    // Every widowed row is the year AFTER death or later → single. (The
+    // previous behavior kept the first widowed row MFJ, granting the
+    // survivor an illegal extra MFJ year.)
     const widowedRows = r.combined.filter(x => x.spouseAlive && !x.primaryAlive);
     expect(widowedRows.length).toBeGreaterThan(2);
-    expect(widowedRows[0].filingStatus).toBe('mfj');           // year of death
-    for (const row of widowedRows.slice(1)) {
-      expect(row.filingStatus, `age ${row.age}`).toBe('single'); // thereafter
+    for (const row of widowedRows) {
+      expect(row.filingStatus, `age ${row.age}`).toBe('single');
     }
   });
 

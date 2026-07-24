@@ -15,7 +15,13 @@ import { sweepJointSsClaiming } from '@/lib/decisionEngine';
 import { spousalFactor } from '@/lib/ssClaiming';
 
 function estimateBenefit(currentIncome, startAge, workYears) {
-  const aime = Math.min(currentIncome, SS_WAGE_CAP) / 12;
+  // The 35-year work factor scales the AIME (SSA averages your top 35 years,
+  // zero-filling missing ones) BEFORE the bend-point formula — not the PIA
+  // after. The PIA formula is progressive (90/32/15%), so scaling the PIA
+  // instead understated shorter careers by up to ~16% (e.g. 20 work years
+  // at $85K: $1,722/mo vs the correct $2,041/mo).
+  const workFactor = Math.min(workYears / 35, 1);
+  const aime = (Math.min(currentIncome, SS_WAGE_CAP) * workFactor) / 12;
 
   let pia;
   if (aime <= SS_BEND_POINTS[0]) {
@@ -46,9 +52,7 @@ function estimateBenefit(currentIncome, startAge, workYears) {
     ageAdj = 1 + monthsLate * (2 / 300);
   }
 
-  const workFactor = Math.min(workYears / 35, 1);
-
-  return pia * ageAdj * workFactor;
+  return pia * ageAdj;
 }
 
 /**
@@ -105,7 +109,7 @@ function JointStrategyCard() {
         <Stat
           label="Best Combination"
           value={`You ${best.primaryAge} · Spouse ${best.spouseAge}`}
-          sub={`${fmt(best.net)} lifetime net resources`}
+          sub={`${fmt(best.net)} end-of-plan wealth`}
           color="var(--accent)"
         />
         <Stat

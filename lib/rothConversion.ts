@@ -13,7 +13,7 @@
  * federal+state+SS-taxability math.
  */
 
-import { computeTax, FEDERAL_BRACKET_TOPS, STANDARD_DEDUCTIONS } from './taxEngine';
+import { computeTax, computeSSTaxable, FEDERAL_BRACKET_TOPS, STANDARD_DEDUCTIONS } from './taxEngine';
 import { RMD_TABLE } from './constants';
 
 export type Bracket = 0 | 12 | 22 | 24 | 32;
@@ -74,10 +74,15 @@ export interface RothLadderYear {
 export interface RothLadderScenario {
   years: RothLadderYear[];
   lifetimeTax: number;
-  /** Total IRMAA Part B surcharges paid across the projection (65+ years).
-   *  IRMAA is a Medicare premium, not a tax, so it's tracked separately from
-   *  lifetimeTax — but conversions that trip a tier are a real cash cost. */
+  /** Total IRMAA Part B surcharges paid across the projection (65+ years,
+   *  BOTH beneficiaries for MFJ). IRMAA is a Medicare premium, not a tax, so
+   *  it's tracked separately from lifetimeTax — but conversions that trip a
+   *  tier are a real cash cost. */
   lifetimeIrmaa: number;
+  /** Present-value totals discounted at the scenario's portfolio return —
+   *  the honest basis for comparing tax paid now vs tax paid decades later. */
+  lifetimeTaxPV: number;
+  lifetimeIrmaaPV: number;
   /** First-year RMD (age 73) in this scenario. */
   rmdAt73: number;
   /** Total balance (trad + roth) at longevityAge. */
@@ -113,10 +118,12 @@ function rmdDivisor(age: number): number | null {
 
 function ssGrossInYear(input: RothLadderInput, age: number): number {
   if (age < input.ssStartAge) return 0;
-  // 2.5% COLA approximation. We don't apply a claiming-age adjustment factor —
-  // the user is assumed to have entered their actual claimed monthly benefit.
+  // 2.0% COLA — matches computeProjection's assumption (was 2.5% here,
+  // which made this module's SS diverge from the baseline projection shown
+  // on the same screen). No claiming-age factor: the user is assumed to
+  // have entered their actual claimed monthly benefit.
   const yearsClaimed = age - input.ssStartAge;
-  return input.ssMonthlyBenefit * 12 * Math.pow(1 + 0.025, yearsClaimed);
+  return input.ssMonthlyBenefit * 12 * Math.pow(1 + 0.02, yearsClaimed);
 }
 
 function pensionInYear(input: RothLadderInput, age: number): number {
@@ -136,9 +143,19 @@ function runScenario(input: RothLadderInput, withLadder: boolean): RothLadderSce
   const years: RothLadderYear[] = [];
   let lifetimeTax = 0;
   let lifetimeIrmaa = 0;
+  let lifetimeTaxPV = 0;
+  let lifetimeIrmaaPV = 0;
   let rmdAt73 = 0;
 
-  for (let age = input.retireAge; age <= input.longevityAge; age++) {
+  // Both spouses pay Part B, so an IRMAA tier costs an MFJ couple 2×.
+  const irmaaBeneficiaries = input.filingStatus === 'mfj' ? 2 : 1;
+
+  // Don't re-simulate years that already happened: a 64-year-old who
+  // retired at 60 starts from TODAY's balances at 64, not from a replay of
+  // ages 60-63 (which also produced taxYear < 2026).
+  const simStartAge = Math.max(input.retireAge, input.currentAge);
+
+  for (let age = simStartAge; age <= input.longevityAge; age++) {
     const ssGross = ssGrossInYear(input, age);
     const pension = pensionInYear(input, age);
 
@@ -160,12 +177,25 @@ function runScenario(input: RothLadderInput, withLadder: boolean): RothLadderSce
       input.targetBracket > 0 &&
       tradBal > 0
     ) {
-      // We want taxable income (= ordinary + conversion - stdDed) to land at
-      // the top of the target bracket. SS taxability and capital gains are
-      // ignored for the headroom calc — they're handled in the actual tax run.
+      // We want taxable income (= ordinary + taxable SS + conversion −
+      // stdDed) to land at the top of the target bracket. Two former
+      // errors here: (1) the unused standard deduction was dropped —
+      // `top − max(0, ordinary − stdDed)` under-filled the classic
+      // no-income window by the whole deduction ($32.2K/yr MFJ, ~$419K of
+      // foregone low-bracket capacity over a 13-year ladder); (2) taxable
+      // SS was ignored, overshooting the bracket top by up to 0.85×SS once
+      // benefits started. Taxable SS depends on the conversion itself
+      // (provisional-income feedback), so fix-point it in a few passes.
       const ordinaryBeforeConversion = pension + rmd;
-      const taxableBefore = Math.max(0, ordinaryBeforeConversion - stdDed);
-      const headroom = Math.max(0, targetTaxableTop - taxableBefore);
+      let taxableSS = 0;
+      let headroom = 0;
+      for (let pass = 0; pass < 3; pass++) {
+        headroom = Math.max(0, targetTaxableTop + stdDed - ordinaryBeforeConversion - taxableSS);
+        const tentative = Math.min(headroom, tradBal);
+        taxableSS = computeSSTaxable(
+          ssGross, ordinaryBeforeConversion + tentative, input.filingStatus
+        ).taxableAmount;
+      }
       conversion = Math.min(headroom, tradBal);
       tradBal -= conversion;
       rothBal += conversion;
@@ -189,10 +219,24 @@ function runScenario(input: RothLadderInput, withLadder: boolean): RothLadderSce
 
     const totalTax = taxResult.totalTax;
     lifetimeTax += totalTax;
+    // Discount factor for present-value totals: a dollar of tax paid in
+    // year n, funded from money that would otherwise compound at the
+    // portfolio return, costs (1+r)^-n of today's dollars. Comparing
+    // NOMINAL tax sums across decades made accelerating tax always look
+    // "cheaper" (the baseline's tax base grows before being RMD-taxed) —
+    // the optimizer reported six-figure phantom savings even when
+    // conversion-year and RMD-year marginal rates were identical.
+    const discount = Math.pow(1 + yearReturn, -(age - simStartAge));
+    lifetimeTaxPV += totalTax * discount;
     // IRMAA only applies once on Medicare (65+). taxResult.irmaa is the
-    // monthly Part B surcharge; annualize it. (Real IRMAA keys off MAGI from
-    // two years prior — same-year is the approximation used app-wide.)
-    if (age >= 65) lifetimeIrmaa += taxResult.irmaa * 12;
+    // monthly Part B surcharge PER BENEFICIARY; annualize it and count both
+    // spouses for MFJ. (Real IRMAA keys off MAGI from two years prior —
+    // same-year is the approximation used app-wide.)
+    if (age >= 65) {
+      const irmaaYear = taxResult.irmaa * 12 * irmaaBeneficiaries;
+      lifetimeIrmaa += irmaaYear;
+      lifetimeIrmaaPV += irmaaYear * discount;
+    }
 
     // End-of-year growth on remaining balances. Both buckets share the same
     // return assumption (post-conversion the dollars sit in Roth and grow
@@ -219,6 +263,8 @@ function runScenario(input: RothLadderInput, withLadder: boolean): RothLadderSce
     years,
     lifetimeTax,
     lifetimeIrmaa,
+    lifetimeTaxPV,
+    lifetimeIrmaaPV,
     rmdAt73,
     finalBalance: tradBal + rothBal,
   };
@@ -230,9 +276,10 @@ function runScenario(input: RothLadderInput, withLadder: boolean): RothLadderSce
 
 export interface RothOptimizerOption {
   targetBracket: Bracket;
-  /** Lifetime tax saved vs baseline (positive = ladder better). */
+  /** PRESENT-VALUE lifetime tax saved vs baseline (positive = ladder better),
+   *  discounted at the portfolio return. */
   taxSaved: number;
-  /** Extra IRMAA surcharges the ladder causes vs baseline (positive = cost). */
+  /** PV of extra IRMAA surcharges the ladder causes vs baseline (positive = cost). */
   irmaaCost: number;
   /** taxSaved - irmaaCost — the honest number to rank on. */
   netSaved: number;
@@ -265,8 +312,12 @@ export function optimizeRothLadder(
 
   const options: RothOptimizerOption[] = brackets.map((targetBracket) => {
     const output = modelRothLadder({ ...input, targetBracket });
-    const taxSaved = Math.round(output.taxSaved);
-    const irmaaCost = Math.round(output.ladder.lifetimeIrmaa - output.baseline.lifetimeIrmaa);
+    // Rank on PRESENT-VALUE savings. Nominal sums compare tax dollars paid
+    // decades apart at face value, which reported large phantom savings for
+    // any conversion (the deferred tax base grows before being RMD-taxed) —
+    // at identical marginal rates the PV difference is correctly ≈ $0.
+    const taxSaved = Math.round(output.baseline.lifetimeTaxPV - output.ladder.lifetimeTaxPV);
+    const irmaaCost = Math.round(output.ladder.lifetimeIrmaaPV - output.baseline.lifetimeIrmaaPV);
     return {
       targetBracket,
       taxSaved,

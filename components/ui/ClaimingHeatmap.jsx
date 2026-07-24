@@ -63,7 +63,7 @@ export default function ClaimingHeatmap({ grid, best }) {
                     return (
                       <td
                         key={sAge}
-                        title={`You at ${pAge}, spouse at ${sAge}: ${fmt(cell.net)} lifetime net` +
+                        title={`You at ${pAge}, spouse at ${sAge}: ${fmt(cell.net)} end-of-plan wealth` +
                           (deltaVsBest < 0 ? ` (${fmt(deltaVsBest)} vs best)` : ' — best') +
                           (cell.isCurrent ? ' · current plan' : '')}
                         style={{
@@ -93,7 +93,7 @@ export default function ClaimingHeatmap({ grid, best }) {
           <span style={{ width: 12, height: 12, borderRadius: 3, outline: '2px dashed var(--text-dim)', outlineOffset: -1, display: 'inline-block' }} />
           Your current plan
         </span>
-        <span>Darker = more lifetime net resources. Hover any cell for its number.</span>
+        <span>Darker = more wealth left at the end of the plan. Hover any cell for its number.</span>
       </div>
     </div>
   );

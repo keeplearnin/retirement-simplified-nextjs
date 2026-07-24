@@ -45,16 +45,26 @@ export default function HealthcareBridge() {
     const y0 = bridge.years[0];
     const coveredAges = y0.coveredAges;
     const maxMagi = Math.max(y0.cliffMagi * 1.35, (y0.magi || 0) * 1.15, 120_000);
+    const priceAt = (magi) => computeAcaYear({
+      magi, householdSize: plan.hasSpouse ? 2 : 1, coveredAges, base21Monthly: base21,
+    }).subsidy;
     const pts = [];
     const steps = 80;
     for (let i = 0; i <= steps; i++) {
       const magi = (i / steps) * maxMagi;
-      const r = computeAcaYear({
-        magi, householdSize: plan.hasSpouse ? 2 : 1, coveredAges, base21Monthly: base21,
-      });
-      pts.push({ magi, subsidy: r.subsidy });
+      pts.push({ magi, subsidy: priceAt(magi) });
     }
-    return { pts, maxMagi, year: y0 };
+    // Render the cliff as the vertical drop it actually is — without these
+    // two points the line between adjacent samples drew it as a ~$1,500-wide
+    // diagonal.
+    pts.push({ magi: y0.cliffMagi, subsidy: priceAt(y0.cliffMagi) });
+    pts.push({ magi: y0.cliffMagi + 1, subsidy: 0 });
+    pts.sort((a, b) => a.magi - b.magi);
+    // The "you are here" dot uses the EXACT subsidy at the year's MAGI —
+    // snapping to the nearest sample could draw the dot on the wrong side
+    // of the cliff (top of the cliff while the table said $0).
+    const dot = { magi: Math.min(y0.magi, maxMagi), subsidy: priceAt(Math.min(y0.magi, maxMagi)) };
+    return { pts, maxMagi, year: y0, dot };
   }, [bridge, plan.hasSpouse, base21]);
 
   if (!bridge || !bridge.anyBridge) {
@@ -85,7 +95,7 @@ export default function HealthcareBridge() {
         <Stat
           label="Bridge Years"
           value={`${years.length}`}
-          sub={`Age ${years[0].age} until Medicare at 65`}
+          sub={`Age ${years[0].coveredAges[0]} until Medicare at 65`}
           color="var(--text)"
         />
         <Stat
@@ -138,7 +148,7 @@ export default function HealthcareBridge() {
       {/* The cliff curve */}
       {curve && (
         <Card style={{ marginTop: 16 }}>
-          <SectionLabel>Subsidy vs. MAGI — Age {curve.year.age}{curve.year.coveredCount === 2 ? ' (both covered)' : ''}</SectionLabel>
+          <SectionLabel>Subsidy vs. MAGI — Age {curve.year.coveredAges.join(' / ')}{curve.year.coveredCount === 2 ? ' (both covered)' : ''}</SectionLabel>
           <svg viewBox="0 0 600 210" style={{ width: '100%', height: 'auto', display: 'block' }}>
             {[0.25, 0.5, 0.75, 1].map((f) => {
               const y = 180 - f * 160;
@@ -169,12 +179,10 @@ export default function HealthcareBridge() {
                 </g>
               );
             })()}
-            {/* Your position */}
+            {/* Your position — exact computed point, never a snapped sample */}
             {(() => {
-              const magi = Math.min(curve.year.magi, curve.maxMagi);
-              const r = curve.pts.reduce((a, b) => (Math.abs(b.magi - magi) < Math.abs(a.magi - magi) ? b : a));
-              const x = 55 + (magi / curve.maxMagi) * 535;
-              const y = 180 - (r.subsidy / maxSubsidy) * 160;
+              const x = 55 + (curve.dot.magi / curve.maxMagi) * 535;
+              const y = 180 - (curve.dot.subsidy / maxSubsidy) * 160;
               return <circle cx={x} cy={y} r={5} fill="var(--warn)" stroke="var(--bg, #fff)" strokeWidth={2} />;
             })()}
             {[0, 0.25, 0.5, 0.75, 1].map((f) => (
@@ -205,8 +213,10 @@ export default function HealthcareBridge() {
             <tbody>
               {years.map((y) => (
                 <tr key={y.age} style={{ borderTop: '1px solid var(--border)' }}>
+                  {/* Ages of the members actually covered — a spouse-only
+                      year shows the spouse's age, not the primary's. */}
                   <td style={{ padding: '9px 12px 9px 0', color: 'var(--text)', fontWeight: 500 }}>
-                    {y.age}{y.coveredCount === 2 ? ` / ${y.spouseAge}` : ''}
+                    {y.coveredAges.join(' / ')}
                   </td>
                   <td style={{ textAlign: 'right', padding: '9px 0 9px 12px', color: 'var(--text)' }}>{fmt(y.magi)}</td>
                   <td style={{ textAlign: 'right', padding: '9px 0 9px 12px', fontWeight: 600, color: y.overCliff ? 'var(--danger)' : y.belowFloor ? 'var(--warn)' : 'var(--text-muted)' }}>
@@ -225,12 +235,15 @@ export default function HealthcareBridge() {
       </Card>
 
       {/* COBRA comparison */}
-      {cobra && (
+      {cobra && (() => {
+        // Fewer than 18 months when Medicare arrives first — label honestly.
+        const cobraMonths = cobra.periods.reduce((s, p) => s + p.months, 0);
+        return (
         <Card style={{ marginTop: 16 }}>
-          <SectionLabel>COBRA vs. Marketplace — First 18 Months</SectionLabel>
+          <SectionLabel>COBRA vs. Marketplace — First {cobraMonths} Months</SectionLabel>
           <div className="stats-row" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <Stat label="COBRA (18 mo)" value={fmt(cobra.cobraTotal)} sub={`${fmt(cobraMonthly)}/mo, your quote`} color="var(--text)" />
-            <Stat label="Marketplace (18 mo)" value={fmt(cobra.marketplaceTotal)} sub="Net of projected credits" color="var(--text)" />
+            <Stat label={`COBRA (${cobraMonths} mo)`} value={fmt(cobra.cobraTotal)} sub={`${fmt(cobraMonthly)}/mo, your quote`} color="var(--text)" />
+            <Stat label={`Marketplace (${cobraMonths} mo)`} value={fmt(cobra.marketplaceTotal)} sub="Net of projected credits" color="var(--text)" />
             <Stat
               label={cobra.marketplaceSaves >= 0 ? 'Marketplace Saves' : 'COBRA Saves'}
               value={fmt(Math.abs(cobra.marketplaceSaves))}
@@ -241,7 +254,8 @@ export default function HealthcareBridge() {
             />
           </div>
         </Card>
-      )}
+        );
+      })()}
 
       <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 18, lineHeight: 1.6 }}>
         2026 coverage-year figures: 2025 federal poverty guidelines (contiguous US) and the post-sunset

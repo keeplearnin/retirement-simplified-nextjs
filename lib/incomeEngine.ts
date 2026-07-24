@@ -169,14 +169,15 @@ export interface YearlyProjection {
   primaryAlive?: boolean;
   spouseAlive?: boolean;
   /** True for any year where one spouse is dead and the other lives on.
-   *  Drives MFJ→single filing flip in computeProjection (with the year-
-   *  of-death exception: the calendar year of death itself stays MFJ per
-   *  IRS rule; the year after switches to single). */
+   *  Drives the MFJ→single filing flip in computeProjection. The IRS
+   *  year-of-death MFJ rule is satisfied by the death-year row itself,
+   *  which is the last both-alive row under this engine's convention. */
   widowed?: boolean;
   /** Engine's recommended filing status for this year. 'mfj' while both
-   *  alive (or in the year of first death). 'single' once widowed for a
-   *  full calendar year. Singles plans always 'single'. Consumers may
-   *  override (e.g., HoH with dependents, qualifying widow(er)). */
+   *  alive (which includes the calendar year of death — death occurs at
+   *  the END of the last alive row); 'single' for every widowed row.
+   *  Singles plans always 'single'. Consumers may override (e.g., HoH
+   *  with dependents, qualifying widow(er)). */
   filingStatusHint?: 'single' | 'mfj';
 }
 
@@ -223,10 +224,6 @@ export function projectIncome(plan: RetirementPlan): YearlyProjection[] {
     ? Math.max(primaryLongevity, currentAge + (spouseLongevity - spouse.currentAge))
     : primaryLongevity;
 
-  // Track first-widowed-row index so we can apply IRS year-of-death rule
-  // (calendar year of death = MFJ; year after = single). The first widowed
-  // row stays MFJ; subsequent widowed rows flip to single.
-  let firstWidowedRowIdx: number | null = null;
 
   for (let age = currentAge; age <= projectionEndAge; age++) {
     const year = currentYear + (age - currentAge);
@@ -263,22 +260,30 @@ export function projectIncome(plan: RetirementPlan): YearlyProjection[] {
     let spouseSalaryAmt = spouseAlive ? spouseAliveSalary : 0;
 
     // ------ Social Security (primary, as-if-alive) ------
+    // COLA base: the entered benefit is in TODAY'S dollars, and SSA COLAs
+    // accrue from eligibility whether or not you've claimed — so the
+    // exponent runs from the projection start (yearsFromStart), NOT from
+    // startAge. COLA-ing only after the claim age silently penalized
+    // delayed claiming by (1+cola)^(startAge−currentAge) in a projection
+    // where salary/rental/expenses all grow from today — and biased every
+    // claim-age comparison (including the 81-cell joint sweep) toward
+    // claiming early.
     let primaryAliveSs = 0;
     if (socialSecurity && age >= socialSecurity.startAge) {
       const cola = socialSecurity.cola ?? 0.02;
       const factor = ssClaimingFactor(socialSecurity.startAge, SS_FRA);
       const adjustedMonthly = socialSecurity.monthlyBenefitAtFRA * factor;
-      const yearsSinceStart = age - socialSecurity.startAge;
-      primaryAliveSs = adjustedMonthly * 12 * Math.pow(1 + cola, yearsSinceStart);
+      primaryAliveSs = adjustedMonthly * 12 * Math.pow(1 + cola, yearsFromStart);
     }
     // ------ Social Security (spouse, as-if-alive) ------
+    // Same base for the spouse: spouseAge − spouse.currentAge equals
+    // yearsFromStart (the age offset cancels), so one exponent serves both.
     let spouseAliveSs = 0;
     if (spouse?.socialSecurity && spouseAge !== null && spouseAge >= spouse.socialSecurity.startAge) {
       const cola = spouse.socialSecurity.cola ?? 0.02;
       const factor = ssClaimingFactor(spouse.socialSecurity.startAge, SS_FRA);
       const adjustedMonthly = spouse.socialSecurity.monthlyBenefitAtFRA * factor;
-      const yearsSinceStart = spouseAge - spouse.socialSecurity.startAge;
-      spouseAliveSs = adjustedMonthly * 12 * Math.pow(1 + cola, yearsSinceStart);
+      spouseAliveSs = adjustedMonthly * 12 * Math.pow(1 + cola, yearsFromStart);
     }
     // ------ Spousal top-up (both alive) ------
     // A married claimant whose own PIA is less than 50% of their spouse's PIA
@@ -305,8 +310,9 @@ export function projectIncome(plan: RetirementPlan): YearlyProjection[] {
         );
         if (excessMonthly > 0) {
           const cola = socialSecurity!.cola ?? 0.02;
+          // Same today's-dollars COLA base as the worker benefit above.
           primarySpousalExcess = excessMonthly * 12 * spousalFactor(pSpousalStart, SS_FRA)
-            * Math.pow(1 + cola, age - pSpousalStart);
+            * Math.pow(1 + cola, yearsFromStart);
         }
       }
       // Spouse's spousal excess on primary's record (spouse's own age frame).
@@ -319,7 +325,7 @@ export function projectIncome(plan: RetirementPlan): YearlyProjection[] {
         if (excessMonthly > 0) {
           const cola = spouse!.socialSecurity!.cola ?? 0.02;
           spouseSpousalExcess = excessMonthly * 12 * spousalFactor(sSpousalStart, SS_FRA)
-            * Math.pow(1 + cola, spouseAge - sSpousalStart);
+            * Math.pow(1 + cola, yearsFromStart);
         }
       }
     }
@@ -449,22 +455,19 @@ export function projectIncome(plan: RetirementPlan): YearlyProjection[] {
 
     // ── Phase F: filing status hint ──
     // IRS rule: in the calendar year of a spouse's death, the survivor may
-    // still file MFJ. Year after death → single (or qualifying widow(er) for
-    // 2 more years if dependent children, which we don't model). We track
-    // the FIRST widowed row index — that row stays MFJ; subsequent widowed
-    // rows flip to single.
-    if (widowed && firstWidowedRowIdx === null) {
-      firstWidowedRowIdx = projections.length;
-    }
+    // still file MFJ; the year AFTER flips to single (qualifying widow(er)
+    // needs dependent children — not modeled). Under this engine's death
+    // convention (death at the END of the row where age == longevityAge),
+    // the year-of-death row is the last BOTH-ALIVE row, which is already
+    // MFJ — so the first widowed row is the year after death and must be
+    // single. Keeping it MFJ (the previous behavior) granted the survivor
+    // an illegal extra MFJ year (~$4–6K undertaxed at typical incomes).
     let filingStatusHint: 'mfj' | 'single';
     if (!hasSpouse) {
       filingStatusHint = 'single';
     } else if (!widowed) {
       // Both alive (or both gone — same MFJ-default treatment for tax math
       // since "both gone" rows shouldn't be consumed downstream).
-      filingStatusHint = 'mfj';
-    } else if (firstWidowedRowIdx !== null && projections.length === firstWidowedRowIdx) {
-      // Year of first death — still MFJ per IRS rule.
       filingStatusHint = 'mfj';
     } else {
       filingStatusHint = 'single';

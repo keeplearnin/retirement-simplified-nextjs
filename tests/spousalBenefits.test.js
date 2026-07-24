@@ -7,6 +7,30 @@ import { runDecisionEngine, sweepJointSsClaiming } from '@/lib/decisionEngine';
 // spousalFactor — SSA's spousal-benefit reduction schedule
 // ---------------------------------------------------------------------------
 
+describe('ssClaimingFactor — statutory bounds (regression)', () => {
+  it('caps delayed credits at 70 and early claiming at 62', () => {
+    // Out-of-range plan data (agent-written or imported) must not mint
+    // phantom credits: 72 → 1.24 (not 1.40), 60 → 0.70 (not lower).
+    expect(ssClaimingFactor(72)).toBeCloseTo(1.24, 10);
+    expect(ssClaimingFactor(60)).toBeCloseTo(0.70, 10);
+  });
+});
+
+describe('projectIncome — COLA accrues from today, not from the claim age (regression)', () => {
+  it('a delayed claim at 70 includes the COLAs accrued since the projection start', () => {
+    // COLA-ing only after the claim age understated delayed claiming by
+    // (1+cola)^(startAge − currentAge) ≈ 17% at 70 — and biased every
+    // claim-age comparison (including the joint sweep) toward claiming early.
+    const rows = projectIncome({
+      currentAge: 62, retireAge: 62, longevityAge: 90,
+      socialSecurity: { monthlyBenefitAtFRA: 2_500, startAge: 70, cola: 0.02 },
+    });
+    const at70 = rows.find(r => r.age === 70);
+    // 2500 × 1.24 (delayed credits) × 12 × 1.02^8 (8 years of COLA since 62)
+    expect(at70.socialSecurity).toBeCloseTo(2_500 * 1.24 * 12 * Math.pow(1.02, 8), 0);
+  });
+});
+
 describe('spousalFactor', () => {
   it('is 1.0 at FRA', () => {
     expect(spousalFactor(67)).toBe(1);
@@ -197,14 +221,21 @@ describe('sweepJointSsClaiming', () => {
     }))).toBeNull();
   });
 
-  it('restricts claim ages already in the past', () => {
-    const sweep = sweepJointSsClaiming(jointPlan({
+  it('locks members who are already claiming (the past cannot be re-decided)', () => {
+    // Both claimed at 62 and are past it → nothing left to decide.
+    expect(sweepJointSsClaiming(jointPlan({
       currentAge: 66, retireAge: 66, spouseCurrentAge: 64, spouseRetireAge: 64,
+    }))).toBeNull();
+
+    // Primary already claiming (66 > 62), spouse (58) still has the choice:
+    // the primary's dimension collapses to their actual claim age and the
+    // grid always contains the current combination.
+    const sweep = sweepJointSsClaiming(jointPlan({
+      currentAge: 66, retireAge: 66,
     }));
-    for (const c of sweep.grid) {
-      expect(c.primaryAge).toBeGreaterThanOrEqual(66);
-      expect(c.spouseAge).toBeGreaterThanOrEqual(64);
-    }
+    expect(new Set(sweep.grid.map(c => c.primaryAge))).toEqual(new Set([62]));
+    expect(sweep.grid.filter(c => c.isCurrent)).toHaveLength(1);
+    expect(sweep.grid.length).toBe(9); // 1 locked × 9 spouse ages
   });
 });
 

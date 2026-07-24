@@ -253,8 +253,12 @@ export function createDefaultExpensePlan(
   currentAge: number,
   retireAge: number,
   annualSpend: number,
+  // Horizon for expense rows AND the Medicare premium endAge. Callers that
+  // overwrite plan.longevityAge after construction previously left the
+  // healthcare items' endAge frozen at the default 95 — premiums silently
+  // vanished for longevity > 95, in the most expensive years of the plan.
+  longevityAge: number = 95,
 ): ExpensePlan {
-  const longevityAge = 95;
 
   // Use full user-entered spending — taxes are modeled separately by taxEngine
   const spendBase = annualSpend;

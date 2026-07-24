@@ -16,7 +16,10 @@ describe('fplForHousehold — 2025 guidelines for 2026 coverage', () => {
 describe('applicablePercentage — post-sunset 2026 schedule', () => {
   it('floor and band edges', () => {
     expect(applicablePercentage(1.0)).toBeCloseTo(0.0210, 4);
-    expect(applicablePercentage(1.33)).toBeCloseTo(0.0210, 4);
+    // Bands are [from, to): "at least 133 but less than 150" — exactly 133%
+    // takes the next band's 3.14% initial percentage, not 2.10%.
+    expect(applicablePercentage(1.329)).toBeCloseTo(0.0210, 4);
+    expect(applicablePercentage(1.33)).toBeCloseTo(0.0314, 4);
     expect(applicablePercentage(1.50)).toBeCloseTo(0.0419, 4);
     expect(applicablePercentage(2.00)).toBeCloseTo(0.0660, 4);
     expect(applicablePercentage(3.00)).toBeCloseTo(0.0996, 4);
