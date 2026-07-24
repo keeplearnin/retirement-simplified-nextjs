@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import SocialSecurity from '@/components/tabs/SocialSecurity';
 import WithdrawalStrategy from '@/components/tabs/WithdrawalStrategy';
+import HealthcareBridge from '@/components/tabs/HealthcareBridge';
 import TaxTorpedo from '@/components/tabs/TaxTorpedo';
 
 /**
@@ -27,6 +28,7 @@ export default function RetirementIncome() {
   const segments = [
     { id: 'claim', label: 'Claim Strategy', sub: 'Social Security timing' },
     { id: 'withdrawal', label: 'Withdrawal Sequence', sub: 'Account drawdown order' },
+    { id: 'bridge', label: 'Healthcare Bridge', sub: 'Pre-65 ACA coverage & the cliff' },
     { id: 'torpedo', label: 'Tax Torpedo', sub: 'Provisional-income trap explainer' },
   ];
 
@@ -35,6 +37,7 @@ export default function RetirementIncome() {
       <SegmentedControl segments={segments} value={view} onChange={setView} />
       {view === 'claim' && <SocialSecurity />}
       {view === 'withdrawal' && <WithdrawalStrategy />}
+      {view === 'bridge' && <HealthcareBridge />}
       {view === 'torpedo' && <TaxTorpedo />}
     </div>
   );

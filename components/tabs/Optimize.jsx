@@ -15,6 +15,7 @@ const CATEGORY_COLORS = {
   'Social Security': 'var(--blue)',
   'Roth Conversions': 'var(--accent)',
   'Medicare / IRMAA': 'var(--warn)',
+  'Healthcare Bridge': 'var(--warn)',
   'Plan Repair': 'var(--danger)',
 };
 
