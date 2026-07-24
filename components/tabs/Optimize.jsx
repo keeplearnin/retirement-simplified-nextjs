@@ -7,6 +7,7 @@ import SectionLabel from '@/components/ui/SectionLabel';
 import InfoBox from '@/components/ui/InfoBox';
 import Button from '@/components/ui/Button';
 import { fmt } from '@/lib/format';
+import ClaimingHeatmap from '@/components/ui/ClaimingHeatmap';
 import { usePlan } from '@/components/PlanProvider';
 import { runDecisionEngine } from '@/lib/decisionEngine';
 
@@ -52,6 +53,13 @@ function ActionCard({ action, rank, onApply, applied }) {
           )}
         </div>
       </div>
+
+      {/* Joint SS claiming grid (couples) */}
+      {action.grid && action.grid.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <ClaimingHeatmap grid={action.grid} best={action.apply ? { primaryAge: action.apply.primaryStartAge, spouseAge: action.apply.spouseStartAge } : null} />
+        </div>
+      )}
 
       {/* Roth execution schedule */}
       {action.schedule && action.schedule.length > 0 && (
@@ -131,6 +139,11 @@ export default function Optimize() {
     } else if (a.type === 'ss-start-age') {
       const src = plan.incomeSources.find(s => s.id === a.sourceId);
       if (src) updateIncome(a.sourceId, { ...src, startAge: a.startAge });
+    } else if (a.type === 'ss-joint-start-age') {
+      const pSrc = plan.incomeSources.find(s => s.id === a.primarySourceId);
+      if (pSrc) updateIncome(a.primarySourceId, { ...pSrc, startAge: a.primaryStartAge });
+      const sSrc = plan.incomeSources.find(s => s.id === a.spouseSourceId);
+      if (sSrc) updateIncome(a.spouseSourceId, { ...sSrc, startAge: a.spouseStartAge });
     }
     setAppliedIds(ids => [...ids, action.id]);
   }

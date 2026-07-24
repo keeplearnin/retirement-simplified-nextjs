@@ -7,8 +7,12 @@ import Stat from '@/components/ui/Stat';
 import SectionLabel from '@/components/ui/SectionLabel';
 import InfoBox from '@/components/ui/InfoBox';
 import MiniChart from '@/components/ui/MiniChart';
+import ClaimingHeatmap from '@/components/ui/ClaimingHeatmap';
 import { fmt } from '@/lib/format';
 import { SS_WAGE_CAP, SS_BEND_POINTS, SS_FACTORS, SS_FRA } from '@/lib/constants';
+import { usePlan } from '@/components/PlanProvider';
+import { sweepJointSsClaiming } from '@/lib/decisionEngine';
+import { spousalFactor } from '@/lib/ssClaiming';
 
 function estimateBenefit(currentIncome, startAge, workYears) {
   const aime = Math.min(currentIncome, SS_WAGE_CAP) / 12;
@@ -45,6 +49,86 @@ function estimateBenefit(currentIncome, startAge, workYears) {
   const workFactor = Math.min(workYears / 35, 1);
 
   return pia * ageAdj * workFactor;
+}
+
+/**
+ * Joint claiming strategy for couples — driven by the REAL plan (not the
+ * standalone estimator above it). Runs all 81 claiming-age combinations
+ * through the full projection: spousal top-ups, survivor step-up,
+ * bridge-year withdrawals, and taxes.
+ */
+function JointStrategyCard() {
+  const { plan } = usePlan();
+
+  const sweep = useMemo(() => {
+    if (!plan.hasSpouse) return null;
+    try {
+      return sweepJointSsClaiming(plan);
+    } catch (e) {
+      console.error('Joint SS sweep failed:', e);
+      return null;
+    }
+  }, [plan]);
+
+  if (!plan.hasSpouse) {
+    return (
+      <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 14, lineHeight: 1.6 }}>
+        Married? Add your spouse in My Plan and this tab gains a joint claiming optimizer —
+        all 81 age combinations, with spousal top-ups and the survivor step-up modeled.
+      </p>
+    );
+  }
+  if (!sweep) {
+    return (
+      <Card style={{ marginTop: 14 }}>
+        <SectionLabel>Joint Claiming Strategy</SectionLabel>
+        <p style={{ fontSize: 12.5, color: 'var(--text-muted)', lineHeight: 1.6, margin: 0 }}>
+          Add a Social Security income source for each of you in My Plan (the spouse&apos;s can be $0
+          if they never worked — they still qualify for a spousal benefit) and this section will sweep
+          all 81 claiming-age combinations through your full plan.
+        </p>
+      </Card>
+    );
+  }
+
+  const { grid, best, current, baselineNet } = sweep;
+  const currentCell = grid.find((c) => c.isCurrent);
+  const delta = best.net - (currentCell ? currentCell.net : baselineNet);
+  const alreadyOptimal = best.primaryAge === current.primaryAge && best.spouseAge === current.spouseAge;
+  const spousalAt62 = Math.round(spousalFactor(62) * 50);
+
+  return (
+    <Card style={{ marginTop: 14 }}>
+      <SectionLabel>Joint Claiming Strategy — Your Actual Plan</SectionLabel>
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 16 }}>
+        <Stat
+          label="Best Combination"
+          value={`You ${best.primaryAge} · Spouse ${best.spouseAge}`}
+          sub={`${fmt(best.net)} lifetime net resources`}
+          color="var(--accent)"
+        />
+        <Stat
+          label={alreadyOptimal ? 'Your Plan' : 'Left on the Table'}
+          value={alreadyOptimal ? 'Already optimal' : `+${fmt(delta)}`}
+          sub={alreadyOptimal
+            ? `Claiming at ${current.primaryAge}/${current.spouseAge} is the best combination`
+            : `vs your current ${current.primaryAge}/${current.spouseAge} — apply it from the Optimize tab`}
+          color={alreadyOptimal ? 'var(--accent)' : 'var(--warn)'}
+        />
+      </div>
+
+      <ClaimingHeatmap grid={grid} best={best} />
+
+      <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 14, lineHeight: 1.7 }}>
+        Why the grid isn&apos;t symmetric: the survivor keeps the <em>larger</em> of the two checks for
+        life, so delayed credits on the higher earner&apos;s benefit pay out for as long as <em>either</em> of
+        you is alive — while the lower earner&apos;s check only runs until the first death. A spouse whose
+        own benefit is under 50% of the other&apos;s PIA is topped up to the spousal amount (reduced to
+        {' '}{spousalAt62}% of PIA if taken at 62; delaying spousal past FRA earns nothing). Every cell
+        re-runs your full plan — bridge withdrawals, SS taxability, RMDs, and taxes included.
+      </p>
+    </Card>
+  );
 }
 
 export default function SocialSecurity() {
@@ -160,6 +244,8 @@ export default function SocialSecurity() {
               { key: 'claim70', color: 'var(--accent)', label: 'Claim at 70', width: 2 },
             ]} />
           </Card>
+
+          <JointStrategyCard />
         </div>
       </div>
     </div>

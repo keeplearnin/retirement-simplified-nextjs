@@ -4,8 +4,8 @@
  */
 
 import { SS_FRA, RMD_START_AGE, RMD_TABLE } from '@/lib/constants';
-// SSA claiming factor — single implementation (was duplicated in 3 files).
-import { ssClaimingFactor } from './ssClaiming';
+// SSA claiming factors — single implementation (was duplicated in 3 files).
+import { ssClaimingFactor, spousalFactor } from './ssClaiming';
 
 // ---------------------------------------------------------------------------
 // Income source interfaces
@@ -280,12 +280,58 @@ export function projectIncome(plan: RetirementPlan): YearlyProjection[] {
       const yearsSinceStart = spouseAge - spouse.socialSecurity.startAge;
       spouseAliveSs = adjustedMonthly * 12 * Math.pow(1 + cola, yearsSinceStart);
     }
+    // ------ Spousal top-up (both alive) ------
+    // A married claimant whose own PIA is less than 50% of their spouse's PIA
+    // receives a spousal "excess" on top of their own benefit:
+    //   excess = max(0, 50% × other's PIA − own PIA) × spousalFactor
+    // Payable only once BOTH have filed (you can't collect on a spouse's
+    // record until that spouse claims). The spousal factor is keyed to the
+    // claimant's age when the spousal portion begins — reduced if before FRA,
+    // never increased past it (no delayed credits on spousal benefits).
+    // Deemed-filing subtleties (restricted applications ended in 2015) are
+    // out of scope: we model file-once-eligible, which matches post-1954
+    // birth cohorts — i.e., everyone this planner targets.
+    const bothSsConfigured = !!(socialSecurity && spouse?.socialSecurity);
+    let primarySpousalExcess = 0;
+    let spouseSpousalExcess = 0;
+    if (bothSsConfigured && primaryAlive && spouseAlive && spouseAge !== null) {
+      // Primary's spousal excess on spouse's record. Start age (in the
+      // primary's frame): when both the primary and the spouse have claimed.
+      const spouseClaimInPrimaryFrame = spouse!.socialSecurity!.startAge - spouseAgeOffset;
+      const pSpousalStart = Math.max(socialSecurity!.startAge, spouseClaimInPrimaryFrame);
+      if (age >= pSpousalStart) {
+        const excessMonthly = Math.max(
+          0, 0.5 * spouse!.socialSecurity!.monthlyBenefitAtFRA - socialSecurity!.monthlyBenefitAtFRA
+        );
+        if (excessMonthly > 0) {
+          const cola = socialSecurity!.cola ?? 0.02;
+          primarySpousalExcess = excessMonthly * 12 * spousalFactor(pSpousalStart, SS_FRA)
+            * Math.pow(1 + cola, age - pSpousalStart);
+        }
+      }
+      // Spouse's spousal excess on primary's record (spouse's own age frame).
+      const primaryClaimInSpouseFrame = socialSecurity!.startAge + spouseAgeOffset;
+      const sSpousalStart = Math.max(spouse!.socialSecurity!.startAge, primaryClaimInSpouseFrame);
+      if (spouseAge >= sSpousalStart) {
+        const excessMonthly = Math.max(
+          0, 0.5 * socialSecurity!.monthlyBenefitAtFRA - spouse!.socialSecurity!.monthlyBenefitAtFRA
+        );
+        if (excessMonthly > 0) {
+          const cola = spouse!.socialSecurity!.cola ?? 0.02;
+          spouseSpousalExcess = excessMonthly * 12 * spousalFactor(sSpousalStart, SS_FRA)
+            * Math.pow(1 + cola, spouseAge - sSpousalStart);
+        }
+      }
+    }
+
     // SS step-up: surviving spouse can claim the higher of (their own) or
     // (the deceased's would-have-been amount). The deceased's line goes to
     // zero. This is the single most consequential survivor-analysis rule —
     // a non-working spouse with a small own-PIA can see SS jump materially.
-    let ssAmt = primaryAlive ? primaryAliveSs : 0;
-    let spouseSsAmt = spouseAlive ? spouseAliveSs : 0;
+    // Survivor benefits REPLACE spousal top-ups (you get one or the other,
+    // never both), so the step-up compares own-only worker amounts.
+    let ssAmt = primaryAlive ? primaryAliveSs + primarySpousalExcess : 0;
+    let spouseSsAmt = spouseAlive ? spouseAliveSs + spouseSpousalExcess : 0;
     if (primaryAlive && !spouseAlive && hasSpouse) {
       ssAmt = Math.max(primaryAliveSs, spouseAliveSs);
     } else if (!primaryAlive && spouseAlive && hasSpouse) {
