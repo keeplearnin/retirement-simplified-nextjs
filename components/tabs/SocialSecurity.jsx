@@ -95,7 +95,8 @@ function JointStrategyCard() {
   const currentCell = grid.find((c) => c.isCurrent);
   const delta = best.net - (currentCell ? currentCell.net : baselineNet);
   const alreadyOptimal = best.primaryAge === current.primaryAge && best.spouseAge === current.spouseAge;
-  const spousalAt62 = Math.round(spousalFactor(62) * 50);
+  // 0.65 × 50% = 32.5% of the worker's PIA — keep the half point, don't round.
+  const spousalAt62 = (spousalFactor(62) * 50).toFixed(1).replace(/\.0$/, '');
 
   return (
     <Card style={{ marginTop: 14 }}>
