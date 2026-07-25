@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Card from '@/components/ui/Card';
 import Stat from '@/components/ui/Stat';
 import Slider from '@/components/ui/Slider';
@@ -23,6 +23,8 @@ export default function HealthcareBridge() {
   const { plan } = usePlan();
   const [base21, setBase21] = useState(400);
   const [cobraMonthly, setCobraMonthly] = useState(0);
+  const curveWrapRef = useRef(null);
+  const [curveHover, setCurveHover] = useState(null); // { magi, px, width }
 
   const projection = useMemo(() => {
     try { return computeProjection(plan); } catch { return null; }
@@ -145,10 +147,23 @@ export default function HealthcareBridge() {
         />
       </Card>
 
-      {/* The cliff curve */}
+      {/* The cliff curve — scrub to price any MAGI */}
       {curve && (
         <Card style={{ marginTop: 16 }}>
           <SectionLabel>Subsidy vs. MAGI — Age {curve.year.coveredAges.join(' / ')}{curve.year.coveredCount === 2 ? ' (both covered)' : ''}</SectionLabel>
+          <div
+            ref={curveWrapRef}
+            style={{ position: 'relative' }}
+            onMouseMove={(e) => {
+              const el = curveWrapRef.current;
+              if (!el) return;
+              const r = el.getBoundingClientRect();
+              const svgX = ((e.clientX - r.left) / r.width) * 600;
+              const frac = Math.min(1, Math.max(0, (svgX - 55) / 535));
+              setCurveHover({ magi: frac * curve.maxMagi, px: ((55 + frac * 535) / 600) * r.width, width: r.width });
+            }}
+            onMouseLeave={() => setCurveHover(null)}
+          >
           <svg viewBox="0 0 600 210" style={{ width: '100%', height: 'auto', display: 'block' }}>
             {[0.25, 0.5, 0.75, 1].map((f) => {
               const y = 180 - f * 160;
@@ -190,10 +205,48 @@ export default function HealthcareBridge() {
                 {fmt(Math.round(curve.maxMagi * f / 1000) * 1000)}
               </text>
             ))}
+            {/* Scrub guide */}
+            {curveHover && (() => {
+              const svgX = 55 + (curveHover.magi / curve.maxMagi) * 535;
+              return <line x1={svgX} y1={20} x2={svgX} y2={180} stroke="var(--text-muted)" strokeWidth={1} opacity={0.5} />;
+            })()}
           </svg>
+
+          {/* Scrub tooltip: exact pricing at any MAGI */}
+          {curveHover && (() => {
+            const r = computeAcaYear({
+              magi: curveHover.magi, householdSize: plan.hasSpouse ? 2 : 1,
+              coveredAges: curve.year.coveredAges, base21Monthly: base21,
+            });
+            const flip = curveHover.px > curveHover.width * 0.6;
+            return (
+              <div style={{
+                position: 'absolute', top: 6, left: flip ? curveHover.px - 226 : curveHover.px + 12,
+                width: 212, pointerEvents: 'none', zIndex: 6, fontFamily: 'var(--sans)',
+                background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10,
+                boxShadow: '0 8px 28px rgba(0,0,0,0.28)', padding: '9px 12px',
+              }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
+                  MAGI {fmt(Math.round(curveHover.magi / 500) * 500)}
+                  <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}> · {Math.round(r.fplRatio * 100)}% FPL</span>
+                </div>
+                {[
+                  ['Premium credit', r.subsidy > 0 ? fmt(r.subsidy) : r.belowFloor ? '$0 — below 100% FPL' : r.overCliff ? '$0 — over the cliff' : '$0'],
+                  ['You pay', fmt(r.netPremium)],
+                ].map(([k, v]) => (
+                  <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, lineHeight: 1.7 }}>
+                    <span style={{ color: 'var(--text-dim)' }}>{k}</span>
+                    <span style={{ color: r.subsidy > 0 && k === 'Premium credit' ? 'var(--accent)' : 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{v}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+          </div>
           <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8, lineHeight: 1.6 }}>
-            The dot is your projected MAGI that year. The vertical drop at the dashed line is the cliff —
-            crossing it forfeits ~{fmt(curve.year.subsidyAtCliff)} of credit in one dollar of income.
+            The dot is your projected MAGI that year — move your cursor along the curve to price any
+            income level. The vertical drop at the dashed line is the cliff — crossing it forfeits
+            ~{fmt(curve.year.subsidyAtCliff)} of credit in one dollar of income.
           </p>
         </Card>
       )}

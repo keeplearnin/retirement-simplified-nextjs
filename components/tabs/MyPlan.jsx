@@ -12,6 +12,7 @@ import { detectIrmaaCliff } from '@/lib/taxEngine';
 import { RMD_TABLE, RMD_START_AGE } from '@/lib/constants';
 import HealthcareBreakdown from '@/components/HealthcareBreakdown';
 import BridgeOptionsCard from '@/components/BridgeOptionsCard';
+import WealthChart from '@/components/ui/WealthChart';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -1498,12 +1499,46 @@ export default function MyPlan() {
       <div className="myplan-results">
       {/* ============ VERDICT HERO ============
           The one question users come here to answer, answered once, first,
-          large — with the score ring folded in instead of floating in its
-          own card below the fold. */}
+          large — with the interactive wealth chart AS the hero, not below
+          the fold. A brand-new user with the untouched default plan gets a
+          calm setup state instead of a false "Money runs out at 75" alarm
+          computed on placeholder data. */}
       {(() => {
+        const unconfigured = results.startingBalance === 0 && !plan._expenseManuallySet;
+        if (unconfigured) {
+          return (
+            <Card style={{ marginBottom: 16, padding: '30px 32px' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, letterSpacing: 0.3, marginBottom: 8 }}>
+                Welcome
+              </div>
+              <div style={{ fontFamily: 'var(--serif)', fontSize: 26, fontWeight: 600, color: 'var(--heading, var(--text))', textWrap: 'balance', maxWidth: 560, lineHeight: 1.25 }}>
+                Let&apos;s build your plan
+              </div>
+              <p style={{ fontSize: 13.5, color: 'var(--text-muted)', lineHeight: 1.65, marginTop: 10, maxWidth: 560 }}>
+                Add your savings and income on the left and your verdict appears here — one
+                sentence, one chart, every dollar auditable. Nothing is judged until your real
+                numbers are in.
+              </p>
+              <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => {
+                    const el = document.querySelector('.myplan-inputs');
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                  style={{ padding: '10px 18px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: 'var(--bg)', fontSize: 13, fontWeight: 700, fontFamily: 'var(--sans)' }}
+                >
+                  Add savings &amp; income →
+                </button>
+                <a href="/verdict" style={{ padding: '10px 18px', borderRadius: 10, border: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: 13, fontWeight: 600, fontFamily: 'var(--sans)', textDecoration: 'none' }}>
+                  60-second Quick Verdict
+                </a>
+              </div>
+            </Card>
+          );
+        }
         const covered = results.moneyLastsAge >= plan.longevityAge;
         return (
-          <Card style={{ marginBottom: 16, padding: '22px 26px' }}>
+          <Card style={{ marginBottom: 16, padding: '22px 26px 16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 280 }}>
                 <div style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, letterSpacing: 0.3, marginBottom: 6 }}>
@@ -1540,10 +1575,18 @@ export default function MyPlan() {
                 <SuccessScore projections={combined} />
               </div>
             </div>
+            {/* The picture IS the hero: scrub any year for its exact dollars. */}
+            <WealthChart
+              rows={combined}
+              retireAge={plan.retireAge}
+              moneyLastsAge={results.moneyLastsAge}
+              covered={covered}
+            />
           </Card>
         );
       })()}
       {/* ---- Assumptions strip: the levers that drive the verdict, visible ---- */}
+      {!(results.startingBalance === 0 && !plan._expenseManuallySet) && (
       <AssumptionsStrip
         plan={plan}
         onEdit={() => {
@@ -1551,8 +1594,11 @@ export default function MyPlan() {
           if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }}
       />
+      )}
       {/* ---- Next steps (suggestions) ---- */}
       {(() => {
+        // Setup state: no alarm-colored to-do list on placeholder data.
+        if (results.startingBalance === 0 && !plan._expenseManuallySet) return null;
         const suggestions = generateSuggestions(plan, results);
         const active = suggestions.filter(s => !dismissedSuggestions.includes(s.id));
         if (active.length === 0) return null;
