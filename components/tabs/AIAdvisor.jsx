@@ -55,6 +55,7 @@ export default function AIAdvisor() {
   });
   const [activePanel, setActivePanel] = useState(null); // 'health' | 'insights' | 're' | 'optimize' | 'settings' | null
   const chatRef = useRef(null);
+  const messagesEndRef = useRef(null);
 
   function togglePanel(name) {
     setActivePanel((prev) => (prev === name ? null : name));
@@ -216,8 +217,15 @@ export default function AIAdvisor() {
     }).catch(() => undefined);
   }
 
+  // scrollIntoView (not chatRef.scrollTop = chatRef.scrollHeight) because the
+  // page itself can be taller than the viewport — title/pills/card/input/
+  // footer often exceed 720px. Setting scrollTop only moves the inner
+  // 460px box, which is a no-op once its own content already fits; the
+  // outer page never got told to scroll, so new replies and the input box
+  // stayed below the fold. scrollIntoView asks the browser to satisfy
+  // whichever container(s) actually have overflow, inner or outer.
   useEffect(() => {
-    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages, loading]);
 
   // Toast supports an optional `undo` action that renders an inline button.
@@ -398,6 +406,17 @@ export default function AIAdvisor() {
         setMessages((prev) => [
           ...prev,
           { role: 'assistant', content: "You're sending messages too quickly. Please wait a moment." },
+        ]);
+        return;
+      }
+      // Any other non-ok status (503 "not configured", 502 upstream error,
+      // 500, etc.) — the response body is {error}, not {text}. Falling
+      // through to the success path below would push content: undefined,
+      // which renders as a blank chat bubble with no explanation at all.
+      if (!res.ok) {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: data?.error || 'Sorry, something went wrong. Please try again.' },
         ]);
         return;
       }
@@ -1471,6 +1490,7 @@ export default function AIAdvisor() {
                   Thinking…
                 </div>
               )}
+              <div ref={messagesEndRef} />
             </div>
           )}
         </div>
