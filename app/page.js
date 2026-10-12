@@ -41,7 +41,7 @@ import Icon from '@/components/ui/Icon';
 function AppContent() {
   const [tab, setTab] = useState('myplan');
   const [loaded, setLoaded] = useState(false);
-  const [theme, setTheme] = useState('dark');
+  const [theme, setTheme] = useState('light');
   const { user, isConfigured: configured, authLoading, signIn, signOut } = useAuth();
 
   const [onboarded, setOnboarded] = useState(true); // true initially to avoid flash
@@ -57,6 +57,7 @@ function AppContent() {
     window.addEventListener('navigate-tab', handler);
     window.addEventListener('replay-onboarding', replayHandler);
     // Restore saved theme
+    // The root layout applies the saved theme before paint; mirror it here.
     const saved = localStorage.getItem('theme');
     if (saved === 'light' || saved === 'dark') {
       setTheme(saved);
@@ -86,7 +87,7 @@ function AppContent() {
   }, []);
 
   function toggleTheme() {
-    const next = theme === 'dark' ? 'light' : 'dark';
+    const next = theme === 'light' ? 'dark' : 'light';
     setTheme(next);
     document.documentElement.setAttribute('data-theme', next);
     localStorage.setItem('theme', next);
@@ -104,11 +105,11 @@ function AppContent() {
   // a basic calculator.")
   const categories = [
     { id: 'plan', label: 'Plan', icon: 'chart', tabs: [
-      { id: 'myplan', label: 'My Plan' },
+      { id: 'myplan', label: 'My plan' },
       { id: 'optimize', label: 'Optimize' },
       { id: 'scenarios', label: 'Scenarios' },
       { id: 'accounts', label: 'Accounts' },
-      { id: 'equity', label: 'Equity Comp' },
+      { id: 'equity', label: 'Equity comp' },
       { id: 'college', label: 'College' },
       { id: 'portfolio', label: 'Portfolio' },
     ]},
@@ -123,14 +124,14 @@ function AppContent() {
     //   • RothStrategy      = Roth vs Trad + Roth Ladder
     //   • RetirementIncome  = Social Security + Withdrawal + Tax Torpedo
     { id: 'coach', label: 'Coach', icon: 'sparkles', tabs: [
-      { id: 'advisor', label: 'AI Advisor' },
-      { id: 'roth-strategy', label: 'Roth Strategy' },
-      { id: 'income', label: 'Retirement Income' },
+      { id: 'advisor', label: 'AI advisor' },
+      { id: 'roth-strategy', label: 'Roth strategy' },
+      { id: 'income', label: 'Retirement income' },
       { id: 'inheritance', label: 'Inheritance' },
       { id: 'montecarlo', label: 'Monte Carlo' },
     ]},
     { id: 'learn', label: 'Learn', icon: 'book', tabs: [
-      { id: 'guide', label: 'Getting Started' },
+      { id: 'guide', label: 'Getting started' },
     ]},
   ];
 
@@ -151,167 +152,101 @@ function AppContent() {
           if (!(result && result.skipped === true)) setTab('optimize');
         }} />
       )}
-      {/* Compact header — logo + nav + actions in one row */}
+      {/* Masthead — brand, three sections, actions, then the double rule */}
       <header className="app-header">
-        {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flexShrink: 0 }} onClick={() => setTab('myplan')}>
-          <span className="brand-name" style={{ fontWeight: 700, fontFamily: 'var(--sans)', color: 'var(--text)', letterSpacing: '-0.02em' }}>
-            Retire<span style={{ color: 'var(--accent)' }}>.</span>Simplified
-          </span>
-          <span className="brand-free" style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 2, opacity: 0.7 }}>Free</span>
-        </div>
+        <div className="masthead">
+          <button type="button" className="brand" onClick={() => setTab('myplan')} aria-label="Retirement.Simplified — go to My plan">
+            <span className="brand-name">Retire<span className="dot">.</span>Simplified</span>
+          </button>
 
-        {/* Nav pills — wrapper provides the fade-gradient scroll affordance on mobile */}
-        <div className="nav-scroll-wrapper">
-          <nav className="nav-scroll" style={{ display: 'flex', gap: 2, background: 'var(--bg2)', borderRadius: 28, padding: 3, minWidth: 0 }}>
-            {categories.map(c => {
-              const isActive = c.id === activeCategory.id;
-              return (
+          <div className="nav-scroll-wrapper">
+            <nav className="nav-scroll" aria-label="Sections">
+              {categories.map(c => (
                 <button
                   key={c.id}
+                  type="button"
                   onClick={() => setTab(c.tabs[0].id)}
-                  className="nav-pill"
-                  style={{
-                    padding: '8px 16px', border: 'none', cursor: 'pointer', borderRadius: 24,
-                    background: isActive ? 'var(--accent)' : 'transparent',
-                    color: isActive ? '#fff' : 'var(--text-muted)',
-                    fontWeight: isActive ? 600 : 500, fontSize: 13,
-                    transition: 'all .2s', fontFamily: 'var(--sans)',
-                    whiteSpace: 'nowrap',
-                    display: 'inline-flex', alignItems: 'center', gap: 8,
-                  }}
+                  className="nav-tab"
+                  aria-current={c.id === activeCategory.id ? 'page' : undefined}
                 >
-                  <Icon name={c.icon} size={15} />
+                  <span className="nav-icon"><Icon name={c.icon} size={15} /></span>
                   {c.label}
                 </button>
-              );
-            })}
-          </nav>
-        </div>
+              ))}
+            </nav>
+          </div>
 
-        {/* Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <a
-            href="/verdict"
-            title="Quick Verdict — see where you stand in 90 seconds"
-            style={{
-              padding: '6px 12px', borderRadius: 16, textDecoration: 'none',
-              border: '1px solid var(--accent)', background: 'var(--accent-dim)',
-              color: 'var(--accent)', fontSize: 11, fontWeight: 600, fontFamily: 'var(--sans)',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <span className="quick-verdict-text" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Icon name="bolt" size={12} />Quick Verdict</span>
-            <span className="quick-verdict-icon-only" aria-label="Quick Verdict"><Icon name="bolt" size={13} /></span>
-          </a>
-          {authLoading ? null : user ? (
-            <>
-              {user.picture && <img src={user.picture} alt="" style={{ width: 28, height: 28, borderRadius: '50%', border: '2px solid var(--accent)' }} referrerPolicy="no-referrer" />}
-              <button onClick={signOut} style={{ padding: '6px 12px', borderRadius: 16, border: '1px solid var(--border)', cursor: 'pointer', background: 'transparent', color: 'var(--text-dim)', fontSize: 11, fontWeight: 500, fontFamily: 'var(--sans)' }}>Sign Out</button>
-            </>
-          ) : configured ? (
-            <button onClick={signIn} style={{ padding: '6px 14px', borderRadius: 16, border: '1px solid var(--accent)', cursor: 'pointer', background: 'var(--accent-dim)', color: 'var(--accent)', fontSize: 11, fontWeight: 600, fontFamily: 'var(--sans)' }}>Sign in</button>
-          ) : null}
-          <button
-            onClick={toggleTheme}
-            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            style={{
-              width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--border)',
-              background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all .25s',
-            }}
-          >
-            <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={15} />
-          </button>
+          <div className="masthead-actions">
+            <a href="/verdict" className="mast-btn" title="See where you stand in 90 seconds">
+              <span className="quick-verdict-text"><Icon name="bolt" size={13} />Quick verdict</span>
+              <span className="quick-verdict-icon-only" aria-label="Quick verdict"><Icon name="bolt" size={14} /></span>
+            </a>
+            {authLoading ? null : user ? (
+              <>
+                {user.picture && <img src={user.picture} alt="" className="mast-avatar" referrerPolicy="no-referrer" />}
+                <button type="button" onClick={signOut} className="mast-btn">Sign out</button>
+              </>
+            ) : configured ? (
+              <button type="button" onClick={signIn} className="mast-btn solid">Sign in</button>
+            ) : null}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="mast-btn icon"
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={15} />
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* Sub-tab row (hidden for single-tab categories) */}
+      {/* Section tabs (hidden for single-tab categories) */}
       {subTabs.length > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 4, padding: '12px 16px 8px', borderBottom: '1px solid var(--border)' }}>
-          {subTabs.map(t => {
-            const isActive = tab === t.id;
-            return (
+        <nav className="subnav" aria-label={`${activeCategory.label} pages`}>
+          <div className="subnav-inner">
+            {subTabs.map(t => (
               <button
                 key={t.id}
+                type="button"
                 onClick={() => setTab(t.id)}
-                style={{
-                  padding: '6px 16px', border: 'none', cursor: 'pointer', borderRadius: 20,
-                  background: isActive ? 'var(--accent-dim)' : 'transparent',
-                  color: isActive ? 'var(--accent)' : 'var(--text-dim)',
-                  fontWeight: isActive ? 600 : 400, fontSize: 12,
-                  transition: 'all .2s', fontFamily: 'var(--sans)',
-                }}
+                className="subnav-tab"
+                aria-current={tab === t.id ? 'page' : undefined}
               >
                 {t.label}
               </button>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        </nav>
       )}
 
-      <main className="section-pad" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 40px' }}>
+      <main className="section-pad" style={{ maxWidth: 1148, margin: '0 auto', padding: '20px 24px 48px' }}>
         {/* "Finish setup" banner — shown when the user skipped onboarding
             without entering plan data. Persists across reloads (via the
             'retirement-onboarding-skipped' localStorage flag) until they
             either complete onboarding (replay) or enter plan data. */}
         {onboardingSkipped && tab === 'myplan' && (
-          <div
-            style={{
-              margin: '16px 0',
-              padding: '12px 16px',
-              background: 'var(--accent-dim, rgba(16,185,129,0.10))',
-              border: '1px solid var(--accent)',
-              borderRadius: 10,
-              fontFamily: 'var(--sans)',
-              fontSize: 13,
-              color: 'var(--text)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 12,
-              flexWrap: 'wrap',
-            }}
-          >
+          <div className="setup-banner" role="status">
             <span>
-              <strong>Finish setting up your plan</strong> — you skipped onboarding earlier. Takes ~3 minutes.
+              <strong>Your plan is missing your numbers.</strong> Setup takes about 3 minutes.
             </span>
             <div style={{ display: 'flex', gap: 8 }}>
               <button
+                type="button"
+                className="btn btn-primary btn-sm"
                 onClick={() => {
                   localStorage.removeItem('retirement-onboarding-skipped');
                   window.dispatchEvent(new Event('replay-onboarding'));
                 }}
-                style={{
-                  background: 'var(--accent)',
-                  color: 'var(--bg)',
-                  border: 'none',
-                  borderRadius: 8,
-                  padding: '6px 14px',
-                  fontSize: 13,
-                  fontWeight: 700,
-                  fontFamily: 'var(--sans)',
-                  cursor: 'pointer',
-                }}
               >
-                Finish setup →
+                Finish setup
               </button>
               <button
+                type="button"
+                className="btn btn-ghost btn-sm"
                 onClick={() => {
                   localStorage.setItem('retirement-onboarding-skipped', '0');
                   setOnboardingSkipped(false);
-                }}
-                style={{
-                  background: 'transparent',
-                  color: 'var(--text-muted)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 8,
-                  padding: '6px 12px',
-                  fontSize: 12,
-                  fontWeight: 500,
-                  fontFamily: 'var(--sans)',
-                  cursor: 'pointer',
                 }}
               >
                 Dismiss
@@ -334,25 +269,28 @@ function AppContent() {
         {tab === 'guide' && <GettingStarted />}
       </main>
 
-      <footer style={{ maxWidth: 700, margin: '0 auto', textAlign: 'center', padding: '28px 24px 40px', borderTop: '1px solid var(--border)' }}>
-        <p style={{ color: 'var(--text-dim)', fontSize: 11, lineHeight: 1.8, maxWidth: 580, margin: '0 auto' }}>
-          <strong>Disclaimer:</strong> This tool is for educational purposes only and does not constitute financial advice. Past performance does not guarantee future results. All projections are hypothetical. Consult a qualified financial professional for advice specific to your situation.
-        </p>
-        {/* Trust links — methodology, source, license — kept low-key but discoverable */}
-        <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 18, flexWrap: 'wrap', fontSize: 11 }}>
-          <a href="/methodology" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>How the math works</a>
-          <a href="https://github.com/keeplearnin/retirement-simplified-nextjs" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-dim)', textDecoration: 'none' }}>Source on GitHub</a>
-          <a href="/verdict" style={{ color: 'var(--text-dim)', textDecoration: 'none' }}>Quick Verdict</a>
-          <a href="/report" style={{ color: 'var(--text-dim)', textDecoration: 'none' }}>PDF Report</a>
+      <footer className="site-footer">
+        <div className="site-footer-inner">
+          <div>
+            <div className="brand-name" style={{ color: 'var(--heading)', fontSize: 15 }}>Retire<span className="dot">.</span>Simplified</div>
+            <p className="footer-note">
+              Free and open source (MIT). Built independently — not a financial advisor. Tax and benefits figures are refreshed each year from the IRS, SSA and CMS.
+            </p>
+          </div>
+          <nav aria-label="About the numbers" className="footer-col">
+            <a href="/methodology">How the math works</a>
+            <a href="/report">Download a PDF report</a>
+            <a href="https://github.com/keeplearnin/retirement-simplified-nextjs" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
+          </nav>
+          <nav aria-label="Free calculators" className="footer-col">
+            <a href="/verdict">Quick verdict</a>
+            <a href="/calculators/irmaa-cliff-checker">IRMAA cliff checker</a>
+            <a href="/calculators/tax-torpedo">Tax torpedo</a>
+            <a href="/calculators/social-security-break-even">Social Security break-even</a>
+          </nav>
         </div>
-        {/* Standalone calculators — SEO entry points that funnel into the app */}
-        <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center', gap: 18, flexWrap: 'wrap', fontSize: 11 }}>
-          <a href="/calculators/irmaa-cliff-checker" style={{ color: 'var(--text-dim)', textDecoration: 'none' }}>IRMAA Cliff Checker</a>
-          <a href="/calculators/tax-torpedo" style={{ color: 'var(--text-dim)', textDecoration: 'none' }}>Tax Torpedo</a>
-          <a href="/calculators/social-security-break-even" style={{ color: 'var(--text-dim)', textDecoration: 'none' }}>SS Break-Even</a>
-        </div>
-        <p style={{ color: 'var(--text-dim)', fontSize: 11, marginTop: 16, lineHeight: 1.7, opacity: 0.6 }}>
-          Built independently. Not a financial advisor. Free, open source, MIT licensed. Tax + benefits data refreshed annually from the IRS, SSA, and CMS.
+        <p className="footer-disclaimer">
+          <strong>For education only.</strong> This tool does not give financial advice. Projections are hypothetical and past performance does not guarantee future results. For advice on your situation, talk to a qualified financial professional.
         </p>
       </footer>
     </div>

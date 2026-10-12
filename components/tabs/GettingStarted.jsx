@@ -73,10 +73,10 @@ const steps = [
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em' }}>Fund Type</th>
-                <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em' }}>Vanguard</th>
-                <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em' }}>Fidelity</th>
-                <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em' }}>Schwab</th>
+                <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-dim)', fontSize: 11 }}>Fund Type</th>
+                <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-dim)', fontSize: 11 }}>Vanguard</th>
+                <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-dim)', fontSize: 11 }}>Fidelity</th>
+                <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-dim)', fontSize: 11 }}>Schwab</th>
               </tr>
             </thead>
             <tbody>
@@ -192,7 +192,7 @@ export default function GettingStarted() {
                   {step.icon}
                 </span>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Step {stepNum}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Step {stepNum}</div>
                   <div style={{ fontSize: 16, fontFamily: 'var(--serif)', color: isOpen ? 'var(--accent)' : 'var(--text)' }}>{step.title}</div>
                 </div>
                 <span style={{

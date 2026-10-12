@@ -47,7 +47,7 @@ export default function WhereToStart() {
                   borderRadius: 10,
                   background: `${step.color}22`,
                   color: step.color,
-                  textTransform: 'uppercase',
+
                   letterSpacing: '.04em',
                 }}>
                   {step.priority}

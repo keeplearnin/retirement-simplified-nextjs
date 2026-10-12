@@ -231,7 +231,7 @@ export default function SocialSecurity() {
                   background: age === startAge ? 'var(--accent-dim)' : 'var(--card-bg)',
                   border: `1px solid ${age === startAge ? 'var(--accent)' : 'var(--border)'}`,
                 }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>Age {age}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Age {age}</div>
                   <div style={{ fontSize: 20, fontFamily: 'var(--serif)', color: age === 62 ? 'var(--danger)' : age === 67 ? 'var(--warn)' : age === 70 ? 'var(--accent)' : 'var(--text)' }}>
                     ${monthly.toLocaleString()}
                   </div>

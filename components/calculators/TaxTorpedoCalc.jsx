@@ -46,7 +46,7 @@ export default function TaxTorpedoCalc() {
               style={{
                 flex: 1, padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
                 border: filingStatus === val ? '1.5px solid var(--accent)' : '1px solid var(--border)',
-                background: filingStatus === val ? 'var(--accent-dim, rgba(16,185,129,0.08))' : 'transparent',
+                background: filingStatus === val ? 'var(--accent-dim, var(--accent-dim))' : 'transparent',
                 color: filingStatus === val ? 'var(--accent)' : 'var(--text-muted)',
                 fontSize: 13, fontWeight: 600, fontFamily: 'var(--sans)',
               }}

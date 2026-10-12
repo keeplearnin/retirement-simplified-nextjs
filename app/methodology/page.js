@@ -154,7 +154,7 @@ export default function MethodologyPage() {
             Retire<span style={{ color: 'var(--accent)' }}>.</span>Simplified
           </span>
         </a>
-        <span style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 2 }}>
+        <span style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 600 }}>
           Methodology
         </span>
       </div>

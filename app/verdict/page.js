@@ -20,27 +20,19 @@ export default function VerdictPage() {
   }
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingTop: 24 }}>
-      {/* Lightweight header so users can navigate back to the full app */}
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        maxWidth: 720, margin: '0 auto', padding: '0 16px 16px',
-      }}>
-        <a
-          href="/"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none',
-            color: 'var(--text)', fontFamily: 'var(--sans)',
-          }}
-        >
-          <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.02em' }}>
-            Retire<span style={{ color: 'var(--accent)' }}>.</span>Simplified
-          </span>
-        </a>
-        <span style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 2 }}>
-          Verdict
-        </span>
-      </div>
+    <main style={{ minHeight: '100vh', background: 'var(--bg)', paddingTop: 16 }}>
+      {/* Lightweight masthead so users can get back to the full app */}
+      <header style={{ borderBottom: '4px double var(--rule)', marginBottom: 8 }}>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          maxWidth: 720, margin: '0 auto', padding: '0 16px 14px',
+        }}>
+          <a href="/" style={{ textDecoration: 'none', color: 'var(--heading)' }}>
+            <span className="brand-name" style={{ fontSize: 17 }}>Retire<span className="dot">.</span>Simplified</span>
+          </a>
+          <a href="/" className="mast-btn">Open the full planner</a>
+        </div>
+      </header>
 
       {output ? (
         <VerdictResult output={output} input={input} onRestart={restart} />

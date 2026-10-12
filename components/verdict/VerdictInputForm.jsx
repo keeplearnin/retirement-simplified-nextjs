@@ -71,7 +71,7 @@ export default function VerdictInputForm({ onSubmit }) {
       <Card>
         {/* Household toggle */}
         <div style={{ marginBottom: 14 }}>
-          <div style={{ marginBottom: 8, fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>
+          <div style={{ marginBottom: 8, fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 }}>
             Are you planning…
           </div>
           <div style={{ display: 'flex', gap: 8 }}>

@@ -61,7 +61,7 @@ export default function SsBreakEven() {
             <thead>
               <tr>
                 {['Claim at', 'Monthly check', '% of FRA', `Lifetime to ${longevity}`, 'Break-even vs 67'].map((h, i) => (
-                  <th key={h} style={{ textAlign: i === 0 ? 'left' : 'right', padding: i === 0 ? '8px 12px 8px 0' : '8px 0 8px 12px', fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>{h}</th>
+                  <th key={h} style={{ textAlign: i === 0 ? 'left' : 'right', padding: i === 0 ? '8px 12px 8px 0' : '8px 0 8px 12px', fontSize: 11, color: 'var(--text-dim)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -69,7 +69,7 @@ export default function SsBreakEven() {
               {options.map((o) => {
                 const isBest = o.claimAge === best.claimAge;
                 return (
-                  <tr key={o.claimAge} style={{ borderTop: '1px solid var(--border)', background: isBest ? 'var(--accent-dim, rgba(16,185,129,0.07))' : 'transparent' }}>
+                  <tr key={o.claimAge} style={{ borderTop: '1px solid var(--border)', background: isBest ? 'var(--accent-dim, var(--accent-dim))' : 'transparent' }}>
                     <td style={{ padding: '9px 12px 9px 0', fontWeight: isBest ? 700 : 500, color: 'var(--text)' }}>
                       {o.claimAge}{o.claimAge === SS_FRA ? ' (FRA)' : ''}{isBest ? ' ' : ''}
                     </td>

@@ -60,7 +60,7 @@ export default function AccountList({ linked, refreshing, onRefresh, onDisconnec
                       padding: '2px 7px', borderRadius: 4,
                       background: (TYPE_BADGE_COLORS[acct.subtype] || 'var(--text-dim)') + '18',
                       color: TYPE_BADGE_COLORS[acct.subtype] || 'var(--text-dim)',
-                      textTransform: 'uppercase', letterSpacing: 0.3,
+
                     }}>
                       {TYPE_LABELS[acct.subtype] || acct.subtype}
                     </span>

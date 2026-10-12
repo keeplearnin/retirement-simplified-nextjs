@@ -457,7 +457,7 @@ export default function AIAdvisor() {
           style={{
             marginBottom: 12,
             padding: '8px 12px',
-            background: 'var(--accent-dim, rgba(16,185,129,0.08))',
+            background: 'var(--accent-dim, var(--accent-dim))',
             border: '1px solid var(--accent)',
             borderRadius: 8,
             fontFamily: 'var(--sans)',
@@ -774,7 +774,7 @@ export default function AIAdvisor() {
                               fontSize: 11,
                               fontWeight: 600,
                               color: 'var(--accent)',
-                              background: 'var(--accent-dim, rgba(16,185,129,0.10))',
+                              background: 'var(--accent-dim, var(--accent-dim))',
                               padding: '2px 8px',
                               borderRadius: 10,
                             }}
@@ -922,7 +922,7 @@ export default function AIAdvisor() {
 
                       {reviewReport.changes?.length > 0 && (
                         <div style={{ marginBottom: 12 }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6 }}>
                             What changed
                           </div>
                           {reviewReport.changes.slice(0, 5).map((c, i) => (
@@ -946,7 +946,7 @@ export default function AIAdvisor() {
                           borderRadius: 6,
                           marginBottom: 10,
                         }}>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 4 }}>
                             Next action
                           </div>
                           <div style={{ fontSize: 13, color: 'var(--text)' }}>
@@ -1075,7 +1075,7 @@ export default function AIAdvisor() {
                             fontSize: 11,
                             fontWeight: 700,
                             color: 'var(--text-muted)',
-                            textTransform: 'uppercase',
+
                             letterSpacing: 1,
                             display: 'flex',
                             alignItems: 'center',
@@ -1140,7 +1140,7 @@ export default function AIAdvisor() {
                             fontSize: 11,
                             fontWeight: 700,
                             color: 'var(--text-muted)',
-                            textTransform: 'uppercase',
+
                             letterSpacing: 1,
                             marginBottom: 6,
                           }}
@@ -1170,7 +1170,7 @@ export default function AIAdvisor() {
                                   fontSize: 10,
                                   fontWeight: 600,
                                   color: 'var(--accent)',
-                                  background: 'var(--accent-dim, rgba(16,185,129,0.10))',
+                                  background: 'var(--accent-dim, var(--accent-dim))',
                                   padding: '1px 6px',
                                   borderRadius: 8,
                                 }}
@@ -1400,7 +1400,7 @@ export default function AIAdvisor() {
                               style={{
                                 flex: 1,
                                 textAlign: 'left',
-                                background: applied ? 'var(--bg2)' : 'var(--accent-dim, rgba(16,185,129,0.10))',
+                                background: applied ? 'var(--bg2)' : 'var(--accent-dim, var(--accent-dim))',
                                 color: applied ? 'var(--text-muted)' : 'var(--accent)',
                                 border: 'none',
                                 padding: '8px 12px',
@@ -1440,7 +1440,7 @@ export default function AIAdvisor() {
                                   fontWeight: 700,
                                   fontFamily: 'var(--sans)',
                                   cursor: 'pointer',
-                                  textTransform: 'uppercase',
+
                                   letterSpacing: 0.5,
                                 }}
                                 title="Undo (within 30 seconds)"
@@ -1556,7 +1556,7 @@ export default function AIAdvisor() {
                 fontWeight: 700,
                 fontFamily: 'var(--sans)',
                 cursor: 'pointer',
-                textTransform: 'uppercase',
+
                 letterSpacing: 0.5,
               }}
             >

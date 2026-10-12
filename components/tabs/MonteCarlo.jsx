@@ -280,7 +280,7 @@ export default function MonteCarlo() {
                 });
                 const toneColor = interp.tone === 'good' ? 'var(--accent)' : interp.tone === 'caution' ? 'var(--warn)' : 'var(--danger)';
                 const toneBg = interp.tone === 'good'
-                  ? 'rgba(52,211,153,0.08)'
+                  ? 'var(--accent-dim)'
                   : interp.tone === 'caution'
                   ? 'rgba(251,191,36,0.08)'
                   : 'rgba(239,68,68,0.08)';
@@ -390,7 +390,7 @@ export default function MonteCarlo() {
                       return (
                         <div key={i} style={{
                           padding: '12px 14px', borderRadius: 8,
-                          background: isCombined ? 'rgba(52,211,153,0.06)' : 'var(--bg2)',
+                          background: isCombined ? 'var(--accent-dim)' : 'var(--bg2)',
                           border: isCombined ? '1.5px solid var(--accent)' : '1px solid var(--border)',
                         }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -438,7 +438,7 @@ export default function MonteCarlo() {
                   )}
 
                   {sensitivity.current >= 0.9 && (
-                    <div style={{ marginTop: 14, padding: '10px 14px', borderRadius: 8, background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)', fontSize: 12, color: 'var(--accent)', lineHeight: 1.6 }}>
+                    <div style={{ marginTop: 14, padding: '10px 14px', borderRadius: 8, background: 'var(--accent-dim)', border: '1px solid var(--accent-glow)', fontSize: 12, color: 'var(--accent)', lineHeight: 1.6 }}>
                       <strong>You are on track.</strong> Your success rate of {(sensitivity.current * 100).toFixed(0)}% means your plan survives the vast majority of market scenarios. The levers above show your margin of safety.
                     </div>
                   )}

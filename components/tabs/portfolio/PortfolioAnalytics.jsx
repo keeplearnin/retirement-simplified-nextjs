@@ -11,7 +11,7 @@ function corrColor(v) {
   if (v >= 0.8) return 'rgba(239,68,68,0.7)';
   if (v >= 0.6) return 'rgba(249,115,22,0.5)';
   if (v >= 0.3) return 'rgba(251,191,36,0.35)';
-  if (v >= 0) return 'rgba(52,211,153,0.2)';
+  if (v >= 0) return 'var(--accent-glow)';
   return 'rgba(59,130,246,0.4)';
 }
 
@@ -23,7 +23,7 @@ function ratingColor(val, thresholds) {
 }
 
 const cellStyle = { padding: '8px 10px', fontSize: 11, fontFamily: 'var(--sans)', borderBottom: '1px solid var(--border)' };
-const headerStyle = { ...cellStyle, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', fontSize: 10, letterSpacing: '.06em' };
+const headerStyle = { ...cellStyle, fontWeight: 700, color: 'var(--text-dim)', fontSize: 10, };
 
 export default function PortfolioAnalytics({ alloc, portfolioSize, funds }) {
   const tickers = Object.entries(alloc).filter(([, p]) => p > 0).map(([t]) => t);
@@ -48,7 +48,7 @@ export default function PortfolioAnalytics({ alloc, portfolioSize, funds }) {
   return (
     <div style={{ marginTop: 24 }}>
       {/* Portfolio-level summary */}
-      <Card style={{ marginBottom: 20, background: 'linear-gradient(135deg, rgba(99,102,241,0.06) 0%, rgba(52,211,153,0.04) 100%)' }}>
+      <Card style={{ marginBottom: 20, background: 'linear-gradient(135deg, rgba(99,102,241,0.06) 0%, var(--accent-dim) 100%)' }}>
         <SectionLabel icon="📊">Portfolio Risk Analytics</SectionLabel>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginTop: 8 }}>
           {[
@@ -60,7 +60,7 @@ export default function PortfolioAnalytics({ alloc, portfolioSize, funds }) {
             { label: 'Annual Income', value: fmt(annualIncome), color: 'var(--accent)' },
           ].map((m, i) => (
             <div key={i} style={{ background: 'var(--bg2)', borderRadius: 8, padding: '12px 14px', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>{m.label}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600 }}>{m.label}</div>
               <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--serif)', color: m.color, marginTop: 4 }}>{m.value}</div>
             </div>
           ))}
@@ -196,7 +196,7 @@ export default function PortfolioAnalytics({ alloc, portfolioSize, funds }) {
             { label: 'Annual Income', value: fmt(annualIncome), sub: `${fmt(monthlyIncome)}/mo · Yield ${blendedYield.toFixed(1)}%`, color: 'var(--blue)' },
           ].map((m, i) => (
             <div key={i} style={{ background: 'var(--bg2)', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase' }}>{m.label}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600 }}>{m.label}</div>
               <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'var(--serif)', color: m.color, marginTop: 2 }}>{m.value}</div>
               <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{m.sub}</div>
             </div>
@@ -229,7 +229,7 @@ export default function PortfolioAnalytics({ alloc, portfolioSize, funds }) {
             })}
           </tbody>
         </table>
-        <div style={{ marginTop: 10, padding: '8px 12px', background: 'rgba(52,211,153,0.06)', borderRadius: 6, fontSize: 11, color: 'var(--text-dim)' }}>
+        <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--accent-dim)', borderRadius: 6, fontSize: 11, color: 'var(--text-dim)' }}>
           <strong style={{ color: 'var(--text)' }}>Tax-Optimal Placement:</strong> Hold BND/BNDX in tax-deferred accounts (401k/IRA) — bond interest is taxed as ordinary income. Hold VOO/VXF in taxable accounts — qualified dividends taxed at lower LTCG rates. GLD in tax-deferred if possible (collectibles rate = 28%).
         </div>
       </Card>
@@ -269,7 +269,7 @@ export default function PortfolioAnalytics({ alloc, portfolioSize, funds }) {
         <SectionLabel icon="🌍">Geographic Exposure</SectionLabel>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }} className="grid-2">
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.06em' }}>By Country/Region</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>By Country/Region</div>
             {sortedGeos.slice(0, 10).map(([geo, pct]) => (
               <div key={geo} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
                 <span style={{ color: 'var(--text-muted)' }}>{geo}</span>
@@ -278,7 +278,7 @@ export default function PortfolioAnalytics({ alloc, portfolioSize, funds }) {
             ))}
           </div>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.06em' }}>Summary</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>Summary</div>
             {(() => {
               const us = (geos['United States'] || 0);
               const developed = us + (geos['Japan'] || 0) + (geos['UK'] || 0) + (geos['France'] || 0) + (geos['Germany'] || 0) + (geos['Switzerland'] || 0) + (geos['Australia'] || 0) + (geos['Canada'] || 0) + (geos['Netherlands'] || 0) + (geos['Sweden'] || 0) + (geos['Europe'] || 0);
@@ -304,19 +304,19 @@ export default function PortfolioAnalytics({ alloc, portfolioSize, funds }) {
           <SectionLabel icon="📉">Interest Rate Sensitivity (Bond Allocation)</SectionLabel>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 12 }}>
             <div style={{ background: 'var(--bg2)', borderRadius: 8, padding: '10px 14px', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase' }}>Portfolio Duration</div>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600 }}>Portfolio Duration</div>
               <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'var(--serif)', color: 'var(--blue)' }}>{portfolioDuration.toFixed(1)} yrs</div>
               <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Price drop per 1% rate increase</div>
             </div>
             <div style={{ background: 'var(--bg2)', borderRadius: 8, padding: '10px 14px', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase' }}>If Rates Rise 1%</div>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600 }}>If Rates Rise 1%</div>
               <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'var(--serif)', color: 'var(--danger)' }}>
                 -{fmt(Math.round(portfolioSize * (totalBondPct / 100) * portfolioDuration / 100))}
               </div>
               <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Impact on bond portion ({totalBondPct}% of portfolio)</div>
             </div>
             <div style={{ background: 'var(--bg2)', borderRadius: 8, padding: '10px 14px', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase' }}>Bond Yield to Maturity</div>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600 }}>Bond Yield to Maturity</div>
               <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'var(--serif)', color: 'var(--accent)' }}>
                 {(Object.entries(alloc).filter(([t]) => BOND_METRICS[t]).reduce((s, [t, p]) => s + (BOND_METRICS[t]?.yieldToMaturity || 0) * p, 0) / totalBondPct).toFixed(2)}%
               </div>

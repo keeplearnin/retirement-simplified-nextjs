@@ -128,7 +128,7 @@ export default function Onboarding({ onComplete }) {
   const SpouseSectionLabel = ({ children }) => (
     <div style={{
       marginTop: 18, marginBottom: 10, fontSize: 10, color: 'var(--text-dim)',
-      textTransform: 'uppercase', letterSpacing: 2, fontWeight: 700,
+ fontWeight: 700,
       borderTop: '1px solid var(--border)', paddingTop: 14,
     }}>
       {children}
@@ -267,7 +267,7 @@ export default function Onboarding({ onComplete }) {
             <div style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: 24, maxWidth: 360, margin: '0 auto 24px' }}>
               Answer a few quick questions and we'll build a personalized retirement projection for you.
             </div>
-            <div style={{ marginBottom: 8, fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 2, fontWeight: 600 }}>
+            <div style={{ marginBottom: 8, fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 }}>
               Are you planning…
             </div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>

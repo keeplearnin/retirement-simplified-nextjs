@@ -72,7 +72,7 @@ export default function HealthcareBridge() {
   if (!bridge || !bridge.anyBridge) {
     return (
       <div className="fade-up">
-        <InfoBox title="No bridge years to cover" color="var(--accent)" bgColor="var(--accent-dim, rgba(16,185,129,0.08))">
+        <InfoBox title="No bridge years to cover" color="var(--accent)" bgColor="var(--accent-dim, var(--accent-dim))">
           {plan.retireAge >= 65
             ? 'You retire at 65 or later, so Medicare picks up right where employer coverage ends — no marketplace bridge needed. If you move retirement earlier, this tab prices the gap years.'
             : 'No pre-65 coverage years found in the current projection.'}
@@ -259,7 +259,7 @@ export default function HealthcareBridge() {
             <thead>
               <tr>
                 {['Age', 'MAGI', '% of FPL', 'Benchmark', 'Credit', 'You pay'].map((h, i) => (
-                  <th key={h} style={{ textAlign: i === 0 ? 'left' : 'right', padding: i === 0 ? '8px 12px 8px 0' : '8px 0 8px 12px', fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>{h}</th>
+                  <th key={h} style={{ textAlign: i === 0 ? 'left' : 'right', padding: i === 0 ? '8px 12px 8px 0' : '8px 0 8px 12px', fontSize: 11, color: 'var(--text-dim)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
