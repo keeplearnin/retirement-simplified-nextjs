@@ -104,7 +104,7 @@ export default function HealthcareBreakdown({ plan }) {
           background: 'var(--warn-dim)', border: '1px solid var(--warn)',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-            <div style={{ fontSize: 12, color: 'var(--warn)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700 }}>
+            <div style={{ fontSize: 12, color: 'var(--warn)', fontWeight: 700 }}>
               Pre-Medicare bridge: ages {bridgeStartAge}–64
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
@@ -160,7 +160,7 @@ export default function HealthcareBreakdown({ plan }) {
           background: 'var(--blue-dim)', border: '1px solid var(--blue)',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-            <div style={{ fontSize: 12, color: 'var(--blue)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700 }}>
+            <div style={{ fontSize: 12, color: 'var(--blue)', fontWeight: 700 }}>
               Medicare era: ages 65–{plan.longevityAge || 95}
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
@@ -186,7 +186,7 @@ export default function HealthcareBreakdown({ plan }) {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
           <div>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 }}>
               Lifetime total {householdSize === 2 ? '(household)' : ''}
             </div>
             <div style={{ fontSize: 24, fontWeight: 700, color: lifetimeColor, fontFamily: 'var(--serif)' }}>
@@ -194,7 +194,7 @@ export default function HealthcareBreakdown({ plan }) {
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 }}>
               Fidelity benchmark
             </div>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-muted)' }}>

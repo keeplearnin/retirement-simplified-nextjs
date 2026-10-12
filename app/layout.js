@@ -1,22 +1,10 @@
-import { Inter, Fraunces } from 'next/font/google';
+// Public Sans — the US Web Design System typeface. Plain, civic, built for
+// forms and figures: the right voice for a tool whose numbers come from the
+// IRS, SSA and CMS. Self-hosted via Fontsource so builds don't depend on a
+// network fetch to Google Fonts. One family carries both UI and display;
+// hierarchy comes from weight and size, not a second face.
+import '@fontsource-variable/public-sans/wght.css';
 import './globals.css';
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-});
-
-// Display face — carries the product's personality. Fraunces is an
-// editorial serif with optical sizing: warm and characterful at hero-number
-// sizes, quiet at heading sizes. Deliberately NOT the geometric-sans that
-// every generated dashboard ships with. Inter stays for UI text.
-const fraunces = Fraunces({
-  subsets: ['latin'],
-  variable: '--font-fraunces',
-  axes: ['opsz'],
-  display: 'swap',
-});
 
 export const metadata = {
   title: 'Retirement.Simplified — From First Paycheck to Last Withdrawal',
@@ -27,9 +15,17 @@ export const metadata = {
   },
 };
 
+// Apply the saved theme before first paint on every route (home, verdict,
+// calculators, methodology) so there's no light/dark flash and the choice
+// carries across pages. Light is the default.
+const themeScript = `try{var t=localStorage.getItem('theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t)}catch(e){}`;
+
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${inter.variable} ${fraunces.variable}`}>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body>{children}</body>
     </html>
   );

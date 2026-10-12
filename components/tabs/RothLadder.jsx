@@ -137,7 +137,7 @@ export default function RothLadder() {
 
       <Card style={{ marginTop: 16 }}>
         <SectionLabel>Strategy</SectionLabel>
-        <div style={{ marginBottom: 14, fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>
+        <div style={{ marginBottom: 14, fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 }}>
           Target bracket to fill
         </div>
         <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
@@ -296,8 +296,8 @@ export default function RothLadder() {
 
 function ScenarioCard({ title, accent, lifetimeTax, finalBalance, rmdAt73, highlight }) {
   return (
-    <Card style={{ borderLeft: `3px solid ${accent}`, background: highlight ? 'rgba(52,211,153,0.04)' : undefined }}>
-      <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700, marginBottom: 10 }}>
+    <Card style={{ borderLeft: `3px solid ${accent}`, background: highlight ? 'var(--accent-dim)' : undefined }}>
+      <div style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 700, marginBottom: 10 }}>
         {title}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>

@@ -118,7 +118,7 @@ export default function Scenarios() {
 
   return (
     <div className="fade-up">
-      <InfoBox title="Scenario Comparison" color="var(--blue)" bgColor="rgba(96,165,250,0.08)">
+      <InfoBox title="Scenario Comparison" color="var(--blue)" bgColor="var(--blue-dim)">
         Snapshot your plan, change anything (retire earlier, sell the rental, move states), snapshot again,
         and compare futures side-by-side. Every column runs your full tax-aware projection — not a simplified curve.
       </InfoBox>
@@ -167,7 +167,7 @@ export default function Scenarios() {
                 <div key={s.id} style={{
                   display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
                   borderRadius: 8, border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
-                  background: isSelected ? 'var(--accent-dim, rgba(16,185,129,0.06))' : 'var(--bg2)',
+                  background: isSelected ? 'var(--accent-dim, var(--accent-dim))' : 'var(--bg2)',
                 }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, cursor: atCapacity ? 'not-allowed' : 'pointer', opacity: atCapacity ? 0.5 : 1 }}>
                     <input type="checkbox" checked={isSelected} disabled={atCapacity} onChange={() => toggleSelect(s.id)} />
@@ -197,7 +197,7 @@ export default function Scenarios() {
               <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 480, fontFamily: 'var(--sans)' }}>
                 <thead>
                   <tr>
-                    <th style={{ textAlign: 'left', padding: '8px 12px 8px 0', fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>Metric</th>
+                    <th style={{ textAlign: 'left', padding: '8px 12px 8px 0', fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 }}>Metric</th>
                     {compared.map((c) => (
                       <th key={c.id} style={{ textAlign: 'right', padding: '8px 12px', fontSize: 13, fontWeight: 700, color: c.color }}>
                         {c.name}

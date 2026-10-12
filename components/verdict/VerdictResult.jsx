@@ -103,7 +103,7 @@ export default function VerdictResult({ output, input, onRestart }) {
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px' }}>
       {/* Hero verdict */}
       <div style={{ textAlign: 'center', marginBottom: 24 }}>
-        <div style={{ fontSize: 11, color, textTransform: 'uppercase', letterSpacing: 2, fontWeight: 700, marginBottom: 8 }}>
+        <div style={{ fontSize: 11, color, fontWeight: 700, marginBottom: 8 }}>
           {label}
         </div>
         <h1 style={{ fontSize: 28, fontWeight: 700, fontFamily: 'var(--serif)', color: 'var(--text)', lineHeight: 1.3, margin: '0 auto', maxWidth: 560 }}>
@@ -115,7 +115,7 @@ export default function VerdictResult({ output, input, onRestart }) {
       <Card style={{ marginBottom: 16 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, textAlign: 'center' }}>
           <div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>
               Where you are
             </div>
             <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>
@@ -123,7 +123,7 @@ export default function VerdictResult({ output, input, onRestart }) {
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>
               {isAhead ? 'Ahead by' : 'Behind by'}
             </div>
             <div style={{ fontSize: 22, fontWeight: 700, color }}>
@@ -131,7 +131,7 @@ export default function VerdictResult({ output, input, onRestart }) {
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>
               Benchmark for your age
             </div>
             <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-muted)' }}>
@@ -148,7 +148,7 @@ export default function VerdictResult({ output, input, onRestart }) {
       <Card style={{ marginBottom: 16 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>
               Projected at retirement
             </div>
             <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>
@@ -159,7 +159,7 @@ export default function VerdictResult({ output, input, onRestart }) {
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>
               Estimated need (4% rule)
             </div>
             <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>
@@ -179,7 +179,7 @@ export default function VerdictResult({ output, input, onRestart }) {
         <Card style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14 }}>
             <div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>
                 Healthcare bridge: retirement → 65
               </div>
               <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
@@ -191,7 +191,7 @@ export default function VerdictResult({ output, input, onRestart }) {
               </div>
             </div>
             <div style={{ flexShrink: 0, textAlign: 'right' }}>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
                 Lifetime
               </div>
               <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--warn)' }}>
@@ -206,7 +206,7 @@ export default function VerdictResult({ output, input, onRestart }) {
       )}
       {healthcare && healthcare.preMedicareYears === 0 && (
         <Card style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>
             Lifetime healthcare in retirement
           </div>
           <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
@@ -220,7 +220,7 @@ export default function VerdictResult({ output, input, onRestart }) {
 
       {/* Top 3 actions */}
       <div style={{ marginTop: 24 }}>
-        <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 2, fontWeight: 700, marginBottom: 12 }}>
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 700, marginBottom: 12 }}>
           Your top 3 moves
         </div>
         {output.topActions.map((action, i) => (
@@ -243,7 +243,7 @@ export default function VerdictResult({ output, input, onRestart }) {
                 </div>
               </div>
               <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
                   Impact
                 </div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)' }}>

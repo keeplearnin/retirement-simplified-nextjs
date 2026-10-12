@@ -182,7 +182,7 @@ export default function PortfolioBuilder() {
   return (
     <div className="fade-up">
       {/* Hero */}
-      <Card style={{ marginBottom: 20, background: 'linear-gradient(135deg, var(--card) 0%, rgba(52,211,153,0.06) 100%)' }}>
+      <Card style={{ marginBottom: 20, background: 'linear-gradient(135deg, var(--card) 0%, var(--accent-dim) 100%)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 32, flexWrap: 'wrap' }}>
           <Donut segs={donutSegs} label={`${totalStock}% Stocks`} size={150} strokeWidth={24} radius={58} />
           <div>
@@ -353,7 +353,7 @@ export default function PortfolioBuilder() {
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border)' }}>
                 {['ETF', 'Category', 'Alloc', 'Amount', 'Fee', '10yr', '20yr', 'Max Draw'].map(h => (
-                  <th key={h} style={{ padding: '8px 10px', textAlign: h === 'ETF' || h === 'Category' ? 'left' : 'right', color: 'var(--text-dim)', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '.06em' }}>{h}</th>
+                  <th key={h} style={{ padding: '8px 10px', textAlign: h === 'ETF' || h === 'Category' ? 'left' : 'right', color: 'var(--text-dim)', fontWeight: 600, fontSize: 10 }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -393,7 +393,7 @@ export default function PortfolioBuilder() {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }} className="grid-2">
           {/* Taxable column */}
-          <div style={{ background: 'rgba(52,211,153,0.04)', border: '1px solid rgba(52,211,153,0.15)', borderRadius: 8, padding: 14 }}>
+          <div style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-glow)', borderRadius: 8, padding: 14 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 }}>Taxable Brokerage</div>
             {taxable.length > 0 ? taxable.map(f => (
               <div key={f.ticker} style={{ marginBottom: 8, padding: '8px 10px', background: 'var(--card)', borderRadius: 6, border: '1px solid var(--border)' }}>
@@ -421,7 +421,7 @@ export default function PortfolioBuilder() {
           </div>
 
           {/* Either column */}
-          <div style={{ background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.15)', borderRadius: 8, padding: 14 }}>
+          <div style={{ background: 'var(--blue-dim)', border: '1px solid var(--blue-dim)', borderRadius: 8, padding: 14 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue)', marginBottom: 8 }}>↔Either / Roth IRA</div>
             {either.length > 0 ? either.map(f => (
               <div key={f.ticker} style={{ marginBottom: 8, padding: '8px 10px', background: 'var(--card)', borderRadius: 6, border: '1px solid var(--border)' }}>
@@ -467,7 +467,7 @@ export default function PortfolioBuilder() {
         onClick={() => setShowAnalytics(!showAnalytics)}
         style={{
           width: '100%', marginTop: 20, padding: '16px 24px', borderRadius: 10,
-          background: showAnalytics ? 'rgba(99,102,241,0.12)' : 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(52,211,153,0.06) 100%)',
+          background: showAnalytics ? 'rgba(99,102,241,0.12)' : 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, var(--accent-dim) 100%)',
           border: showAnalytics ? '1.5px solid rgba(99,102,241,0.4)' : '1.5px solid var(--border)',
           cursor: 'pointer', transition: 'all .25s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
         }}

@@ -96,7 +96,7 @@ export default function BridgeOptionsCard({
               <div style={{ fontSize: 13, fontWeight: 700, color: usingRE ? 'var(--accent)' : 'var(--text)' }}>
                 Sell or downsize real estate
               </div>
-              {usingRE && <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>active</span>}
+              {usingRE && <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700 }}>active</span>}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 8 }}>
               Your real estate is projected at <strong>{fmt(realEstateBalance)}</strong> at age {longevityAge}. Selling or downsizing covers roughly <strong>{reYearsCovered} year{reYearsCovered === 1 ? '' : 's'}</strong> of your retirement spending ({fmt(retireSpending)}/yr in today's dollars).

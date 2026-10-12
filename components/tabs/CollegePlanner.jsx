@@ -200,7 +200,7 @@ export default function CollegePlanner() {
 
   return (
     <div>
-      <InfoBox title="Fund every kid's college without derailing your own retirement" color="var(--blue)" bgColor="rgba(96,165,250,0.08)">
+      <InfoBox title="Fund every kid's college without derailing your own retirement" color="var(--blue)" bgColor="var(--blue-dim)">
         College costs inflate at <strong>~5%</strong> — nearly double general inflation — and multiple kids create a <strong>double-tuition crunch</strong> when their college years overlap. This projects each child's 529 year by year, tells you the <strong>monthly contribution to fully fund</strong> the share you'll cover, flags the <strong>peak overlap year</strong>, and values your <strong>state 529 tax deduction</strong>.
       </InfoBox>
 

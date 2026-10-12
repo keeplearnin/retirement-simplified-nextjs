@@ -29,7 +29,7 @@ function ActionCard({ action, rank, onApply, applied }) {
         <div style={{ flex: 1, minWidth: 260 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', fontFamily: 'var(--sans)' }}>#{rank}</span>
-            <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, color, fontFamily: 'var(--sans)' }}>
+            <span style={{ fontSize: 10, fontWeight: 600, color, fontFamily: 'var(--sans)' }}>
               {action.category}
             </span>
           </div>
@@ -44,7 +44,7 @@ function ActionCard({ action, rank, onApply, applied }) {
           <div style={{ fontSize: 24, fontWeight: 700, fontFamily: 'var(--serif)', color }}>
             {action.dollarValue >= 0 ? '+' : ''}{fmt(action.dollarValue)}
           </div>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
             lifetime impact
           </div>
           {action.yearsGain > 0 && (
@@ -164,7 +164,7 @@ export default function Optimize() {
 
   return (
     <div className="fade-up">
-      <InfoBox title="Decision Engine" color="var(--accent)" bgColor="var(--accent-dim, rgba(16,185,129,0.08))">
+      <InfoBox title="Decision Engine" color="var(--accent)" bgColor="var(--accent-dim, var(--accent-dim))">
         Every recommendation below re-runs your full plan — taxes, Social Security taxability, RMDs, IRMAA,
         and the withdrawal waterfall — not a rule of thumb. Expand &ldquo;Show the math&rdquo; on any card to audit it.
         {' '}<a href="/report" style={{ color: 'var(--accent)', fontWeight: 600 }}>Print / save the full plan as PDF →</a>

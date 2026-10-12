@@ -33,7 +33,7 @@ export default function IrmaaChecker() {
               style={{
                 flex: 1, padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
                 border: filingStatus === val ? '1.5px solid var(--accent)' : '1px solid var(--border)',
-                background: filingStatus === val ? 'var(--accent-dim, rgba(16,185,129,0.08))' : 'transparent',
+                background: filingStatus === val ? 'var(--accent-dim, var(--accent-dim))' : 'transparent',
                 color: filingStatus === val ? 'var(--accent)' : 'var(--text-muted)',
                 fontSize: 13, fontWeight: 600, fontFamily: 'var(--sans)',
               }}
@@ -75,16 +75,16 @@ export default function IrmaaChecker() {
           <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 420, fontFamily: 'var(--sans)', fontSize: 13 }}>
             <thead>
               <tr>
-                <th style={{ textAlign: 'left', padding: '8px 12px 8px 0', fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>MAGI up to</th>
-                <th style={{ textAlign: 'right', padding: '8px 12px', fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>Monthly surcharge</th>
-                <th style={{ textAlign: 'right', padding: '8px 0 8px 12px', fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1 }}>Annual cost{perPerson === 2 ? ' (couple)' : ''}</th>
+                <th style={{ textAlign: 'left', padding: '8px 12px 8px 0', fontSize: 11, color: 'var(--text-dim)' }}>MAGI up to</th>
+                <th style={{ textAlign: 'right', padding: '8px 12px', fontSize: 11, color: 'var(--text-dim)' }}>Monthly surcharge</th>
+                <th style={{ textAlign: 'right', padding: '8px 0 8px 12px', fontSize: 11, color: 'var(--text-dim)' }}>Annual cost{perPerson === 2 ? ' (couple)' : ''}</th>
               </tr>
             </thead>
             <tbody>
               {table.map((tier, i) => {
                 const isCurrent = i === cliff.currentTier;
                 return (
-                  <tr key={i} style={{ borderTop: '1px solid var(--border)', background: isCurrent ? 'var(--accent-dim, rgba(16,185,129,0.07))' : 'transparent' }}>
+                  <tr key={i} style={{ borderTop: '1px solid var(--border)', background: isCurrent ? 'var(--accent-dim, var(--accent-dim))' : 'transparent' }}>
                     <td style={{ padding: '9px 12px 9px 0', color: 'var(--text)', fontWeight: isCurrent ? 700 : 400 }}>
                       {isFinite(tier.magiThreshold) ? fmt(tier.magiThreshold) : 'Above all thresholds'}
                       {isCurrent && <span style={{ color: 'var(--accent)', fontSize: 11, marginLeft: 8 }}>← you</span>}

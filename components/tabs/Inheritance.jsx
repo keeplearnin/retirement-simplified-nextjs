@@ -121,7 +121,7 @@ export default function Inheritance() {
       {/* SECTION 1: Today snapshot */}
       <Card style={{ marginBottom: 16 }}>
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: 1, color: 'var(--text-muted)', fontWeight: 'var(--fw-bold)' }}>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 'var(--fw-bold)' }}>
             If you died today
           </div>
           <div style={{ marginTop: 6, fontSize: 'var(--text-md)', color: 'var(--text-muted)' }}>
@@ -144,7 +144,7 @@ export default function Inheritance() {
           flexWrap: 'wrap',
         }}>
           <div>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--accent)', fontWeight: 'var(--fw-bold)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--accent)', fontWeight: 'var(--fw-bold)', marginBottom: 4 }}>
               Net to heirs
             </div>
             <div style={{
@@ -189,7 +189,7 @@ export default function Inheritance() {
 
         {/* Per-account breakdown */}
         <div>
-          <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: 1, color: 'var(--text-muted)', fontWeight: 'var(--fw-bold)', marginBottom: 12 }}>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 'var(--fw-bold)', marginBottom: 12 }}>
             By account type
           </div>
           {orderedAccounts.map((key) => {
@@ -243,7 +243,7 @@ export default function Inheritance() {
 
         {/* Assumption sliders */}
         <div style={{ marginTop: 20, padding: '14px 16px', background: 'var(--bg2)', borderRadius: 'var(--radius-sm)' }}>
-          <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: 1, color: 'var(--text-muted)', fontWeight: 'var(--fw-bold)', marginBottom: 10 }}>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 'var(--fw-bold)', marginBottom: 10 }}>
             Assumptions
           </div>
           <SliderRow
@@ -266,7 +266,7 @@ export default function Inheritance() {
       {/* SECTION 2: Step-up lever */}
       <Card>
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: 1, color: 'var(--text-muted)', fontWeight: 'var(--fw-bold)' }}>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 'var(--fw-bold)' }}>
             Spend-order matters
           </div>
           <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 'var(--fw-bold)', margin: '6px 0 0', color: 'var(--text)', fontFamily: 'var(--serif)' }}>
@@ -357,7 +357,7 @@ function SpendStrategyCard({ data, highlight }) {
       <div style={{
         fontSize: 'var(--text-xs)',
         fontWeight: 'var(--fw-bold)',
-        textTransform: 'uppercase',
+
         letterSpacing: 1,
         color: highlight ? 'var(--accent)' : 'var(--text-muted)',
         marginBottom: 8,

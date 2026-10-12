@@ -50,14 +50,14 @@ export default function ClaimingHeatmap({ grid, best }) {
         <div style={{ display: 'flex', alignItems: 'center', marginRight: 4 }}>
           <span style={{
             writingMode: 'vertical-rl', transform: 'rotate(180deg)',
-            fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--text-dim)',
+            fontSize: 10, color: 'var(--text-dim)',
           }}>
             You claim at
           </span>
         </div>
 
         <div style={{ overflowX: 'auto' }}>
-          <div style={{ fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--text-dim)', textAlign: 'center', marginBottom: 6 }}>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', marginBottom: 6 }}>
             Spouse claims at
           </div>
           <table style={{ borderCollapse: 'separate', borderSpacing: 3 }}>

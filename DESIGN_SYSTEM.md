@@ -1,6 +1,17 @@
 # Design System
 
-Retire.Simplified's visual + component vocabulary. Started as an answer to the design-review feedback "the site looks like a basic calculator" — the root cause was inline styles everywhere with no consistent design tokens.
+Retire.Simplified's visual + component vocabulary.
+
+## Direction — "the statement you can trust"
+
+The app's numbers come from the IRS, SSA and CMS, and its audience is everyday savers, not analysts. So the look borrows from the paperwork people already trust with their money — a benefits statement, a bank passbook, a cheque — instead of a fintech dashboard.
+
+- **Paper and ink.** Cool statement paper (`#EEF2F3`), sheets (`#FAFBFB`), navy ink (`#14233D`). Cheque green (`#1A6B4F`) for actions and good news; ledger red (`#B23A2E`) for shortfalls. Light is the default; dark is navy night (`#0F1726`), never near-black.
+- **One typeface.** Public Sans — the US Web Design System face — self-hosted via `@fontsource-variable/public-sans` (no build-time Google Fonts fetch). Hierarchy comes from weight and size. `--serif` is kept as the *display role* name for existing inline styles and resolves to the same family.
+- **Ledger figures.** `tabular-nums` is set on `body`, so amounts line up row to row.
+- **Letterhead, not pills.** Masthead with a `4px double` rule (`--rule`), text tabs underlined in cheque green, section tabs underlined in ink. Corners are small and form-like (4–10px); pills only for true status chips.
+- **The one flourish: `.total`.** The accounting double underline under a bottom-line figure (Left over, Surplus, Shortfall; `<Stat total>`). Use it only on real totals so it keeps its meaning.
+- **No decoration.** No glows, hover lifts, grain textures, gradient washes, or ALL-CAPS tracked labels. Labels are sentence case.
 
 ## Status
 
@@ -28,7 +39,8 @@ All defined in `app/globals.css` under `:root` / `[data-theme="light"]`. Use the
 --blue, --purple                    Decorative
 --heading, --text, --text-muted, --text-dim   Typography
 --border, --border-light            Hairlines
---glass, --glass-border             Frosted overlays
+--glass, --glass-border             Masthead backdrop
+--rule                              Double rules (masthead, footer, totals)
 ```
 
 ### Typography
@@ -46,7 +58,7 @@ Scale: 1.125 ratio (major second), anchored at 13px body.
 ```
 Weights: `--fw-regular` 400 · `--fw-medium` 500 · `--fw-semi` 600 · `--fw-bold` 700 · `--fw-black` 800
 
-Family: `--serif` (DM Sans display) · `--sans` (Inter UI)
+Family: `--sans` (Public Sans, all UI) · `--serif` (display role → same family, heavier weights, tight tracking)
 
 Use **tabular-nums** for any number that will animate or compare — keeps digits from jittering sideways.
 
@@ -67,11 +79,11 @@ Use **tabular-nums** for any number that will animate or compare — keeps digit
 
 ### Radii
 ```
---radius-xs   6px    Small chips, inline elements
---radius-sm   10px   Buttons, drawers
---radius      14px   Cards (default)
---radius-lg   18px   Hero cards
---radius-pill 999px  Pills, status chips
+--radius-xs   4px    Small inline elements
+--radius-sm   6px    Buttons, inputs, drawers
+--radius      8px    Cards (default)
+--radius-lg   10px   Chat bubbles, large sheets
+--radius-pill 999px  Status chips only
 ```
 
 ### Shadows
@@ -79,7 +91,7 @@ Use **tabular-nums** for any number that will animate or compare — keeps digit
 --shadow-sm    Subtle hairline depth
 --shadow-md    Default card / drawer elevation
 --shadow-lg    Modals, dialogs
---shadow-glow  Accent-colored glow on hover for the primary CTA
+--shadow-glow  Retired (resolves to none) — kept so old references don't break
 ```
 
 ### Motion

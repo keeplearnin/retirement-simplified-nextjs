@@ -78,7 +78,7 @@ export default function SavePlanButton({ getCurrentSettings, tabName }) {
         onClick={handleSave}
         disabled={saving}
         style={{
-          background: saved ? 'var(--accent)' : 'linear-gradient(135deg, rgba(52,211,153,0.1) 0%, rgba(96,165,250,0.08) 100%)',
+          background: saved ? 'var(--accent)' : 'linear-gradient(135deg, var(--accent-dim) 0%, var(--blue-dim) 100%)',
           border: saved ? '1.5px solid var(--accent)' : '1.5px solid var(--border)',
           borderRadius: 20, padding: '8px 20px',
           color: saved ? '#fff' : 'var(--text-muted)',
