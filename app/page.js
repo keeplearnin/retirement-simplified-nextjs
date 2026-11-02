@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import AuthProvider, { useAuth } from '@/components/AuthProvider';
 import { PlanProvider } from '@/components/PlanProvider';
 import Onboarding from '@/components/Onboarding';
@@ -41,11 +41,26 @@ import Icon from '@/components/ui/Icon';
 function AppContent() {
   const [tab, setTab] = useState('myplan');
   const [loaded, setLoaded] = useState(false);
-  const [theme, setTheme] = useState('dark');
+  const [theme, setTheme] = useState('light');
   const { user, isConfigured: configured, authLoading, signIn, signOut } = useAuth();
 
   const [onboarded, setOnboarded] = useState(true); // true initially to avoid flash
   const [onboardingSkipped, setOnboardingSkipped] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef(null);
+
+  // Close the "More planners" menu on outside click, Escape, or tab change.
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onClick = (e) => { if (moreRef.current && !moreRef.current.contains(e.target)) setMoreOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setMoreOpen(false); };
+    document.addEventListener('mousedown', onClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [moreOpen]);
 
   useEffect(() => {
     setTimeout(() => setLoaded(true), 100);
@@ -151,107 +166,109 @@ function AppContent() {
           if (!(result && result.skipped === true)) setTab('optimize');
         }} />
       )}
-      {/* Compact header — logo + nav + actions in one row */}
+      {/* Header — logo, three top-level sections (underline tabs), actions.
+          On phones the section tabs move to the bottom bar below. */}
       <header className="app-header">
-        {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flexShrink: 0 }} onClick={() => setTab('myplan')}>
-          <span className="brand-name" style={{ fontWeight: 700, fontFamily: 'var(--sans)', color: 'var(--text)', letterSpacing: '-0.02em' }}>
+        <div className="app-header-inner">
+          <button type="button" className="brand" onClick={() => setTab('myplan')} aria-label="Retire.Simplified — go to My Plan">
             Retire<span style={{ color: 'var(--accent)' }}>.</span>Simplified
-          </span>
-          <span className="brand-free" style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 2, opacity: 0.7 }}>Free</span>
-        </div>
-
-        {/* Nav pills — wrapper provides the fade-gradient scroll affordance on mobile */}
-        <div className="nav-scroll-wrapper">
-          <nav className="nav-scroll" style={{ display: 'flex', gap: 2, background: 'var(--bg2)', borderRadius: 28, padding: 3, minWidth: 0 }}>
-            {categories.map(c => {
-              const isActive = c.id === activeCategory.id;
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => setTab(c.tabs[0].id)}
-                  className="nav-pill"
-                  style={{
-                    padding: '8px 16px', border: 'none', cursor: 'pointer', borderRadius: 24,
-                    background: isActive ? 'var(--accent)' : 'transparent',
-                    color: isActive ? '#fff' : 'var(--text-muted)',
-                    fontWeight: isActive ? 600 : 500, fontSize: 13,
-                    transition: 'all .2s', fontFamily: 'var(--sans)',
-                    whiteSpace: 'nowrap',
-                    display: 'inline-flex', alignItems: 'center', gap: 8,
-                  }}
-                >
-                  <Icon name={c.icon} size={15} />
-                  {c.label}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <a
-            href="/verdict"
-            title="Quick Verdict — see where you stand in 90 seconds"
-            style={{
-              padding: '6px 12px', borderRadius: 16, textDecoration: 'none',
-              border: '1px solid var(--accent)', background: 'var(--accent-dim)',
-              color: 'var(--accent)', fontSize: 11, fontWeight: 600, fontFamily: 'var(--sans)',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <span className="quick-verdict-text" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Icon name="bolt" size={12} />Quick Verdict</span>
-            <span className="quick-verdict-icon-only" aria-label="Quick Verdict"><Icon name="bolt" size={13} /></span>
-          </a>
-          {authLoading ? null : user ? (
-            <>
-              {user.picture && <img src={user.picture} alt="" style={{ width: 28, height: 28, borderRadius: '50%', border: '2px solid var(--accent)' }} referrerPolicy="no-referrer" />}
-              <button onClick={signOut} style={{ padding: '6px 12px', borderRadius: 16, border: '1px solid var(--border)', cursor: 'pointer', background: 'transparent', color: 'var(--text-dim)', fontSize: 11, fontWeight: 500, fontFamily: 'var(--sans)' }}>Sign Out</button>
-            </>
-          ) : configured ? (
-            <button onClick={signIn} style={{ padding: '6px 14px', borderRadius: 16, border: '1px solid var(--accent)', cursor: 'pointer', background: 'var(--accent-dim)', color: 'var(--accent)', fontSize: 11, fontWeight: 600, fontFamily: 'var(--sans)' }}>Sign in</button>
-          ) : null}
-          <button
-            onClick={toggleTheme}
-            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            style={{
-              width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--border)',
-              background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all .25s',
-            }}
-          >
-            <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={15} />
           </button>
+
+          <nav className="top-nav" aria-label="Main">
+            {categories.map(c => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setTab(c.tabs[0].id)}
+                className="top-nav-link"
+                aria-current={c.id === activeCategory.id ? 'page' : undefined}
+              >
+                {c.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="header-actions">
+            <a href="/verdict" className="header-pill" title="Quick Verdict — see where you stand in 90 seconds">
+              <span className="quick-verdict-text">Quick verdict</span>
+              <span className="quick-verdict-icon-only" aria-label="Quick verdict"><Icon name="bolt" size={15} /></span>
+            </a>
+            {authLoading ? null : user ? (
+              <>
+                {user.picture && <img src={user.picture} alt="" style={{ width: 32, height: 32, borderRadius: '50%' }} referrerPolicy="no-referrer" />}
+                <button type="button" onClick={signOut} className="header-pill header-pill-quiet">Sign out</button>
+              </>
+            ) : configured ? (
+              <button type="button" onClick={signIn} className="header-pill">Sign in</button>
+            ) : null}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="header-icon-btn"
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={17} />
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* Sub-tab row (hidden for single-tab categories) */}
-      {subTabs.length > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 4, padding: '12px 16px 8px', borderBottom: '1px solid var(--border)' }}>
-          {subTabs.map(t => {
-            const isActive = tab === t.id;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                style={{
-                  padding: '6px 16px', border: 'none', cursor: 'pointer', borderRadius: 20,
-                  background: isActive ? 'var(--accent-dim)' : 'transparent',
-                  color: isActive ? 'var(--accent)' : 'var(--text-dim)',
-                  fontWeight: isActive ? 600 : 400, fontSize: 12,
-                  transition: 'all .2s', fontFamily: 'var(--sans)',
-                }}
-              >
-                {t.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {/* Section pills — the first few sub-tabs inline, the rest under "More"
+          so a category never shows a wall of seven tabs. */}
+      {subTabs.length > 1 && (() => {
+        const inline = subTabs.length > 5 ? subTabs.slice(0, 4) : subTabs;
+        const overflow = subTabs.length > 5 ? subTabs.slice(4) : [];
+        const activeOverflow = overflow.find(t => t.id === tab);
+        return (
+          <div className="sub-nav-wrap">
+            <nav className="sub-nav" aria-label={`${activeCategory.label} sections`}>
+              {inline.map(t => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setTab(t.id)}
+                  className="sub-nav-pill"
+                  aria-current={tab === t.id ? 'page' : undefined}
+                >
+                  {t.label}
+                </button>
+              ))}
+              {overflow.length > 0 && (
+                <div className="sub-nav-more" ref={moreRef}>
+                  <button
+                    type="button"
+                    className="sub-nav-pill"
+                    aria-current={activeOverflow ? 'page' : undefined}
+                    aria-expanded={moreOpen}
+                    aria-haspopup="true"
+                    onClick={() => setMoreOpen(o => !o)}
+                  >
+                    {activeOverflow ? activeOverflow.label : 'More planners'}
+                    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+                  </button>
+                  {moreOpen && (
+                    <div className="sub-nav-menu">
+                      {overflow.map(t => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          className="sub-nav-menu-item"
+                          aria-current={tab === t.id ? 'page' : undefined}
+                          onClick={() => { setTab(t.id); setMoreOpen(false); }}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </nav>
+          </div>
+        );
+      })()}
 
-      <main className="section-pad" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 40px' }}>
+      <main className="section-pad app-main">
         {/* "Finish setup" banner — shown when the user skipped onboarding
             without entering plan data. Persists across reloads (via the
             'retirement-onboarding-skipped' localStorage flag) until they
@@ -333,6 +350,22 @@ function AppContent() {
         {tab === 'montecarlo' && <MonteCarlo />}
         {tab === 'guide' && <GettingStarted />}
       </main>
+
+      {/* Phone-only bottom tab bar — replaces the header tabs under 720px. */}
+      <nav className="bottom-nav" aria-label="Main">
+        {categories.map(c => (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => setTab(c.tabs[0].id)}
+            className="bottom-nav-link"
+            aria-current={c.id === activeCategory.id ? 'page' : undefined}
+          >
+            <Icon name={c.icon} size={22} />
+            {c.label}
+          </button>
+        ))}
+      </nav>
 
       <footer style={{ maxWidth: 700, margin: '0 auto', textAlign: 'center', padding: '28px 24px 40px', borderTop: '1px solid var(--border)' }}>
         <p style={{ color: 'var(--text-dim)', fontSize: 11, lineHeight: 1.8, maxWidth: 580, margin: '0 auto' }}>

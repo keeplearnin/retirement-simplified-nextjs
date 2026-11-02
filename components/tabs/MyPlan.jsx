@@ -68,9 +68,11 @@ function Collapsible({ title, defaultOpen = true, children, badge, variant }) {
     >
       {/* Title + badge wrap as a flex group so the badge sits below the title
           on narrow screens instead of orphaning to the next line mid-word. */}
-      <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 10, rowGap: 2, textAlign: 'left' }}>
+      {/* minWidth 0 + wrapping badge: a long badge (the Ledger's) used to be
+          nowrap and pushed the whole page wider than a phone screen. */}
+      <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 10, rowGap: 2, textAlign: 'left', minWidth: 0 }}>
         <span style={{ fontFamily: 'var(--serif)', fontSize: isRow ? 16 : 18, fontWeight: 500 }}>{title}</span>
-        {badge && <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--sans)', fontWeight: 500, whiteSpace: 'nowrap' }}>{badge}</span>}
+        {badge && <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--sans)', fontWeight: 500 }}>{badge}</span>}
       </span>
       <span style={{ fontSize: 12, color: 'var(--text-dim)', transition: 'transform .2s', transform: open ? 'rotate(180deg)' : 'rotate(0)', flexShrink: 0 }}>
         &#9660;
@@ -616,44 +618,44 @@ function SuccessScore({ projections }) {
   if (brokeAge === undefined) {
     // Portfolio + income covers everything through longevity
     score = 100;
-    color = '#34d399';
-    label = 'Fully Funded';
+    color = 'var(--accent)';
+    label = 'Fully funded';
   } else if (brokeAge >= lastAge - 5) {
     score = Math.max(70, Math.min(99, Math.round(((brokeAge - retireAge) / (lastAge - retireAge)) * 100)));
-    color = '#f59e0b';
-    label = 'Nearly There';
+    color = 'var(--warn)';
+    label = 'Nearly there';
   } else if (brokeAge >= retireAge + 10) {
     score = Math.max(30, Math.min(69, Math.round(((brokeAge - retireAge) / (lastAge - retireAge)) * 100)));
-    color = '#f59e0b';
-    label = 'Needs Work';
+    color = 'var(--warn)';
+    label = 'Needs work';
   } else {
     score = Math.max(0, Math.min(29, Math.round(((brokeAge - retireAge) / (lastAge - retireAge)) * 100)));
-    color = '#ef4444';
-    label = 'At Risk';
+    color = 'var(--danger)';
+    label = 'At risk';
   }
 
-  const radius = 70;
+  const radius = 46;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
 
+  // Ring + label side by side — the verdict sentence carries the story,
+  // the score is a quiet secondary read.
   return (
-    <div style={{ textAlign: 'center' }}>
-      <svg width={180} height={180} viewBox="0 0 180 180">
-        <circle cx={90} cy={90} r={radius} fill="none" stroke="var(--border)" strokeWidth={10} />
+    <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+      <svg width={112} height={112} viewBox="0 0 112 112" role="img" aria-label={`Plan score ${score} out of 100: ${label}`}>
+        <circle cx={56} cy={56} r={radius} fill="none" stroke="var(--border)" strokeWidth={8} />
         <circle
-          cx={90} cy={90} r={radius} fill="none" stroke={color} strokeWidth={10}
+          cx={56} cy={56} r={radius} fill="none" stroke={color} strokeWidth={8}
           strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset}
-          transform="rotate(-90 90 90)"
+          transform="rotate(-90 56 56)"
           style={{ transition: 'stroke-dashoffset 0.8s ease' }}
         />
-        <text x={90} y={82} textAnchor="middle" fill={color} fontSize={36} fontWeight={700} fontFamily="var(--sans)">{score}%</text>
-        <text x={90} y={106} textAnchor="middle" fill="var(--text-muted)" fontSize={12} fontFamily="var(--sans)">{label}</text>
+        <text x={56} y={65} textAnchor="middle" fill="var(--heading)" fontSize={30} fontFamily="var(--serif)">{score}</text>
       </svg>
-      {brokeAge && (
-        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
-          Savings run out at age {brokeAge}
-        </div>
-      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Plan score</span>
+        <span style={{ fontFamily: 'var(--serif)', fontSize: 22, color: 'var(--heading)' }}>{label}</span>
+      </div>
     </div>
   );
 }
@@ -1093,7 +1095,8 @@ export default function MyPlan() {
       {/* ============ INPUTS SIDEBAR ============ */}
       <div className="myplan-inputs">
         {/* One quiet panel for all inputs — flat rows, not six stacked cards */}
-        <Card style={{ padding: '4px 18px' }}>
+        <Card style={{ padding: '22px 22px 4px', borderRadius: 20 }}>
+        <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 22, color: 'var(--heading)', marginBottom: 6 }}>Your numbers</h2>
         <Collapsible variant="row" title="Personal Info" defaultOpen={false} badge={plan.hasSpouse ? `Couple, ages ${plan.currentAge}/${plan.spouseCurrentAge}` : `Age ${plan.currentAge}, retire ${plan.retireAge}`}>
           {/* Household-type toggle — lets a single user enable couples mode after onboarding */}
           <div style={{ marginBottom: 16 }}>
@@ -1537,14 +1540,24 @@ export default function MyPlan() {
           );
         }
         const covered = results.moneyLastsAge >= plan.longevityAge;
+        const yearsShort = plan.longevityAge - results.moneyLastsAge;
+        const lastRow = combined[combined.length - 1] || {};
+        const leftAtEnd = Math.max(0, lastRow.portfolioEndBalance || 0);
+        const planEnd = plan.hasSpouse && plan.spouseLongevityAge ? `${plan.longevityAge} / ${plan.spouseLongevityAge}` : plan.longevityAge;
+        const goOptimize = () => window.dispatchEvent(new CustomEvent('navigate-tab', { detail: 'optimize' }));
+        const dlRow = { display: 'flex', justifyContent: 'space-between', gap: 12, borderTop: '1px solid var(--border)', paddingTop: 14 };
         return (
-          <Card style={{ marginBottom: 16, padding: '22px 26px 16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: 280 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, letterSpacing: 0.3, marginBottom: 6 }}>
-                  Your plan today
+          <>
+            <div className="verdict-row">
+              {/* The verdict: one plain sentence, one next step. */}
+              <Card style={{ flex: '999 1 400px', minWidth: 0, padding: '36px 40px', display: 'flex', flexDirection: 'column', gap: 18, borderRadius: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Your verdict</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, borderRadius: 999, padding: '3px 12px', color: covered ? 'var(--accent)' : 'var(--warn)', background: covered ? 'var(--accent-dim)' : 'var(--warn-dim)' }}>
+                    {covered ? 'On track' : 'Needs attention'}
+                  </span>
                 </div>
-                <div style={{ fontFamily: 'var(--serif)', fontSize: 26, lineHeight: 1.25, color: covered ? 'var(--heading, var(--text))' : 'var(--text)', fontWeight: 600, textWrap: 'balance', maxWidth: 520 }}>
+                <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(30px, 4vw, 42px)', lineHeight: 1.15, letterSpacing: '-0.015em', color: 'var(--heading)', textWrap: 'balance', maxWidth: 640 }}>
                   {covered
                     // "Funded through the full plan" not "lasts to age N" —
                     // for couples the plan extends past the primary's
@@ -1552,15 +1565,18 @@ export default function MyPlan() {
                     // primary-frame age (audit: "lasts to 92" on a plan
                     // funded through the spouse's 94) undersells and
                     // confuses. The subline carries the exact ages.
-                    ? <>On track — funded through your full plan</>
-                    : <>Money runs out at age <span style={{ color: 'var(--danger)' }}>{results.moneyLastsAge}</span></>}
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
-                  Entering retirement at {plan.retireAge} with {fmt(results.portfolioAtRetire)} · plan runs to {plan.longevityAge}
-                  {plan.hasSpouse && plan.spouseLongevityAge ? ` / ${plan.spouseLongevityAge}` : ''}
-                  {!covered ? ` — ${plan.longevityAge - results.moneyLastsAge} years short` : ''}
+                    ? <>You&apos;re on track. Your money lasts through your whole plan.</>
+                    : <>Your savings run out at {results.moneyLastsAge}, {yearsShort} {yearsShort === 1 ? 'year' : 'years'} before your plan ends.</>}
+                </h1>
+                <p style={{ fontSize: 16, color: 'var(--text-muted)', lineHeight: 1.55, maxWidth: 600 }}>
+                  Retiring at {plan.retireAge} with {fmt(results.portfolioAtRetire)} saved, spending {fmt(plan.annualSpending)} a year, with a plan that runs to {planEnd}.
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px 20px', marginTop: 4 }}>
+                  <button type="button" onClick={goOptimize} className="verdict-cta">
+                    {covered ? 'See ways to keep more' : 'See ways to fix it'}
+                  </button>
                   <Explain
-                    label="How this verdict was computed"
+                    label="How we calculated this"
                     lines={[
                       `Every year from ${plan.currentAge} to the end of the plan: income − taxes − spending; any shortfall is withdrawn from savings (cash → taxable → 401(k) → Roth${plan.useRealEstateInRetirement ? ' → real estate' : ''}).`,
                       covered
@@ -1570,19 +1586,29 @@ export default function MyPlan() {
                     ]}
                   />
                 </div>
-              </div>
-              <div style={{ textAlign: 'center', flexShrink: 0 }}>
+              </Card>
+
+              <Card style={{ flex: '1 1 280px', minWidth: 0, padding: 28, display: 'flex', flexDirection: 'column', gap: 22, borderRadius: 20 }}>
                 <SuccessScore projections={combined} />
-              </div>
+                <dl style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 14 }}>
+                  <div style={dlRow}><dt style={{ color: 'var(--text-muted)' }}>Money lasts to</dt><dd style={{ fontWeight: 600, color: covered ? 'var(--heading)' : 'var(--warn)' }}>{covered ? `Age ${planEnd}+` : `Age ${results.moneyLastsAge}`}</dd></div>
+                  <div style={dlRow}><dt style={{ color: 'var(--text-muted)' }}>At retirement ({plan.retireAge})</dt><dd style={{ fontWeight: 600, color: 'var(--heading)' }}>{fmt(results.portfolioAtRetire)}</dd></div>
+                  <div style={dlRow}><dt style={{ color: 'var(--text-muted)' }}>Left at end of plan</dt><dd style={{ fontWeight: 600, color: 'var(--heading)' }}>{fmt(leftAtEnd)}</dd></div>
+                </dl>
+              </Card>
             </div>
-            {/* The picture IS the hero: scrub any year for its exact dollars. */}
-            <WealthChart
-              rows={combined}
-              retireAge={plan.retireAge}
-              moneyLastsAge={results.moneyLastsAge}
-              covered={covered}
-            />
-          </Card>
+
+            {/* The picture: scrub any year for its exact dollars. */}
+            <Card style={{ marginBottom: 20, padding: '28px 32px 20px', borderRadius: 20 }}>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 22, color: 'var(--heading)', marginBottom: 8 }}>Net worth over time</h2>
+              <WealthChart
+                rows={combined}
+                retireAge={plan.retireAge}
+                moneyLastsAge={results.moneyLastsAge}
+                covered={covered}
+              />
+            </Card>
+          </>
         );
       })()}
       {/* ---- Assumptions strip: the levers that drive the verdict, visible ---- */}
@@ -1602,27 +1628,42 @@ export default function MyPlan() {
         const suggestions = generateSuggestions(plan, results);
         const active = suggestions.filter(s => !dismissedSuggestions.includes(s.id));
         if (active.length === 0) return null;
-        const colors = { danger: 'var(--danger)', warn: 'var(--warn)', info: 'var(--blue)' };
-        // Alarm styling only when something is actually alarming — a benign
-        // tip shouldn't ship with a warning-yellow bar.
-        const hasDanger = active.some(s => s.severity === 'danger');
+        const goOptimize = () => window.dispatchEvent(new CustomEvent('navigate-tab', { detail: 'optimize' }));
+        // Ranked list, most urgent first; severity shows on the number badge.
+        const rank = { danger: 0, warn: 1, info: 2 };
+        const ordered = [...active].sort((x, y) => (rank[x.severity] ?? 2) - (rank[y.severity] ?? 2));
+        const badge = {
+          danger: { color: 'var(--danger)', background: 'var(--danger-dim)' },
+          warn: { color: 'var(--warn)', background: 'var(--warn-dim)' },
+          info: { color: 'var(--accent)', background: 'var(--accent-dim)' },
+        };
         return (
-          <Card style={{ marginBottom: 16, ...(hasDanger ? { borderLeft: '3px solid var(--danger)' } : {}) }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 10, fontFamily: 'var(--serif)' }}>
-              Next steps ({active.length})
+          <Card style={{ marginBottom: 20, padding: '28px 32px 12px', borderRadius: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
+              <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 22, color: 'var(--heading)' }}>Your next best moves</h2>
+              <button type="button" onClick={goOptimize} style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', color: 'var(--accent)', fontSize: 14, fontWeight: 500, fontFamily: 'var(--sans)' }}>
+                See dollar impact in Optimize →
+              </button>
             </div>
-            {active.map(s => (
-              <div key={s.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: colors[s.severity] || 'var(--blue)', marginTop: 5, flexShrink: 0 }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{s.title}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{s.detail}</div>
+            {ordered.map((s, i) => (
+              <div key={s.id} style={{ display: 'flex', gap: 16, alignItems: 'center', padding: '16px 0', borderTop: '1px solid var(--border)' }}>
+                <span style={{ width: 32, height: 32, borderRadius: '50%', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, ...(badge[s.severity] || badge.info) }}>
+                  {i + 1}
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--heading)' }}>{s.title}</div>
+                  <div style={{ fontSize: 14, color: 'var(--text-muted)', marginTop: 2 }}>{s.detail}</div>
                 </div>
-                <button onClick={() => {
-                  const next = [...dismissedSuggestions, s.id];
-                  setDismissedSuggestions(next);
-                  localStorage.setItem('suggestions-dismissed', JSON.stringify(next));
-                }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', fontSize: 16, padding: '0 4px' }} title="Dismiss">&times;</button>
+                <button
+                  type="button"
+                  aria-label={`Dismiss: ${s.title}`}
+                  onClick={() => {
+                    const next = [...dismissedSuggestions, s.id];
+                    setDismissedSuggestions(next);
+                    localStorage.setItem('suggestions-dismissed', JSON.stringify(next));
+                  }}
+                  style={{ width: 44, height: 44, flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', fontSize: 20, borderRadius: '50%' }}
+                >&times;</button>
               </div>
             ))}
           </Card>
