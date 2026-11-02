@@ -48,12 +48,18 @@ function AppContent() {
   const [onboardingSkipped, setOnboardingSkipped] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef(null);
+  const moreBtnRef = useRef(null);
 
-  // Close the "More planners" menu on outside click, Escape, or tab change.
+  // Close the "More planners" list on outside click or Escape (Escape also
+  // returns focus to its button so keyboard users aren't stranded).
   useEffect(() => {
     if (!moreOpen) return;
     const onClick = (e) => { if (moreRef.current && !moreRef.current.contains(e.target)) setMoreOpen(false); };
-    const onKey = (e) => { if (e.key === 'Escape') setMoreOpen(false); };
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      setMoreOpen(false);
+      moreBtnRef.current?.focus();
+    };
     document.addEventListener('mousedown', onClick);
     document.addEventListener('keydown', onKey);
     return () => {
@@ -235,19 +241,23 @@ function AppContent() {
               ))}
               {overflow.length > 0 && (
                 <div className="sub-nav-more" ref={moreRef}>
+                  {/* Disclosure (button + list of buttons), not an ARIA menu:
+                      Tab moves through the items, which is what the markup
+                      supports — aria-haspopup promised arrow-key handling. */}
                   <button
                     type="button"
+                    ref={moreBtnRef}
                     className="sub-nav-pill"
                     aria-current={activeOverflow ? 'page' : undefined}
                     aria-expanded={moreOpen}
-                    aria-haspopup="true"
+                    aria-controls="more-planners-list"
                     onClick={() => setMoreOpen(o => !o)}
                   >
                     {activeOverflow ? activeOverflow.label : 'More planners'}
                     <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
                   </button>
                   {moreOpen && (
-                    <div className="sub-nav-menu">
+                    <div className="sub-nav-menu" id="more-planners-list">
                       {overflow.map(t => (
                         <button
                           key={t.id}
@@ -268,7 +278,7 @@ function AppContent() {
         );
       })()}
 
-      <main className="section-pad app-main">
+      <main className="app-main">
         {/* "Finish setup" banner — shown when the user skipped onboarding
             without entering plan data. Persists across reloads (via the
             'retirement-onboarding-skipped' localStorage flag) until they

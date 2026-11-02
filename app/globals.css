@@ -407,6 +407,13 @@ input[type=range]::-moz-range-thumb {
 
 .bottom-nav { display: none; }
 
+/* Tablet: one shared 20px gutter so header, pills and content line up. */
+@media (max-width: 900px) {
+  .app-header-inner { padding: 0 20px; }
+  .sub-nav-wrap { padding: 20px 20px 0; }
+  .app-main { padding: 20px 20px 40px; }
+}
+
 @media (max-width: 720px) {
   .app-header-inner { padding: 0 16px; min-height: 60px; gap: 12px; }
   .brand { font-size: 19px; }
@@ -765,7 +772,6 @@ input[type=range]::-moz-range-thumb {
   .stats-row{flex-direction:column!important}
   .tab-bar{flex-wrap:wrap!important}
   .hero-title{font-size:32px!important}
-  .section-pad{padding:12px!important}
   .myplan-layout{grid-template-columns:1fr!important}
   .myplan-inputs{position:static;max-height:none;overflow:visible;order:2}
   .myplan-results{order:1}

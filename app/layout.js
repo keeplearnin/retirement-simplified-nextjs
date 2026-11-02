@@ -29,7 +29,19 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${inter.variable} ${fraunces.variable}`}>
+    // suppressHydrationWarning: the inline script below may set data-theme
+    // before React hydrates, so <html> legitimately differs from the server.
+    <html lang="en" className={`${inter.variable} ${fraunces.variable}`} suppressHydrationWarning>
+      <head>
+        {/* Apply a saved dark preference before first paint — doing it in an
+            effect flashed the light default first. Runs on every page, so
+            /verdict, /methodology etc. now honor the choice too. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t)}catch(e){}})()`,
+          }}
+        />
+      </head>
       <body>{children}</body>
     </html>
   );
