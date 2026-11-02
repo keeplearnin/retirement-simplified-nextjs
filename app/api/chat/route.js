@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { AI_AGENT_SYSTEM_PROMPT } from '@/lib/constants';
 import { verifyAuth, checkRateLimit, getClientIp } from '@/lib/apiAuth';
 import { TOOL_DEFINITIONS, executeTool } from '@/lib/agentTools';
+import { CLAUDE_SONNET_BODY, claudeHeaders } from '@/lib/claude';
 
 const MAX_TOOL_ITERATIONS = 5;
 
@@ -51,8 +52,7 @@ export async function POST(request) {
       iterations++;
 
       const body = {
-        model: 'claude-sonnet-5',
-        max_tokens: 2048,
+        ...CLAUDE_SONNET_BODY,
         system: AI_AGENT_SYSTEM_PROMPT,
         tools: plan ? TOOL_DEFINITIONS : [],
         messages: loopMessages,
@@ -60,11 +60,7 @@ export async function POST(request) {
 
       const resp = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-        },
+        headers: claudeHeaders(apiKey),
         body: JSON.stringify(body),
       });
 

@@ -20,6 +20,7 @@ import { getUsersForWeeklyCheck, getUserPlan, getSnapshots, updateLastEmailed } 
 import { sendEmail, buildHealthCheckEmail, isEmailConfigured } from '@/lib/email';
 import { TOOL_DEFINITIONS, executeTool } from '@/lib/agentTools';
 import type { PlanSnapshot } from '@/lib/planHistory';
+import { CLAUDE_FAST_MODEL, CLAUDE_REQUEST_DEFAULTS, claudeHeaders } from '@/lib/claude';
 
 const CRON_SECRET = process.env.CRON_SECRET ?? '';
 const MAX_ITERATIONS = 8;
@@ -76,14 +77,10 @@ async function runHealthCheckForUser(
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
+      headers: claudeHeaders(apiKey, { fallback: false }),
       body: JSON.stringify({
-        model: 'claude-haiku-4-5', // Haiku for cost efficiency in batch
-        max_tokens: 1500,
+        model: CLAUDE_FAST_MODEL,
+        ...CLAUDE_REQUEST_DEFAULTS,
         system: HEALTH_CHECK_PROMPT,
         tools: TOOL_DEFINITIONS,
         messages,

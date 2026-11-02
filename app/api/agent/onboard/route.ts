@@ -19,9 +19,9 @@
 import { NextResponse } from 'next/server';
 import { verifyAuth, checkRateLimit, getClientIp } from '@/lib/apiAuth';
 import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/constants';
+import { CLAUDE_SONNET_BODY, claudeHeaders } from '@/lib/claude';
 
 const MAX_ITERATIONS = 5;
-const MODEL = 'claude-sonnet-4-20250514';
 
 // ---------------------------------------------------------------------------
 // Tools — these don't return data to the LLM; they record proposed writes
@@ -186,14 +186,9 @@ export async function POST(request: Request) {
 
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
+      headers: claudeHeaders(apiKey),
       body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 1024,
+        ...CLAUDE_SONNET_BODY,
         system: ONBOARDING_SYSTEM_PROMPT + `\n\nCurrent plan state (already collected): ${JSON.stringify(plan)}`,
         tools,
         messages: loopMessages,

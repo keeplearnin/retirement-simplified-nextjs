@@ -6,8 +6,10 @@ describe('fmt — non-finite guard (never render $NaN)', () => {
     expect(fmt(NaN)).toBe('$0');
     expect(fmt(Infinity)).toBe('$0');
     expect(fmt(-Infinity)).toBe('$0');
-    // @ts-expect-error — guarding against callers that pass undefined at runtime
-    expect(fmt(undefined)).toBe('$0');
+    // Guarding against callers that pass undefined at runtime. Cast rather
+    // than @ts-expect-error: with "strict": false undefined is already a
+    // valid number, so the directive is unused and fails the build.
+    expect(fmt(undefined as unknown as number)).toBe('$0');
   });
 });
 

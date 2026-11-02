@@ -14,9 +14,9 @@ import { verifyAuth, checkRateLimit, getClientIp } from '@/lib/apiAuth';
 import { TOOL_DEFINITIONS, executeTool } from '@/lib/agentTools';
 import { QUARTERLY_REVIEW_SYSTEM_PROMPT } from '@/lib/constants';
 import type { PlanSnapshot } from '@/lib/planHistory';
+import { CLAUDE_SONNET_BODY, claudeHeaders } from '@/lib/claude';
 
 const MAX_ITERATIONS = 8;
-const MODEL = 'claude-sonnet-4-20250514';
 
 export async function POST(request: Request) {
   const authResult = await verifyAuth(request);
@@ -52,14 +52,9 @@ export async function POST(request: Request) {
 
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
+      headers: claudeHeaders(apiKey),
       body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 1500,
+        ...CLAUDE_SONNET_BODY,
         system: QUARTERLY_REVIEW_SYSTEM_PROMPT,
         tools: TOOL_DEFINITIONS,
         messages,

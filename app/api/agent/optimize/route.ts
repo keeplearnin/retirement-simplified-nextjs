@@ -11,6 +11,7 @@ import { NextResponse } from 'next/server';
 import { verifyAuth, checkRateLimit, getClientIp } from '@/lib/apiAuth';
 import { TOOL_DEFINITIONS, executeTool } from '@/lib/agentTools';
 import type { PlanSnapshot } from '@/lib/planHistory';
+import { CLAUDE_SONNET_BODY, claudeHeaders } from '@/lib/claude';
 
 const MAX_ITERATIONS = 10;
 
@@ -108,14 +109,9 @@ export async function POST(request: Request) {
 
       const resp = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-        },
+        headers: claudeHeaders(apiKey),
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 3000,
+          ...CLAUDE_SONNET_BODY,
           system: OPTIMIZE_PROMPT,
           tools: TOOL_DEFINITIONS,
           messages,
