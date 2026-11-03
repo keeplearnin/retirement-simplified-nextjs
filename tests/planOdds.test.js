@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeProjection } from '@/lib/computeProjection';
-import { runPlanOdds, runPlanHistory, impliedMix, sustainableSpend } from '@/lib/planOdds';
+import { runPlanOdds, runPlanHistory, impliedMix, sustainableSpend, spendingRange } from '@/lib/planOdds';
 import { HISTORICAL_RETURNS } from '@/lib/historicalReturns';
 
 function plan(overrides = {}) {
@@ -108,5 +108,29 @@ describe('sustainableSpend', () => {
 
   it('a plan that fails even at $0 spending returns 0', () => {
     expect(sustainableSpend(plan({ savings401k: 0, savingsRoth: 0, savingsTaxable: 0, savingsCash: 0, monthlyContribution: 0, incomeSources: [], annualSpending: 80_000 }))).toBe(0);
+  });
+});
+
+describe('spendingRange', () => {
+  it('brackets "You can spend": less after a 20% fall, more after a 20% rise', () => {
+    const p = plan();
+    const spend = sustainableSpend(p);
+    const { low, high } = spendingRange(p);
+    expect(low).toBeLessThan(spend);
+    expect(high).toBeGreaterThan(spend);
+  });
+
+  it('is the same as moving the invested balances by hand', () => {
+    const p = plan();
+    const { low } = spendingRange(p);
+    const fallen = { ...p, savings401k: p.savings401k * 0.8, savingsRoth: p.savingsRoth * 0.8, savingsTaxable: p.savingsTaxable * 0.8 };
+    expect(low).toBe(sustainableSpend(fallen));
+  });
+
+  it('leaves cash alone: an all-cash plan has no range', () => {
+    const p = plan({ savings401k: 0, savingsRoth: 0, savingsTaxable: 0, savingsCash: 1_500_000 });
+    const { low, high } = spendingRange(p);
+    expect(low).toBe(sustainableSpend(p));
+    expect(high).toBe(low);
   });
 });

@@ -8,7 +8,7 @@ import InfoBox from '@/components/ui/InfoBox';
 import { fmt, fmtFull } from '@/lib/format';
 import { usePlan, INCOME_TEMPLATES, DEBT_TEMPLATES } from '@/components/PlanProvider';
 import { computeProjection } from '@/lib/computeProjection';
-import { runPlanOdds, oddsLabel, ON_TRACK_ODDS, sustainableSpend } from '@/lib/planOdds';
+import { runPlanOdds, oddsLabel, ON_TRACK_ODDS, sustainableSpend, spendingRange, MARKET_MOVE } from '@/lib/planOdds';
 import { LTC_DEFAULT_MONTHLY, ltcStartAge } from '@/lib/expenseEngine';
 import { detectIrmaaCliff } from '@/lib/taxEngine';
 import { RMD_TABLE, RMD_START_AGE } from '@/lib/constants';
@@ -648,15 +648,22 @@ function usePlanOdds(plan) {
 // "How much can I spend?" — the retirement spending that keeps an 80%
 // chance. A search over many odds runs (~0.3s), so it starts only once the
 // odds have settled (odds change only after the plan stops changing).
+// The good/bad-market range is two more searches, run after the headline
+// figure has painted.
 function useSustainableSpend(plan, odds) {
   const [spend, setSpend] = useState(null);
+  const [range, setRange] = useState(null);
   useEffect(() => {
     if (!odds) return;
-    const t = setTimeout(() => setSpend(sustainableSpend(plan)), 50);
-    return () => clearTimeout(t);
+    let t2;
+    const t = setTimeout(() => {
+      setSpend(sustainableSpend(plan));
+      t2 = setTimeout(() => setRange(spendingRange(plan)), 30);
+    }, 50);
+    return () => { clearTimeout(t); clearTimeout(t2); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on settled odds
   }, [odds]);
-  return spend;
+  return { spend, range };
 }
 
 // ---------------------------------------------------------------------------
@@ -1043,7 +1050,7 @@ export default function MyPlan({ openRange = false }) {
   // fixed) — the two views disagreed. Never duplicate the engine again.
   const results = useMemo(() => computeProjection(plan), [plan]);
   const odds = usePlanOdds(plan);
-  const canSpend = useSustainableSpend(plan, odds);
+  const { spend: canSpend, range: spendRange } = useSustainableSpend(plan, odds);
 
   const { combined, essentialTotal, discretionaryTotal, retireEssentialTotal, retireDiscretionaryTotal } = results;
 
@@ -1629,6 +1636,17 @@ export default function MyPlan({ openRange = false }) {
                   {odds && <div style={dlRow}><dt style={{ color: 'var(--text-muted)' }}>Bad market (1 in 10)</dt><dd style={{ fontWeight: 600, color: badLasts.endsWith('+') ? 'var(--heading)' : 'var(--warn)' }}>{badLasts}</dd></div>}
                   <div style={dlRow}><dt style={{ color: 'var(--text-muted)' }}>At retirement ({plan.retireAge})</dt><dd style={{ fontWeight: 600, color: 'var(--heading)' }}>{fmt(results.portfolioAtRetire)}</dd></div>
                 </dl>
+                {/* Guardrails: what to do after a big market move, so a bad
+                    year has a plan instead of a panic. */}
+                {canSpend > 0 && spendRange && (
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.55, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+                    <div style={{ fontWeight: 600, color: 'var(--heading)', marginBottom: 4 }}>If markets move</div>
+                    If your investments fall {MARKET_MOVE * 100}%, {spendRange.low > 0
+                      ? <>trim to <strong style={{ color: 'var(--heading)' }}>{fmt(Math.round(spendRange.low / 12))}/mo</strong></>
+                      : 'an 80% chance is out of reach without bigger changes'}.
+                    {' '}If they rise {MARKET_MOVE * 100}%, you could spend <strong style={{ color: 'var(--heading)' }}>{fmt(Math.round(spendRange.high / 12))}/mo</strong>.
+                  </div>
+                )}
                 <p style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5, margin: 0 }}>
                   &ldquo;You can spend&rdquo; is the everyday retirement spending that keeps about an 80% chance, in today&apos;s dollars. Healthcare and long-term care come on top.
                 </p>
