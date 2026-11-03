@@ -1999,9 +1999,15 @@ export default function MyPlan({ openRange = false }) {
 
         {/* IRMAA Cliff Detector — flag years within $5K of crossing a threshold */}
         {(() => {
+          // Tiers rise with inflation, so compare in today's dollars (as
+          // the projection does when it charges IRMAA).
+          const inflation = (plan.inflationRate ?? 2.5) / 100;
           const cliffYears = combined
             .filter(r => r.isRetired && r.age >= 63 && r.magi != null)
-            .map(r => ({ age: r.age, magi: r.magi, cliff: detectIrmaaCliff(r.magi, plan.filingStatus === 'mfj' ? 'mfj' : 'single') }))
+            .map(r => {
+              const magi = r.magi / Math.pow(1 + inflation, r.age - plan.currentAge);
+              return { age: r.age, magi, cliff: detectIrmaaCliff(magi, plan.filingStatus === 'mfj' ? 'mfj' : 'single') };
+            })
             .filter(x => x.cliff.atRisk);
           if (cliffYears.length === 0) return null;
           const first = cliffYears[0];
@@ -2015,7 +2021,7 @@ export default function MyPlan({ openRange = false }) {
           })();
           return (
             <InfoBox icon="&#127919;" title="IRMAA cliff ahead" color="var(--warn)" bgColor="rgba(251,191,36,.08)">
-              At age {first.age}, your projected MAGI lands within {fmt(first.cliff.distanceToNextCliff)} of the next IRMAA threshold ({fmt(first.cliff.nextThreshold)}).
+              At age {first.age}, your projected MAGI lands within {fmt(first.cliff.distanceToNextCliff)} of the next IRMAA threshold ({fmt(first.cliff.nextThreshold)}, in today&apos;s dollars).
               A small Roth conversion, RMD increase, or capital gain could push you over — costing roughly {fmt(nextSurchargePerBeneficiary)}/yr per Medicare beneficiary in extra Part B premiums.
               {plan.filingStatus === 'mfj' ? ' Married couples on Medicare pay the surcharge twice.' : ''}
             </InfoBox>
