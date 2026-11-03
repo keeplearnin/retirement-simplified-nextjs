@@ -8,6 +8,7 @@ import InfoBox from '@/components/ui/InfoBox';
 import { fmt, fmtFull } from '@/lib/format';
 import { usePlan, INCOME_TEMPLATES, DEBT_TEMPLATES } from '@/components/PlanProvider';
 import { computeProjection } from '@/lib/computeProjection';
+import { runPlanOdds, oddsLabel, ON_TRACK_ODDS } from '@/lib/planOdds';
 import { detectIrmaaCliff } from '@/lib/taxEngine';
 import { RMD_TABLE, RMD_START_AGE } from '@/lib/constants';
 import HealthcareBreakdown from '@/components/HealthcareBreakdown';
@@ -376,7 +377,7 @@ function IncomeExpenseChart({ projections, retireAge, plan }) {
   const liquidLegacy = lastRow?.liquidBalance ?? 0;
   const illiquidLegacy = Math.max(0, totalLegacy - liquidLegacy);
   // Did the plan run liquid dry at any retired year? (Same condition as
-  // SuccessScore's brokeAge — keeps the two displays consistent.)
+  // the verdict's "money lasts to" — keeps the two displays consistent.)
   const liquidExhaustedAtAge = projections.find(p => p.isRetired && p.availableBalance <= 0 && p.gap < 0)?.age;
   const legacy = totalLegacy;
 
@@ -540,7 +541,7 @@ function IncomeExpenseChart({ projections, retireAge, plan }) {
           1. Liquid lasts through longevity: green, total + breakdown
           2. Liquid exhausted but illiquid (RE/529) remains: amber warning,
              "legacy is illiquid — would need to be sold to cover late-life
-             expenses" (matches SuccessScore's "Needs Work" / "At Risk")
+             expenses"
           3. Total = 0: red "savings depleted" */}
       {legacy > 0 && !liquidExhaustedAtAge && (
         <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: 'var(--accent-dim)', border: '1px solid rgba(52,211,153,0.2)' }}>
@@ -598,51 +599,21 @@ function IncomeExpenseChart({ projections, retireAge, plan }) {
 // Success Score
 // ---------------------------------------------------------------------------
 
-function SuccessScore({ projections }) {
-  if (!projections || projections.length < 2) return null;
-
-  const firstAge = projections[0].age;
-  const lastAge = projections[projections.length - 1].age;
-  const retireAge = projections.find(p => p.isRetired)?.age || lastAge;
-  const ageRange = lastAge - firstAge;
-  if (ageRange <= 0) return null;
-
-  // Find when liquid savings run out AND there's a gap (income < expenses).
-  // Uses liquidBalance (excludes illiquid RE + 529) to match moneyLastsAge.
-  // Bug history: previously used portfolioBalance, which kept growing forever
-  // for users with real estate even after liquid hit zero — producing a 100%
-  // "Fully Funded" score that contradicted the year-by-year Status column.
-  const brokeAge = projections.find(p => p.isRetired && p.availableBalance <= 0 && p.gap < 0)?.age;
-  let score, color, label;
-
-  if (brokeAge === undefined) {
-    // Portfolio + income covers everything through longevity
-    score = 100;
-    color = 'var(--accent)';
-    label = 'Fully funded';
-  } else if (brokeAge >= lastAge - 5) {
-    score = Math.max(70, Math.min(99, Math.round(((brokeAge - retireAge) / (lastAge - retireAge)) * 100)));
-    color = 'var(--warn)';
-    label = 'Nearly there';
-  } else if (brokeAge >= retireAge + 10) {
-    score = Math.max(30, Math.min(69, Math.round(((brokeAge - retireAge) / (lastAge - retireAge)) * 100)));
-    color = 'var(--warn)';
-    label = 'Needs work';
-  } else {
-    score = Math.max(0, Math.min(29, Math.round(((brokeAge - retireAge) / (lastAge - retireAge)) * 100)));
-    color = 'var(--danger)';
-    label = 'At risk';
-  }
-
+// The headline number: the chance the plan lasts, from runPlanOdds — the
+// same plan run through 500 market sequences instead of one steady return.
+function OddsScore({ odds }) {
+  if (!odds) return null;
+  const pct = Math.round(odds.successRate * 100);
+  const { label, color } = oddsLabel(odds.successRate);
   const radius = 46;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (score / 100) * circumference;
+  const offset = circumference - (pct / 100) * circumference;
 
   // Ring + label side by side — the verdict sentence carries the story,
-  // the score is a quiet secondary read.
+  // the odds are a quiet secondary read.
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-      <svg width={112} height={112} viewBox="0 0 112 112" role="img" aria-label={`Plan score ${score} out of 100: ${label}`}>
+      <svg width={112} height={112} viewBox="0 0 112 112" role="img" aria-label={`${pct}% chance your money lasts: ${label}`}>
         <circle cx={56} cy={56} r={radius} fill="none" stroke="var(--border)" strokeWidth={8} />
         <circle
           cx={56} cy={56} r={radius} fill="none" stroke={color} strokeWidth={8}
@@ -650,14 +621,26 @@ function SuccessScore({ projections }) {
           transform="rotate(-90 56 56)"
           style={{ transition: 'stroke-dashoffset 0.8s ease' }}
         />
-        <text x={56} y={65} textAnchor="middle" fill="var(--heading)" fontSize={30} fontFamily="var(--serif)">{score}</text>
+        <text x={56} y={65} textAnchor="middle" fill="var(--heading)" fontSize={30} fontFamily="var(--serif)">{pct}%</text>
       </svg>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Plan score</span>
+        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Chance it lasts</span>
         <span style={{ fontFamily: 'var(--serif)', fontSize: 22, color: 'var(--heading)' }}>{label}</span>
       </div>
     </div>
   );
+}
+
+// Odds take ~150ms (500 full projections), so recompute only once the plan
+// stops changing — dragging a slider stays smooth and the ring catches up.
+function usePlanOdds(plan) {
+  const [odds, setOdds] = useState(null);
+  useEffect(() => {
+    const t = setTimeout(() => setOdds(runPlanOdds(plan)), odds ? 250 : 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `odds` only picks the delay
+  }, [plan]);
+  return odds;
 }
 
 // ---------------------------------------------------------------------------
@@ -1056,6 +1039,7 @@ export default function MyPlan() {
   // from the lib (it still taxed cash withdrawals after the lib was
   // fixed) — the two views disagreed. Never duplicate the engine again.
   const results = useMemo(() => computeProjection(plan), [plan]);
+  const odds = usePlanOdds(plan);
 
   const { combined, essentialTotal, discretionaryTotal, retireEssentialTotal, retireDiscretionaryTotal } = results;
 
@@ -1539,11 +1523,16 @@ export default function MyPlan() {
             </Card>
           );
         }
+        // `covered` = the steady-return path (chart, ledger). The verdict
+        // itself is the odds across many markets once they're computed.
         const covered = results.moneyLastsAge >= plan.longevityAge;
         const yearsShort = plan.longevityAge - results.moneyLastsAge;
+        const pct = odds ? Math.round(odds.successRate * 100) : null;
+        const onTrack = odds ? odds.successRate >= ON_TRACK_ODDS : covered;
         const lastRow = combined[combined.length - 1] || {};
         const leftAtEnd = Math.max(0, lastRow.portfolioEndBalance || 0);
         const planEnd = plan.hasSpouse && plan.spouseLongevityAge ? `${plan.longevityAge} / ${plan.spouseLongevityAge}` : plan.longevityAge;
+        const badLasts = odds?.p10LastsAge != null ? `Age ${odds.p10LastsAge}` : `Age ${planEnd}+`;
         const goOptimize = () => window.dispatchEvent(new CustomEvent('navigate-tab', { detail: 'optimize' }));
         const dlRow = { display: 'flex', justifyContent: 'space-between', gap: 12, borderTop: '1px solid var(--border)', paddingTop: 14 };
         return (
@@ -1553,12 +1542,16 @@ export default function MyPlan() {
               <Card style={{ flex: '999 1 400px', minWidth: 0, padding: '36px 40px', display: 'flex', flexDirection: 'column', gap: 18, borderRadius: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Your verdict</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, borderRadius: 999, padding: '3px 12px', color: covered ? 'var(--accent)' : 'var(--warn)', background: covered ? 'var(--accent-dim)' : 'var(--warn-dim)' }}>
-                    {covered ? 'On track' : 'Needs attention'}
+                  <span style={{ fontSize: 13, fontWeight: 600, borderRadius: 999, padding: '3px 12px', color: onTrack ? 'var(--accent)' : 'var(--warn)', background: onTrack ? 'var(--accent-dim)' : 'var(--warn-dim)' }}>
+                    {onTrack ? 'On track' : 'Needs attention'}
                   </span>
                 </div>
                 <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(30px, 4vw, 42px)', lineHeight: 1.15, letterSpacing: '-0.015em', color: 'var(--heading)', textWrap: 'balance', maxWidth: 640 }}>
-                  {covered
+                  {pct !== null
+                    ? (onTrack
+                      ? <>You&apos;re on track. Your money lasts your whole plan in {pct}% of markets.</>
+                      : <>Your money lasts your whole plan in only {pct}% of markets.</>)
+                    : covered
                     // "Funded through the full plan" not "lasts to age N" —
                     // for couples the plan extends past the primary's
                     // longevity into the survivor's years, and quoting the
@@ -1570,18 +1563,20 @@ export default function MyPlan() {
                 </h1>
                 <p style={{ fontSize: 16, color: 'var(--text-muted)', lineHeight: 1.55, maxWidth: 600 }}>
                   Retiring at {plan.retireAge} with {fmt(results.portfolioAtRetire)} saved, spending {fmt(plan.annualSpending)} a year, with a plan that runs to {planEnd}.
+                  {odds && <> In a steady market your money {covered ? 'lasts the whole way' : `runs out at ${results.moneyLastsAge}`}; in a bad one (1 in 10), {badLasts.endsWith('+') ? 'it still lasts' : `it runs out at ${odds.p10LastsAge}`}.</>}
                 </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px 20px', marginTop: 4 }}>
                   <button type="button" onClick={goOptimize} className="verdict-cta">
-                    {covered ? 'See ways to keep more' : 'See ways to fix it'}
+                    {onTrack ? 'See ways to keep more' : 'See ways to fix it'}
                   </button>
                   <Explain
                     label="How we calculated this"
                     lines={[
                       `Every year from ${plan.currentAge} to the end of the plan: income − taxes − spending; any shortfall is withdrawn from savings (cash → taxable → 401(k) → Roth${plan.useRealEstateInRetirement ? ' → real estate' : ''}).`,
+                      `We run that plan through ${odds?.runs ?? 500} markets: good and bad years in random order, averaging your ${plan.expectedReturn ?? 7}% return with about ${odds ? odds.stdDev.toFixed(0) : 9}% swings a year. The chance is how many never run short.`,
                       covered
-                        ? 'No year exhausts your available savings, so the plan is funded end to end.'
-                        : `At age ${results.moneyLastsAge}, available savings hit $0 with expenses still unpaid.`,
+                        ? 'In a steady market, no year exhausts your available savings.'
+                        : `In a steady market, available savings hit $0 at age ${results.moneyLastsAge} with expenses still unpaid.`,
                       'The Ledger below shows every year’s exact dollars — start, growth, contributions, withdrawals, end.',
                     ]}
                   />
@@ -1589,9 +1584,10 @@ export default function MyPlan() {
               </Card>
 
               <Card style={{ flex: '1 1 280px', minWidth: 0, padding: 28, display: 'flex', flexDirection: 'column', gap: 22, borderRadius: 20 }}>
-                <SuccessScore projections={combined} />
+                <OddsScore odds={odds} />
                 <dl style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 14 }}>
-                  <div style={dlRow}><dt style={{ color: 'var(--text-muted)' }}>Money lasts to</dt><dd style={{ fontWeight: 600, color: covered ? 'var(--heading)' : 'var(--warn)' }}>{covered ? `Age ${planEnd}+` : `Age ${results.moneyLastsAge}`}</dd></div>
+                  <div style={dlRow}><dt style={{ color: 'var(--text-muted)' }}>Steady market: lasts to</dt><dd style={{ fontWeight: 600, color: covered ? 'var(--heading)' : 'var(--warn)' }}>{covered ? `Age ${planEnd}+` : `Age ${results.moneyLastsAge}`}</dd></div>
+                  {odds && <div style={dlRow}><dt style={{ color: 'var(--text-muted)' }}>Bad market (1 in 10)</dt><dd style={{ fontWeight: 600, color: badLasts.endsWith('+') ? 'var(--heading)' : 'var(--warn)' }}>{badLasts}</dd></div>}
                   <div style={dlRow}><dt style={{ color: 'var(--text-muted)' }}>At retirement ({plan.retireAge})</dt><dd style={{ fontWeight: 600, color: 'var(--heading)' }}>{fmt(results.portfolioAtRetire)}</dd></div>
                   <div style={dlRow}><dt style={{ color: 'var(--text-muted)' }}>Left at end of plan</dt><dd style={{ fontWeight: 600, color: 'var(--heading)' }}>{fmt(leftAtEnd)}</dd></div>
                 </dl>

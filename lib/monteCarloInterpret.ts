@@ -47,9 +47,9 @@ export function interpretMonteCarloResult(s: MonteCarloSummary): MonteCarloInter
   const p10Depletion = depletionAge(s.p10, s.startAge);
   const p50Depletion = depletionAge(s.p50, s.startAge);
 
-  if (s.successRate >= 0.90) {
+  if (s.successRate >= 0.8) {
     return {
-      headline: `Your plan has a ${pct}% probability of lasting through age ${s.endAge}.`,
+      headline: `Your plan lasts through age ${s.endAge} in ${pct}% of markets.`,
       detail: p10Depletion
         ? `In the weakest 10% of return scenarios, money runs short around age ${p10Depletion}. That's the tail risk — small adjustments can push that out further.`
         : `Even in the weakest 10% of return scenarios, the portfolio holds. This is a strong plan.`,
@@ -57,27 +57,27 @@ export function interpretMonteCarloResult(s: MonteCarloSummary): MonteCarloInter
     };
   }
 
-  if (s.successRate >= 0.75) {
+  if (s.successRate >= 0.6) {
     return {
-      headline: `Your plan has a ${pct}% probability of lasting through age ${s.endAge}.`,
+      headline: `Your plan lasts through age ${s.endAge} in ${pct}% of markets.`,
       detail: p10Depletion
-        ? `In the weakest 10% of scenarios, money runs short around age ${p10Depletion}. Small adjustments — saving $200 more/mo, working two more years, or trimming $5K of annual spending — typically push success above 90%.`
-        : `Most paths hold up, but a quarter still fall short by ${s.endAge}. Consider a small contribution bump or trimming retirement spending to firm up the plan.`,
+        ? `In the weakest 10% of scenarios, money runs short around age ${p10Depletion}. Small adjustments — saving $200 more/mo, working two more years, or trimming $5K of annual spending — typically push the odds above 80%.`
+        : `Most paths hold up, but a meaningful share still fall short by ${s.endAge}. Consider a small contribution bump or trimming retirement spending to firm up the plan.`,
       tone: 'caution',
     };
   }
 
-  // Below 75% — the plan needs attention
+  // Below 60% — the plan needs attention
   if (p50Depletion) {
     return {
-      headline: `Your plan has a ${pct}% probability of lasting through age ${s.endAge}.`,
-      detail: `Even the median path runs short around age ${p50Depletion}. This needs a real adjustment — try the levers below to see what brings success above 75%.`,
+      headline: `Your plan lasts through age ${s.endAge} in ${pct}% of markets.`,
+      detail: `Even the median path runs short around age ${p50Depletion}. This needs a real adjustment — try the levers below to see what brings the odds above 60%.`,
       tone: 'danger',
     };
   }
 
   return {
-    headline: `Your plan has a ${pct}% probability of lasting through age ${s.endAge}.`,
+    headline: `Your plan lasts through age ${s.endAge} in ${pct}% of markets.`,
     detail: p10Depletion
       ? `In the weakest 10% of scenarios, money runs short around age ${p10Depletion}. The plan works in the median but the tail risk is significant — pick a lever below to firm it up.`
       : `Many scenarios run short before ${s.endAge}. Use the sensitivity levers below to see which adjustments move the needle.`,
