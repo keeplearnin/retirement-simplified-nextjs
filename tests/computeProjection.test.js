@@ -241,3 +241,29 @@ describe('computeProjection — IRMAA', () => {
     expect(spouseAt65.irmaa).toBeGreaterThan(0);
   });
 });
+
+describe('computeProjection — long-term care input', () => {
+  const longLived = (overrides = {}) => basePlan({ savingsCash: 3_000_000, longevityAge: 95, ...overrides });
+  const lateHealthcare = (r) => r.combined.find(row => row.age === 94).healthcare;
+
+  it('defaults to the built-in estimate when the plan has no value', () => {
+    const { ltcMonthly, ...plan } = longLived();
+    expect(lateHealthcare(computeProjection(plan))).toBe(lateHealthcare(computeProjection({ ...plan, ltcMonthly: 3600 })));
+  });
+
+  it('$0 leaves it out; a higher amount costs more', () => {
+    const none = lateHealthcare(computeProjection(longLived({ ltcMonthly: 0 })));
+    const base = lateHealthcare(computeProjection(longLived({ ltcMonthly: 3600 })));
+    const high = lateHealthcare(computeProjection(longLived({ ltcMonthly: 7200 })));
+    expect(none).toBeLessThan(base);
+    expect(high - none).toBeCloseTo(2 * (base - none), -1);
+  });
+
+  it('only applies in the last ~5 years', () => {
+    const none = computeProjection(longLived({ ltcMonthly: 0 }));
+    const base = computeProjection(longLived({ ltcMonthly: 3600 }));
+    const at = (r, age) => r.combined.find(row => row.age === age).healthcare;
+    expect(at(base, 89)).toBe(at(none, 89));
+    expect(at(base, 90)).toBeGreaterThan(at(none, 90));
+  });
+});

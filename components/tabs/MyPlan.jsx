@@ -9,6 +9,7 @@ import { fmt, fmtFull } from '@/lib/format';
 import { usePlan, INCOME_TEMPLATES, DEBT_TEMPLATES } from '@/components/PlanProvider';
 import { computeProjection } from '@/lib/computeProjection';
 import { runPlanOdds, oddsLabel, ON_TRACK_ODDS } from '@/lib/planOdds';
+import { LTC_DEFAULT_MONTHLY, ltcStartAge } from '@/lib/expenseEngine';
 import { detectIrmaaCliff } from '@/lib/taxEngine';
 import { RMD_TABLE, RMD_START_AGE } from '@/lib/constants';
 import HealthcareBreakdown from '@/components/HealthcareBreakdown';
@@ -1432,6 +1433,21 @@ export default function MyPlan() {
               Go-Go: 100% · Slow-Go: 85% · No-Go ({plan.slowGoEndAge}+): 70%
             </div>
           </div>
+          {/* Long-term care is often the cost that decides whether money
+              lasts, so it's a visible input rather than a hidden constant. */}
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+            <Slider
+              label="Long-term care (per month)"
+              value={plan.ltcMonthly ?? LTC_DEFAULT_MONTHLY}
+              onChange={v => updatePlan('ltcMonthly', v)}
+              min={0} max={10000} step={100} format={fmt}
+            />
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: -16, lineHeight: 1.5 }}>
+              {(plan.ltcMonthly ?? LTC_DEFAULT_MONTHLY) > 0
+                ? <>Added from age {ltcStartAge(combined[combined.length - 1]?.age ?? plan.longevityAge)} to the end of your plan, in today&apos;s dollars, rising with healthcare inflation. The default ({fmt(LTC_DEFAULT_MONTHLY)}) is about a 65% chance of needing care × the typical cost of assisted living. Set to $0 to leave it out.</>
+                : <>Not included. Most people need some paid care late in life — a typical estimate is {fmt(LTC_DEFAULT_MONTHLY)}/month.</>}
+            </div>
+          </div>
         </Collapsible>
 
         {/* ---- Assumptions ---- */}
@@ -1577,6 +1593,9 @@ export default function MyPlan() {
                       covered
                         ? 'In a steady market, no year exhausts your available savings.'
                         : `In a steady market, available savings hit $0 at age ${results.moneyLastsAge} with expenses still unpaid.`,
+                      (plan.ltcMonthly ?? LTC_DEFAULT_MONTHLY) > 0
+                        ? `Includes long-term care of ${fmt(plan.ltcMonthly ?? LTC_DEFAULT_MONTHLY)}/month (today’s dollars) from age ${ltcStartAge(lastRow.age ?? plan.longevityAge)}. Change it under Expenses.`
+                        : 'Long-term care is left out (set to $0 under Expenses).',
                       'The Ledger below shows every year’s exact dollars — start, growth, contributions, withdrawals, end.',
                     ]}
                   />

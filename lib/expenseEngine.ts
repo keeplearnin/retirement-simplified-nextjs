@@ -50,6 +50,10 @@ export interface ExpensePlan {
   noGoPct: number; // default 0.70 (70% of discretionary)
   inflationRate: number; // default 2.5%
   healthcareInflation: number; // default 5%
+  /** Expected long-term care cost in today's dollars per month, at full
+   *  strength (see longTermCareCost). Defaults to LTC_DEFAULT_MONTHLY;
+   *  0 = leave long-term care out of the plan. */
+  ltcMonthly?: number;
 }
 
 export type RetirementPhase = 'working' | 'go-go' | 'slow-go' | 'no-go';
@@ -115,15 +119,23 @@ function phaseMultiplier(
  * We model this as a gradual ramp starting at age 85, inflated at a
  * capped LTC-specific rate, peaking in the final years before longevityAge.
  */
+export const LTC_DEFAULT_MONTHLY = 3600;
+
+/** First age long-term care is costed — the last ~5 projected years. */
+export function ltcStartAge(longevityAge: number): number {
+  return Math.max(85, longevityAge - 5);
+}
+
 function longTermCareCost(
   age: number,
   longevityAge: number,
   currentAge: number,
   healthcareInflation: number,
+  baseMonthlyCost: number,
 ): number {
   // Only applies in the last ~5 years of projected life
-  const ltcStartAge = Math.max(85, longevityAge - 5);
-  if (age < ltcStartAge) return 0;
+  const startAge = ltcStartAge(longevityAge);
+  if (age < startAge || baseMonthlyCost <= 0) return 0;
 
   // Probability-weighted monthly LTC cost in today's dollars. Genworth Cost
   // of Care survey: 2026-equivalent median assisted living ~$5,500/mo,
@@ -132,12 +144,12 @@ function longTermCareCost(
   // final ~5 projected years — conditional on reaching that window, the
   // incidence is materially higher (~65%), and duration/severity skew
   // toward the more expensive end (nursing home, not just home health aide).
-  // Blended: 0.65 * ~$5,500 =~ $3,600/mo expected cost.
-  const baseMonthlyCost = 3600;
+  // Blended: 0.65 * ~$5,500 =~ $3,600/mo expected cost — the default for
+  // baseMonthlyCost (LTC_DEFAULT_MONTHLY); users can change it in My Plan.
 
   // Ramp: increases linearly from 50% to 100% over the LTC window
-  const yearsInWindow = longevityAge - ltcStartAge;
-  const yearsSinceStart = age - ltcStartAge;
+  const yearsInWindow = longevityAge - startAge;
+  const yearsSinceStart = age - startAge;
   const rampFactor =
     yearsInWindow > 0
       ? 0.5 + 0.5 * (yearsSinceStart / yearsInWindow)
@@ -200,6 +212,7 @@ export function projectExpenses(plan: ExpensePlan): YearlyExpense[] {
       plan.longevityAge,
       plan.currentAge,
       plan.healthcareInflation,
+      plan.ltcMonthly ?? LTC_DEFAULT_MONTHLY,
     );
 
     // --- Debt payments ---

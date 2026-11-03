@@ -66,6 +66,9 @@ export const DEFAULT_PLAN = {
   // surfaces this at 0.5x to 3.0x. Applied uniformly to ACA premiums and
   // Medicare baseline costs in the expense projection.
   healthcareMultiplier: 1.0,
+  // Expected long-term care cost, today's dollars per month, costed over
+  // the last ~5 years of the plan (lib/expenseEngine.ts). 0 = leave it out.
+  ltcMonthly: 3600,
   // When true, treat real estate as a fallback retirement income source —
   // selling / downsizing / reverse-mortgaging in late retirement is part
   // of the plan, not a last-resort surprise. Counts RE toward liquid for
