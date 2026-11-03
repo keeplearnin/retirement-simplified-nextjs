@@ -22,8 +22,9 @@ import TaxTorpedo from '@/components/tabs/TaxTorpedo';
  * retirement?" — merging them gives users one mental home for the
  * drawdown decision and demotes Tax Torpedo from "tab" to "tip".
  */
-export default function RetirementIncome() {
-  const [view, setView] = useState('claim');
+// initialView: a sub-view to open on, e.g. from Improve's "worth a look" cards.
+export default function RetirementIncome({ initialView }) {
+  const [view, setView] = useState(['claim', 'withdrawal', 'bridge', 'torpedo'].includes(initialView) ? initialView : 'claim');
 
   const segments = [
     { id: 'claim', label: 'Claim Strategy', sub: 'Social Security timing' },

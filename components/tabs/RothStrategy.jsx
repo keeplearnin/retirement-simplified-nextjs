@@ -17,8 +17,9 @@ import RothLadder from '@/components/tabs/RothLadder';
  * restructure. They're the same decision viewed at two life stages, so
  * merging them gives users one mental home for "everything Roth".
  */
-export default function RothStrategy() {
-  const [view, setView] = useState('contributions');
+// initialView: a sub-view to open on, e.g. from Improve's "worth a look" cards.
+export default function RothStrategy({ initialView }) {
+  const [view, setView] = useState(['contributions', 'conversions'].includes(initialView) ? initialView : 'contributions');
 
   const segments = [
     { id: 'contributions', label: 'Contributions', sub: 'Roth vs Trad while working' },

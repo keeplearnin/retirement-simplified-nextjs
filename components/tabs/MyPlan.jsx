@@ -15,6 +15,7 @@ import { RMD_TABLE, RMD_START_AGE } from '@/lib/constants';
 import HealthcareBreakdown from '@/components/HealthcareBreakdown';
 import BridgeOptionsCard from '@/components/BridgeOptionsCard';
 import WealthChart from '@/components/ui/WealthChart';
+import MonteCarlo from '@/components/tabs/MonteCarlo';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -597,7 +598,7 @@ function IncomeExpenseChart({ projections, retireAge, plan }) {
 }
 
 // ---------------------------------------------------------------------------
-// Success Score
+// Odds score
 // ---------------------------------------------------------------------------
 
 // The headline number: the chance the plan lasts, from runPlanOdds — the
@@ -642,20 +643,6 @@ function usePlanOdds(plan) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `odds` only picks the delay
   }, [plan]);
   return odds;
-}
-
-// ---------------------------------------------------------------------------
-// Metric Card
-// ---------------------------------------------------------------------------
-
-function MetricCard({ label, value, sub, color }) {
-  return (
-    <div className="glass-card" style={{ padding: '12px 16px', transition: 'all .2s' }}>
-      <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4, fontWeight: 600 }}>{label}</div>
-      <div className="animate-number" style={{ fontSize: 20, fontWeight: 700, color: color || 'var(--text)', fontFamily: 'var(--sans)' }}>{value}</div>
-      {sub && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{sub}</div>}
-    </div>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1025,7 +1012,8 @@ function RmdProjectionTable({ rows }) {
 // Main Component
 // ---------------------------------------------------------------------------
 
-export default function MyPlan() {
+// openRange: open "See the range" on load (the old Monte Carlo tab id).
+export default function MyPlan({ openRange = false }) {
   const { plan, updatePlan, updateIncome, removeIncome, addIncome, switchIncomeOwner, addDebt, updateDebt, removeDebt, bulkUpdate } = usePlan();
 
   // Dismissed suggestions (read from localStorage after mount to avoid hydration mismatch)
@@ -1215,6 +1203,13 @@ export default function MyPlan() {
               {' '}({plan.retiredReturnPct ?? 60}% of working — adjustable under Assumptions)
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent('navigate-tab', { detail: 'accounts' }))}
+            style={{ background: 'none', border: 'none', padding: 0, marginTop: 4, cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--accent)' }}
+          >
+            Fill in balances from your accounts →
+          </button>
         </Collapsible>
 
         <Collapsible variant="row" title="Income Sources" defaultOpen={false} badge={`${plan.incomeSources.length} source${plan.incomeSources.length !== 1 ? 's' : ''}`}>
@@ -1310,56 +1305,6 @@ export default function MyPlan() {
           </div>
         </Collapsible>
 
-        {/* ---- Debts ---- */}
-        <Collapsible variant="row" title="Debts" defaultOpen={false} badge={(plan.debts || []).length > 0 ? `${fmt((plan.debts || []).reduce((s, d) => s + d.monthlyPayment, 0))}/mo` : 'None'}>
-          {(plan.debts || []).map(debt => (
-            <DebtCard
-              key={debt.id}
-              debt={debt}
-              onChange={updated => updateDebt(debt.id, updated)}
-              onRemove={() => removeDebt(debt.id)}
-              currentAge={plan.currentAge}
-            />
-          ))}
-          <div style={{ position: 'relative', display: 'inline-block' }}>
-            <button
-              onClick={() => setShowDebtMenu(!showDebtMenu)}
-              style={{
-                padding: '10px 20px', borderRadius: 8, cursor: 'pointer',
-                border: '1px dashed var(--warn)', background: 'transparent',
-                color: 'var(--warn)', fontSize: 13, fontWeight: 600,
-                fontFamily: 'var(--sans)',
-              }}
-            >
-              + Add Debt
-            </button>
-            {showDebtMenu && (
-              <div style={{
-                position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 20,
-                background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8,
-                padding: 4, minWidth: 200, boxShadow: '0 8px 24px rgba(0,0,0,.3)',
-              }}>
-                {Object.entries(DEBT_TEMPLATES).map(([key, tmpl]) => (
-                  <button
-                    key={key}
-                    onClick={() => { addDebt(key); setShowDebtMenu(false); }}
-                    style={{
-                      display: 'block', width: '100%', textAlign: 'left',
-                      padding: '10px 14px', border: 'none', cursor: 'pointer',
-                      background: 'transparent', color: 'var(--text)',
-                      fontSize: 13, fontFamily: 'var(--sans)', borderRadius: 6,
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg2)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                  >
-                    {tmpl.name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </Collapsible>
-
         <Collapsible variant="row" title="Expenses" defaultOpen={false} badge={expenseMode === 'simple' ? fmt(plan.annualSpending) + '/yr' : fmt(detailedTotal) + '/yr'}>
           <div style={{ display: 'flex', gap: 2, background: 'var(--bg)', borderRadius: 20, padding: 2, marginBottom: 16, width: 'fit-content' }}>
             {['simple', 'detailed'].map(mode => (
@@ -1447,6 +1392,57 @@ export default function MyPlan() {
                 ? <>Added from age {ltcStartAge(combined[combined.length - 1]?.age ?? plan.longevityAge)} to the end of your plan, in today&apos;s dollars, rising with healthcare inflation. The default ({fmt(LTC_DEFAULT_MONTHLY)}) is about a 65% chance of needing care × the typical cost of assisted living. Set to $0 to leave it out.</>
                 : <>Not included. Most people need some paid care late in life — a typical estimate is {fmt(LTC_DEFAULT_MONTHLY)}/month.</>}
             </div>
+          </div>
+        </Collapsible>
+
+        <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)', marginTop: 20 }}>More</div>
+        {/* ---- Debts ---- */}
+        <Collapsible variant="row" title="Debts" defaultOpen={false} badge={(plan.debts || []).length > 0 ? `${fmt((plan.debts || []).reduce((s, d) => s + d.monthlyPayment, 0))}/mo` : 'None'}>
+          {(plan.debts || []).map(debt => (
+            <DebtCard
+              key={debt.id}
+              debt={debt}
+              onChange={updated => updateDebt(debt.id, updated)}
+              onRemove={() => removeDebt(debt.id)}
+              currentAge={plan.currentAge}
+            />
+          ))}
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            <button
+              onClick={() => setShowDebtMenu(!showDebtMenu)}
+              style={{
+                padding: '10px 20px', borderRadius: 8, cursor: 'pointer',
+                border: '1px dashed var(--warn)', background: 'transparent',
+                color: 'var(--warn)', fontSize: 13, fontWeight: 600,
+                fontFamily: 'var(--sans)',
+              }}
+            >
+              + Add Debt
+            </button>
+            {showDebtMenu && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 20,
+                background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8,
+                padding: 4, minWidth: 200, boxShadow: '0 8px 24px rgba(0,0,0,.3)',
+              }}>
+                {Object.entries(DEBT_TEMPLATES).map(([key, tmpl]) => (
+                  <button
+                    key={key}
+                    onClick={() => { addDebt(key); setShowDebtMenu(false); }}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'left',
+                      padding: '10px 14px', border: 'none', cursor: 'pointer',
+                      background: 'transparent', color: 'var(--text)',
+                      fontSize: 13, fontFamily: 'var(--sans)', borderRadius: 6,
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg2)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {tmpl.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </Collapsible>
 
@@ -1623,6 +1619,10 @@ export default function MyPlan() {
                 covered={covered}
               />
             </Card>
+
+            <Collapsible title="See the range" defaultOpen={openRange} badge="How your plan does in good and bad markets, and what moves the odds">
+              <MonteCarlo embedded />
+            </Collapsible>
           </>
         );
       })()}
@@ -1684,6 +1684,48 @@ export default function MyPlan() {
           </Card>
         );
       })()}
+      {/* Bridge Options card — shows 4 explicit alternatives when liquid
+          CASH is exhausted before longevity. Uses raw liquidBalance (not
+          availableBalance) so the card stays visible even after the user
+          flips on "include RE in retirement plan" — option 1 then shows
+          as "active" so the strategy state is obvious. Without this, the
+          whole card would disappear the instant the user clicked the
+          toggle, which is confusing. */}
+      {(() => {
+        const liquidExhaustedAtAge = combined.find(p => p.isRetired && p.liquidBalance <= 0 && p.gap < 0)?.age;
+        if (!liquidExhaustedAtAge) return null;
+        const lastRow = combined[combined.length - 1];
+        const realEstateBalance = lastRow?.realEstateBalance || 0;
+        // Approximate annual gap = retirement spending (today's $).
+        // Engine has more nuanced numbers but spend is the right magnitude
+        // for the bridge-options copy.
+        const retireSpending = plan.retireSpending || Math.round((plan.annualSpending || 60000) * 0.8);
+        return (
+          <BridgeOptionsCard
+            plan={plan}
+            liquidExhaustedAtAge={liquidExhaustedAtAge}
+            longevityAge={plan.longevityAge || 95}
+            retireAge={plan.retireAge}
+            realEstateBalance={realEstateBalance}
+            retireSpending={retireSpending}
+            onToggleRealEstate={(v) => updatePlan('useRealEstateInRetirement', v)}
+          />
+        );
+      })()}
+
+      {/* ---- The Ledger: every dollar, every year ---- */}
+      <Collapsible title="The Ledger" defaultOpen={false} badge="Every dollar, every year — start + growth + contributions − withdrawals = end">
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 10, lineHeight: 1.5 }}>
+          Left side is your portfolio&apos;s balance sheet; right side is the year&apos;s cash flow
+          (income − taxes − spending). ★ marks the retirement year. If any row looks wrong,
+          that&apos;s the row to question — nothing here is hidden or smoothed.
+        </div>
+        <LedgerTable rows={combined} />
+      </Collapsible>
+
+      {/* Everything below is reference, not a decision — one closed
+          section instead of five cards, tables and warnings. */}
+      <Collapsible title="Details" defaultOpen={false} badge="Monthly budget, income chart, yearly tables, taxes and healthcare">
       {/* ============ HERO: 3-column snapshot ============ */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 20 }} className="grid-2">
         {/* Current Savings */}
@@ -1811,34 +1853,12 @@ export default function MyPlan() {
         <IncomeExpenseChart projections={combined} retireAge={plan.retireAge} plan={plan} />
       </div>
 
-      {/* ---- The Ledger: every dollar, every year ---- */}
-      <Collapsible title="The Ledger" defaultOpen={false} badge="Every dollar, every year — start + growth + contributions − withdrawals = end">
-        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 10, lineHeight: 1.5 }}>
-          Left side is your portfolio&apos;s balance sheet; right side is the year&apos;s cash flow
-          (income − taxes − spending). ★ marks the retirement year. If any row looks wrong,
-          that&apos;s the row to question — nothing here is hidden or smoothed.
-        </div>
-        <LedgerTable rows={combined} />
-      </Collapsible>
-
-      {/* Key Metrics — horizontal strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, marginBottom: 20 }}>
-        {/* De-duplicated (portfolio + money-lasts live in the hero) and
-            de-rainbowed — lifetime facts are facts, not statuses. */}
-        <MetricCard label="Lifetime Income" value={fmt(results.totalLifetimeIncome)} />
-        <MetricCard label="Lifetime Taxes" value={fmt(results.totalLifetimeTax)} />
-        <MetricCard label="Lifetime Expenses" value={fmt(results.totalLifetimeExpense)} />
-        <MetricCard label="Avg Tax Rate" value={`${(results.avgEffectiveRate * 100).toFixed(1)}%`} />
-      </div>
-
-      {/* Year-by-Year & Tax */}
-      <Collapsible title="Year-by-Year Summary" defaultOpen={false} badge="Every 5 years">
+      <h3 className="details-heading">Year by year</h3>
         <SummaryTable rows={combined} />
         <RetirementDetailTable rows={combined} retireAge={plan.retireAge} />
         <RmdProjectionTable rows={combined} />
-      </Collapsible>
 
-      <Collapsible title="Tax Summary" defaultOpen={false}>
+      <h3 className="details-heading">Taxes and healthcare</h3>
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 12 }}>Effective Tax Rate by Phase</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
@@ -1892,35 +1912,6 @@ export default function MyPlan() {
               (3) <strong>Tax-deferred balances roll over</strong> to the survivor's name (no immediate distribution required).
               The single-filer brackets compress at the top — survivor years often see a higher effective rate even on the same income.
             </InfoBox>
-          );
-        })()}
-
-        {/* Bridge Options card — shows 4 explicit alternatives when liquid
-            CASH is exhausted before longevity. Uses raw liquidBalance (not
-            availableBalance) so the card stays visible even after the user
-            flips on "include RE in retirement plan" — option 1 then shows
-            as "active" so the strategy state is obvious. Without this, the
-            whole card would disappear the instant the user clicked the
-            toggle, which is confusing. */}
-        {(() => {
-          const liquidExhaustedAtAge = combined.find(p => p.isRetired && p.liquidBalance <= 0 && p.gap < 0)?.age;
-          if (!liquidExhaustedAtAge) return null;
-          const lastRow = combined[combined.length - 1];
-          const realEstateBalance = lastRow?.realEstateBalance || 0;
-          // Approximate annual gap = retirement spending (today's $).
-          // Engine has more nuanced numbers but spend is the right magnitude
-          // for the bridge-options copy.
-          const retireSpending = plan.retireSpending || Math.round((plan.annualSpending || 60000) * 0.8);
-          return (
-            <BridgeOptionsCard
-              plan={plan}
-              liquidExhaustedAtAge={liquidExhaustedAtAge}
-              longevityAge={plan.longevityAge || 95}
-              retireAge={plan.retireAge}
-              realEstateBalance={realEstateBalance}
-              retireSpending={retireSpending}
-              onToggleRealEstate={(v) => updatePlan('useRealEstateInRetirement', v)}
-            />
           );
         })()}
 

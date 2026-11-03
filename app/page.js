@@ -1,41 +1,30 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import AuthProvider, { useAuth } from '@/components/AuthProvider';
 import { PlanProvider } from '@/components/PlanProvider';
 import Onboarding from '@/components/Onboarding';
 import Auth, { isConfigured } from '@/lib/auth';
 
-// Tab imports — only those wired into the nav categories below.
-//
-// Removed from the bundle for the 3-category Plan/Coach/Learn launch
-// (originally a 5-category structure). Files retained for future revival:
-//   - GrowthProjector  (duplicated My Plan's results chart)
-//   - GoalPlanner      (folded into the retirement-age slider)
-//   - MyPlanV2         (alternate "Stress Test" view — same data twice)
-//
-// Earlier orphans still on the bench: AccountDashboard, FeeImpact, Rebalance,
-// TaxLossHarvesting, ScenarioComparison, InvestingGuide, MyPlans, Journal,
-// RiskQuiz, LinkedAccounts.
-import PortfolioBuilder from '@/components/tabs/PortfolioBuilder';
-import MonteCarlo from '@/components/tabs/MonteCarlo';
-import GettingStarted from '@/components/tabs/GettingStarted';
-import AIAdvisor from '@/components/tabs/AIAdvisor';
+// Screens: Plan (MyPlan), Improve (Optimize + Scenarios), Ask (AIAdvisor).
+// Everything else is reached from the Tools page. Earlier orphans still on
+// the bench (not imported): GrowthProjector, GoalPlanner, MyPlanV2,
+// AccountDashboard, FeeImpact, Rebalance, TaxLossHarvesting, InvestingGuide,
+// MyPlans, Journal, RiskQuiz.
 import MyPlan from '@/components/tabs/MyPlan';
-// Merged tabs — combine multiple decision surfaces under one nav entry.
-// The underlying tabs (TaxAware, RothLadder, SocialSecurity, WithdrawalStrategy,
-// TaxTorpedo) still exist as components and are rendered via these wrappers.
+import Improve from '@/components/tabs/Improve';
+import AIAdvisor from '@/components/tabs/AIAdvisor';
+import Tools, { TOOLS } from '@/components/tabs/Tools';
+// Tools. RothStrategy and RetirementIncome each group several calculators
+// and accept a sub-view (e.g. 'income:bridge').
 import RothStrategy from '@/components/tabs/RothStrategy';
 import RetirementIncome from '@/components/tabs/RetirementIncome';
 import Inheritance from '@/components/tabs/Inheritance';
-// Flagship additions: Optimize (Decision Engine — ranked, dollar-quantified
-// recommendations with auditable math) and Scenarios (side-by-side plan
-// comparison on the full projection engine).
-import Optimize from '@/components/tabs/Optimize';
-import Scenarios from '@/components/tabs/Scenarios';
 import LinkedAccounts from '@/components/tabs/LinkedAccounts';
 import EquityComp from '@/components/tabs/EquityComp';
 import CollegePlanner from '@/components/tabs/CollegePlanner';
+import PortfolioBuilder from '@/components/tabs/PortfolioBuilder';
+import GettingStarted from '@/components/tabs/GettingStarted';
 import Icon from '@/components/ui/Icon';
 
 function AppContent() {
@@ -46,27 +35,6 @@ function AppContent() {
 
   const [onboarded, setOnboarded] = useState(true); // true initially to avoid flash
   const [onboardingSkipped, setOnboardingSkipped] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
-  const moreRef = useRef(null);
-  const moreBtnRef = useRef(null);
-
-  // Close the "More planners" list on outside click or Escape (Escape also
-  // returns focus to its button so keyboard users aren't stranded).
-  useEffect(() => {
-    if (!moreOpen) return;
-    const onClick = (e) => { if (moreRef.current && !moreRef.current.contains(e.target)) setMoreOpen(false); };
-    const onKey = (e) => {
-      if (e.key !== 'Escape') return;
-      setMoreOpen(false);
-      moreBtnRef.current?.focus();
-    };
-    document.addEventListener('mousedown', onClick);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onClick);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [moreOpen]);
 
   useEffect(() => {
     setTimeout(() => setLoaded(true), 100);
@@ -113,50 +81,20 @@ function AppContent() {
     localStorage.setItem('theme', next);
   }
 
-  // Three top-level categories — Plan, Coach, Learn. Earlier structure was
-  // five (My Plan / Build / Optimize / AI Advisor / Learn); compressed per
-  // design review. PortfolioBuilder moved into Plan; the six optimize
-  // workbench tabs moved under Coach alongside AI Advisor. Tab IDs are
-  // kept stable (myplan, portfolio, advisor, tax, ssa, ...) so any saved
-  // localStorage state and external links continue to resolve.
-  // `icon` values are Icon component names (see components/ui/Icon.jsx),
-  // not emoji — gives us consistent monoline glyphs that take currentColor
-  // and sit on the typography baseline. (Design-pass feedback: "looks like
-  // a basic calculator.")
+  // Three screens answer what most people come for: am I okay (Plan), what
+  // should I change (Improve), and questions about my situation (Ask).
+  // Everything else is a Tool — one click away, never in the main nav.
+  // Tab IDs stay stable so saved state and links keep resolving; 'optimize'
+  // is the Improve screen and 'scenarios' / 'montecarlo' open inside
+  // Improve / My Plan. A tool tab may carry a sub-view: 'income:bridge'.
   const categories = [
-    { id: 'plan', label: 'Plan', icon: 'chart', tabs: [
-      { id: 'myplan', label: 'My Plan' },
-      { id: 'optimize', label: 'Optimize' },
-      { id: 'scenarios', label: 'Scenarios' },
-      { id: 'accounts', label: 'Accounts' },
-      { id: 'equity', label: 'Equity Comp' },
-      { id: 'college', label: 'College' },
-      { id: 'portfolio', label: 'Portfolio' },
-    ]},
-    // Coach groups the AI Advisor (chat) with the workbench drill-downs,
-    // ordered by the retirement-planning journey:
-    //   chat (start here) → Roth decisions (accumulation + conversion)
-    //   → retirement income (claim + withdrawal + tax-torpedo explainer)
-    //   → Monte Carlo (downside sensitivity)
-    //
-    // Three workbench tabs in step-1 were merged in step-2 of the
-    // restructure:
-    //   • RothStrategy      = Roth vs Trad + Roth Ladder
-    //   • RetirementIncome  = Social Security + Withdrawal + Tax Torpedo
-    { id: 'coach', label: 'Coach', icon: 'sparkles', tabs: [
-      { id: 'advisor', label: 'AI Advisor' },
-      { id: 'roth-strategy', label: 'Roth Strategy' },
-      { id: 'income', label: 'Retirement Income' },
-      { id: 'inheritance', label: 'Inheritance' },
-      { id: 'montecarlo', label: 'Monte Carlo' },
-    ]},
-    { id: 'learn', label: 'Learn', icon: 'book', tabs: [
-      { id: 'guide', label: 'Getting Started' },
-    ]},
+    { id: 'plan', label: 'Plan', icon: 'chart', tabs: ['myplan', 'montecarlo'] },
+    { id: 'improve', label: 'Improve', icon: 'lightbulb', tabs: ['optimize', 'scenarios'] },
+    { id: 'ask', label: 'Ask', icon: 'sparkles', tabs: ['advisor'] },
   ];
-
-  const activeCategory = categories.find(c => c.tabs.some(t => t.id === tab)) || categories[0];
-  const subTabs = activeCategory.tabs;
+  const [tabId, tabView] = tab.split(':');
+  const activeCategory = categories.find(c => c.tabs.includes(tabId));
+  const activeTool = TOOLS.find(t => t.id === tabId);
 
   return (
     <div style={{ opacity: loaded ? 1 : 0, transition: 'opacity .5s ease', position: 'relative', zIndex: 1 }}>
@@ -185,9 +123,9 @@ function AppContent() {
               <button
                 key={c.id}
                 type="button"
-                onClick={() => setTab(c.tabs[0].id)}
+                onClick={() => setTab(c.tabs[0])}
                 className="top-nav-link"
-                aria-current={c.id === activeCategory.id ? 'page' : undefined}
+                aria-current={c.id === activeCategory?.id ? 'page' : undefined}
               >
                 {c.label}
               </button>
@@ -195,6 +133,14 @@ function AppContent() {
           </nav>
 
           <div className="header-actions">
+            <button
+              type="button"
+              onClick={() => setTab('tools')}
+              className="header-pill header-pill-quiet"
+              aria-current={tab === 'tools' || activeTool ? 'page' : undefined}
+            >
+              Tools
+            </button>
             <a href="/verdict" className="header-pill" title="Quick Verdict — see where you stand in 90 seconds">
               <span className="quick-verdict-text">Quick verdict</span>
               <span className="quick-verdict-icon-only" aria-label="Quick verdict"><Icon name="bolt" size={15} /></span>
@@ -218,65 +164,6 @@ function AppContent() {
           </div>
         </div>
       </header>
-
-      {/* Section pills — the first few sub-tabs inline, the rest under "More"
-          so a category never shows a wall of seven tabs. */}
-      {subTabs.length > 1 && (() => {
-        const inline = subTabs.length > 5 ? subTabs.slice(0, 4) : subTabs;
-        const overflow = subTabs.length > 5 ? subTabs.slice(4) : [];
-        const activeOverflow = overflow.find(t => t.id === tab);
-        return (
-          <div className="sub-nav-wrap">
-            <nav className="sub-nav" aria-label={`${activeCategory.label} sections`}>
-              {inline.map(t => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setTab(t.id)}
-                  className="sub-nav-pill"
-                  aria-current={tab === t.id ? 'page' : undefined}
-                >
-                  {t.label}
-                </button>
-              ))}
-              {overflow.length > 0 && (
-                <div className="sub-nav-more" ref={moreRef}>
-                  {/* Disclosure (button + list of buttons), not an ARIA menu:
-                      Tab moves through the items, which is what the markup
-                      supports — aria-haspopup promised arrow-key handling. */}
-                  <button
-                    type="button"
-                    ref={moreBtnRef}
-                    className="sub-nav-pill"
-                    aria-current={activeOverflow ? 'page' : undefined}
-                    aria-expanded={moreOpen}
-                    aria-controls="more-planners-list"
-                    onClick={() => setMoreOpen(o => !o)}
-                  >
-                    {activeOverflow ? activeOverflow.label : 'More planners'}
-                    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
-                  </button>
-                  {moreOpen && (
-                    <div className="sub-nav-menu" id="more-planners-list">
-                      {overflow.map(t => (
-                        <button
-                          key={t.id}
-                          type="button"
-                          className="sub-nav-menu-item"
-                          aria-current={tab === t.id ? 'page' : undefined}
-                          onClick={() => { setTab(t.id); setMoreOpen(false); }}
-                        >
-                          {t.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </nav>
-          </div>
-        );
-      })()}
 
       <main className="app-main">
         {/* "Finish setup" banner — shown when the user skipped onboarding
@@ -346,19 +233,23 @@ function AppContent() {
             </div>
           </div>
         )}
-        {tab === 'myplan' && <MyPlan />}
-        {tab === 'optimize' && <Optimize />}
-        {tab === 'scenarios' && <Scenarios />}
-        {tab === 'accounts' && <LinkedAccounts />}
-        {tab === 'equity' && <EquityComp />}
-        {tab === 'college' && <CollegePlanner />}
-        {tab === 'portfolio' && <PortfolioBuilder />}
-        {tab === 'advisor' && <AIAdvisor />}
-        {tab === 'roth-strategy' && <RothStrategy />}
-        {tab === 'income' && <RetirementIncome />}
-        {tab === 'inheritance' && <Inheritance />}
-        {tab === 'montecarlo' && <MonteCarlo />}
-        {tab === 'guide' && <GettingStarted />}
+        {activeTool && (
+          <button type="button" className="tools-back" onClick={() => setTab('tools')}>
+            ← All tools
+          </button>
+        )}
+        {(tabId === 'myplan' || tabId === 'montecarlo') && <MyPlan openRange={tabId === 'montecarlo'} />}
+        {(tabId === 'optimize' || tabId === 'scenarios') && <Improve />}
+        {tabId === 'advisor' && <AIAdvisor />}
+        {tabId === 'tools' && <Tools onOpen={setTab} />}
+        {tabId === 'accounts' && <LinkedAccounts />}
+        {tabId === 'equity' && <EquityComp />}
+        {tabId === 'college' && <CollegePlanner />}
+        {tabId === 'portfolio' && <PortfolioBuilder />}
+        {tabId === 'roth-strategy' && <RothStrategy key={tab} initialView={tabView} />}
+        {tabId === 'income' && <RetirementIncome key={tab} initialView={tabView} />}
+        {tabId === 'inheritance' && <Inheritance />}
+        {tabId === 'guide' && <GettingStarted />}
       </main>
 
       {/* Phone-only bottom tab bar — replaces the header tabs under 720px. */}
@@ -367,9 +258,9 @@ function AppContent() {
           <button
             key={c.id}
             type="button"
-            onClick={() => setTab(c.tabs[0].id)}
+            onClick={() => setTab(c.tabs[0])}
             className="bottom-nav-link"
-            aria-current={c.id === activeCategory.id ? 'page' : undefined}
+            aria-current={c.id === activeCategory?.id ? 'page' : undefined}
           >
             <Icon name={c.icon} size={22} />
             {c.label}

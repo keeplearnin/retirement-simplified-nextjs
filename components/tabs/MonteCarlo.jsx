@@ -36,7 +36,9 @@ function leverPlans(plan) {
   };
 }
 
-export default function MonteCarlo() {
+// embedded: shown inside My Plan's "See the range", under the verdict it
+// explains — skip the intro box that points back to My Plan.
+export default function MonteCarlo({ embedded = false }) {
   const { plan } = usePlan();
   // Same call and seed as My Plan's verdict → the same percentage.
   const odds = useMemo(() => runPlanOdds(plan), [plan]);
@@ -106,12 +108,19 @@ export default function MonteCarlo() {
 
   return (
     <div className="fade-up">
-      <InfoBox title="Monte Carlo" color="var(--purple)" bgColor="var(--purple-dim, rgba(139,92,246,0.08))">
-        Your plan from My Plan, run through {odds.runs} markets: good and bad years in random order, averaging your{' '}
-        {plan.expectedReturn ?? 7}% return with about {odds.stdDev.toFixed(0)}% swings a year. Taxes, healthcare and Social Security
-        are all included. To change the numbers,{' '}
-        <button type="button" onClick={goMyPlan} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', textDecoration: 'underline', cursor: 'pointer', font: 'inherit' }}>edit My Plan</button>.
-      </InfoBox>
+      {embedded ? (
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+          Your plan run through {odds.runs} markets: good and bad years in random order, averaging your{' '}
+          {plan.expectedReturn ?? 7}% return with about {odds.stdDev.toFixed(0)}% swings a year.
+        </p>
+      ) : (
+        <InfoBox title="Monte Carlo" color="var(--purple)" bgColor="var(--purple-dim, rgba(139,92,246,0.08))">
+          Your plan from My Plan, run through {odds.runs} markets: good and bad years in random order, averaging your{' '}
+          {plan.expectedReturn ?? 7}% return with about {odds.stdDev.toFixed(0)}% swings a year. Taxes, healthcare and Social Security
+          are all included. To change the numbers,{' '}
+          <button type="button" onClick={goMyPlan} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', textDecoration: 'underline', cursor: 'pointer', font: 'inherit' }}>edit My Plan</button>.
+        </InfoBox>
+      )}
 
       <div style={{ border: `1px solid ${toneColor}`, borderRadius: 12, padding: '14px 18px', margin: '16px 0 14px' }}>
         <div style={{ fontSize: 15, fontWeight: 700, color: toneColor, marginBottom: 6, fontFamily: 'var(--serif)' }}>{interp.headline}</div>
