@@ -23,17 +23,22 @@ function basePlan(overrides = {}) {
 
 // The user-reported scenario: a retiree whose wealth is mostly home equity.
 // $200K cash runs out in ~5 years; $1.5M of real estate sits untouched.
+// Rates are explicit: these tests used to set 0 and silently run on the
+// engine's defaults via `|| x` fallbacks, which no longer swallow a 0.
 const reHeavy = {
   savingsCash: 200_000,
   savingsRealEstate: 1_500_000,
+  inflationRate: 2.5,
+  healthcareInflation: 3.5,
+  cashReturn: 3,
+  realEstateAppreciation: 3,
 };
 
 describe('real estate drawdown (useRealEstateInRetirement)', () => {
   it('toggle OFF: liquid runs out and the plan reports short, despite RE net worth', () => {
     const r = computeProjection(basePlan(reHeavy));
     expect(r.moneyLastsAge).toBeLessThan(100);
-    // RE never touched — it only appreciates (engine floors appreciation at
-    // the 3% default; `0` is swallowed by the `|| 3` fallback).
+    // RE never touched — it only appreciates.
     const last = r.combined[r.combined.length - 1];
     expect(last.realEstateBalance).toBeGreaterThanOrEqual(1_500_000);
     expect(r.combined.every(row => (row.withdrawalRealEstate || 0) === 0)).toBe(true);

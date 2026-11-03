@@ -202,3 +202,42 @@ describe('computeProjection — ledger identity (transparency layer)', () => {
     }
   });
 });
+
+describe('computeProjection — rate inputs', () => {
+  it('a deliberate 0% return is honored, not replaced by the 7% default', () => {
+    const plan = basePlan({ currentAge: 40, retireAge: 65, savings401k: 100_000 });
+    const zero = computeProjection({ ...plan, expectedReturn: 0 });
+    const seven = computeProjection({ ...plan, expectedReturn: 7 });
+    expect(zero.combined[0].portfolioReturn).toBe(0);
+    expect(seven.combined[0].portfolioReturn).toBeGreaterThan(0);
+  });
+
+  it('a missing return still falls back to 7%', () => {
+    const { expectedReturn, ...plan } = basePlan({ currentAge: 40, retireAge: 65, savings401k: 100_000 });
+    const missing = computeProjection(plan);
+    const seven = computeProjection({ ...plan, expectedReturn: 7 });
+    expect(missing.combined[0].portfolioReturn).toBe(seven.combined[0].portfolioReturn);
+  });
+});
+
+describe('computeProjection — IRMAA', () => {
+  const highEarner = (overrides = {}) => basePlan({
+    currentAge: 45, retireAge: 70, savings401k: 500_000, expectedReturn: 7,
+    incomeSources: [{ type: 'salary', amount: 400_000, growthRate: 0, endAge: 70 }],
+    ...overrides,
+  });
+
+  it('is zero before anyone in the household reaches Medicare age', () => {
+    const rows = computeProjection(highEarner()).combined;
+    expect(rows.filter(r => r.age < 65).every(r => r.irmaa === 0)).toBe(true);
+    expect(rows.some(r => r.age >= 65 && r.irmaa > 0)).toBe(true);
+  });
+
+  it('applies when only the spouse is 65+', () => {
+    const rows = computeProjection(highEarner({
+      hasSpouse: true, filingStatus: 'mfj', spouseCurrentAge: 60, spouseRetireAge: 70, spouseLongevityAge: 90,
+    })).combined;
+    const spouseAt65 = rows.find(r => r.age === 50); // primary 50, spouse 65
+    expect(spouseAt65.irmaa).toBeGreaterThan(0);
+  });
+});

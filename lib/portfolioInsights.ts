@@ -37,6 +37,8 @@ export interface PortfolioInsightsResult {
 
 type PlanLike = Record<string, unknown>;
 const num = (v: unknown): number => (typeof v === 'number' ? v : 0);
+// Like num(), but a missing value gets `fallback` while a real 0 stays 0.
+const numOr = (v: unknown, fallback: number): number => (typeof v === 'number' ? v : fallback);
 
 // ---------------------------------------------------------------------------
 // Check 1: Tax bucket diversification
@@ -135,8 +137,8 @@ function checkCashDrag(plan: PlanLike): PortfolioRecommendation | null {
 
   const targetReserve = annualSpending * 0.5; // 6 months
   const excessCash = cash - targetReserve;
-  const expectedReturn = (num(plan.expectedReturn) || 7) / 100;
-  const cashReturn = (num(plan.cashReturn) || 3) / 100;
+  const expectedReturn = numOr(plan.expectedReturn, 7) / 100;
+  const cashReturn = numOr(plan.cashReturn, 3) / 100;
   const annualImpact = Math.round(excessCash * (expectedReturn - cashReturn));
 
   return {
@@ -232,7 +234,7 @@ function checkRothWindow(plan: PlanLike): PortfolioRecommendation | null {
 
 function checkReturnAssumption(plan: PlanLike): PortfolioRecommendation | null {
   const age = num(plan.currentAge);
-  const ret = num(plan.expectedReturn) || 7;
+  const ret = numOr(plan.expectedReturn, 7);
   if (age < 55) return null;
   if (ret <= 8) return null;
 

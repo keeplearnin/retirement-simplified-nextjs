@@ -778,8 +778,8 @@ function LedgerTable({ rows }) {
  * not buried in a collapsed panel.
  */
 function AssumptionsStrip({ plan, onEdit }) {
-  const workingR = plan.expectedReturn || 7;
-  const retiredPct = plan.retiredReturnPct || 60;
+  const workingR = plan.expectedReturn ?? 7;
+  const retiredPct = plan.retiredReturnPct ?? 60;
   const retiredR = (workingR * retiredPct / 100).toFixed(1);
   const spendingAuto = !plan._expenseManuallySet;
   const chip = (label, value, opts = {}) => (
@@ -797,8 +797,8 @@ function AssumptionsStrip({ plan, onEdit }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', margin: '0 0 16px 2px' }}>
       <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', marginRight: 2 }}>Assumptions</span>
       {chip('Return', `${workingR}% → ${retiredR}%`, { title: `${workingR}% while working, ${retiredR}% in retirement (${retiredPct}% of working — the "Retirement Return" slider under Assumptions). Cash & real estate grow at ~3% regardless.` })}
-      {chip('Inflation', `${plan.inflationRate || 2.5}%`, { title: 'Spending and Social Security COLA both grow at this rate.' })}
-      {chip('Healthcare', `+${plan.healthcareInflation || 3.5}%`, { title: 'Healthcare costs inflate faster than general prices.' })}
+      {chip('Inflation', `${plan.inflationRate ?? 2.5}%`, { title: 'Spending and Social Security COLA both grow at this rate.' })}
+      {chip('Healthcare', `+${plan.healthcareInflation ?? 3.5}%`, { title: 'Healthcare costs inflate faster than general prices.' })}
       {chip('Spending', `${fmt(plan.annualSpending)}/yr${spendingAuto ? ' · auto' : ''}`, {
         warn: spendingAuto,
         title: spendingAuto
@@ -1226,8 +1226,8 @@ export default function MyPlan() {
                 isn't enough?!" verdict was entirely this default). Now
                 dynamic, and it names where to change it. */}
             <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -16, marginBottom: 8 }}>
-              In retirement: {((plan.expectedReturn || 7) * (plan.retiredReturnPct || 60) / 100).toFixed(1)}%
-              {' '}({plan.retiredReturnPct || 60}% of working — adjustable under Assumptions)
+              In retirement: {((plan.expectedReturn ?? 7) * (plan.retiredReturnPct ?? 60) / 100).toFixed(1)}%
+              {' '}({plan.retiredReturnPct ?? 60}% of working — adjustable under Assumptions)
             </div>
           </div>
         </Collapsible>
@@ -1451,7 +1451,7 @@ export default function MyPlan() {
         </Collapsible>
 
         {/* ---- Assumptions ---- */}
-        <Collapsible variant="row" title="Assumptions" defaultOpen={false} badge={`${plan.inflationRate || 2.5}% infl`}>
+        <Collapsible variant="row" title="Assumptions" defaultOpen={false} badge={`${plan.inflationRate ?? 2.5}% infl`}>
           <Slider label="General Inflation" value={plan.inflationRate || 2.5} onChange={v => updatePlan('inflationRate', v)} min={1} max={5} step={0.25} suffix="%" />
           <Slider label="Healthcare Inflation" value={plan.healthcareInflation || 3.5} onChange={v => updatePlan('healthcareInflation', v)} min={2} max={7} step={0.25} suffix="%" />
           <Slider
@@ -1466,7 +1466,7 @@ export default function MyPlan() {
           <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
             <Slider label="Retirement Return (% of working)" value={plan.retiredReturnPct || 60} onChange={v => updatePlan('retiredReturnPct', v)} min={40} max={100} step={5} suffix="%" />
             <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: -16, marginBottom: 8 }}>
-              {plan.expectedReturn || 7}% working → {((plan.expectedReturn || 7) * (plan.retiredReturnPct || 60) / 100).toFixed(1)}% retired
+              {plan.expectedReturn ?? 7}% working → {((plan.expectedReturn ?? 7) * (plan.retiredReturnPct ?? 60) / 100).toFixed(1)}% retired
             </div>
           </div>
           <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
@@ -1708,7 +1708,7 @@ export default function MyPlan() {
                         `Growth over ${pre.length} working years: +${fmt(Math.round(g))} (7% stocks-side; cash & real estate ~3%).`,
                         `Contributions invested: +${fmt(Math.round(c))}.`,
                         w > 0
-                          ? `Withdrawn to cover spending beyond income: −${fmt(Math.round(w))}. This is why the balance grows slower than "${plan.expectedReturn || 7}% compounding" — see the Ledger.`
+                          ? `Withdrawn to cover spending beyond income: −${fmt(Math.round(w))}. This is why the balance grows slower than "${plan.expectedReturn ?? 7}% compounding" — see the Ledger.`
                           : 'No pre-retirement withdrawals — income covered spending every year.',
                       ]}
                     />

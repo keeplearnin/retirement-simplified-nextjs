@@ -29,7 +29,7 @@ export default function TaxAware() {
   const [currentBracket, setCurrentBracket] = useState(24);
   const [retireBracket, setRetireBracket] = useState(22);
   const [showReal, setShowReal] = useState(false);
-  const inflationRate = plan.inflationRate || 2.5;
+  const inflationRate = plan.inflationRate ?? 2.5;
 
   // Detect SECURE 2.0 mandatory-Roth-catch-up applicability for this household.
   // Trigger: age 50+ AND salary > $150K (2026 threshold). Couples-aware: any
