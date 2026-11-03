@@ -10,6 +10,7 @@
  */
 
 import { computeProjection } from '@/lib/computeProjection';
+import { runPlanOdds } from '@/lib/planOdds';
 import { ssClaimingFactor, SS_FRA } from '@/lib/ssClaiming';
 import { computeVerdict } from '@/lib/verdict';
 import { modelRothLadder } from '@/lib/rothConversion';
@@ -191,7 +192,7 @@ function executeRunProjection(plan: Record<string, unknown>, overrides: Record<s
     .filter((_: unknown, i: number) => i % 5 === 0 || i === 0) // every 5th year + first
     .map((row: Record<string, unknown>) => ({
       age: row.age,
-      balance: Math.round((row.balance as number) ?? 0),
+      balance: Math.round((row.availableBalance as number) ?? 0),
       totalIncome: Math.round((row.totalIncome as number) ?? 0),
       totalExpense: Math.round((row.totalExpense as number) ?? 0),
       federalTax: Math.round((row.federalTax as number) ?? 0),
@@ -214,6 +215,48 @@ function executeRunProjection(plan: Record<string, unknown>, overrides: Record<s
 }
 
 // ---------------------------------------------------------------------------
+// get_plan_odds
+// The Plan screen's headline: the chance the money lasts across 500 markets.
+// Same function and seed as My Plan, so the chat quotes the identical number.
+// ---------------------------------------------------------------------------
+
+const getPlanOddsDefinition: ToolDefinition = {
+  name: 'get_plan_odds',
+  description:
+    'Returns the chance the user\'s money lasts their whole plan — the headline number on the Plan screen — from 500 market sequences run through the full projection. Also returns the age money runs short in a bad market (1 in 10), the steady-market money-lasts-to age, and median balances. Use this first for "am I on track" / "will my money last" questions. Optional overrides model a what-if (the odds for that scenario) without changing the saved plan.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      retireAge: { type: 'number', description: 'Override retirement age.' },
+      retireSpending: { type: 'number', description: 'Override annual retirement spending.' },
+      monthlyContribution: { type: 'number', description: 'Override monthly savings contribution.' },
+      expectedReturn: { type: 'number', description: 'Override expected annual return (percentage, e.g. 6).' },
+    },
+  },
+};
+
+function executeGetPlanOdds(plan: Record<string, unknown>, overrides: Record<string, unknown> = {}) {
+  const merged = { ...plan, ...overrides } as Parameters<typeof computeProjection>[0];
+  const odds = runPlanOdds(merged);
+  const steady = computeProjection(merged);
+  const retireIdx = Math.max(0, odds.ages.indexOf(merged.retireAge as number));
+  const last = odds.ages.length - 1;
+  return {
+    chanceMoneyLastsPct: Math.round(odds.successRate * 100),
+    marketsTested: odds.runs,
+    marketsThatLast: odds.successes,
+    badMarketRunsShortAtAge: odds.p10LastsAge, // null = lasts even in a 1-in-10 bad market
+    steadyMarketMoneyLastsAge: steady.moneyLastsAge,
+    planEndsAtAge: odds.ages[last],
+    medianBalanceAtRetirement: Math.round(odds.percentiles.p50[retireIdx]),
+    medianBalanceAtPlanEnd: Math.round(odds.percentiles.p50[last]),
+    assumedYearlySwingPct: Math.round(odds.stdDev),
+    whereToCheck: 'Plan screen verdict, and "See the range" below it',
+    scenarioOverrides: Object.keys(overrides).length > 0 ? overrides : null,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Tool 3: get_verdict
 // Compares current savings to Fidelity benchmarks and surfaces gap + actions.
 // ---------------------------------------------------------------------------
@@ -221,7 +264,7 @@ function executeRunProjection(plan: Record<string, unknown>, overrides: Record<s
 const getVerdictDefinition: ToolDefinition = {
   name: 'get_verdict',
   description:
-    'Compares the user\'s current savings to Fidelity age-based benchmarks. Returns gap status (ahead / on-track / behind / significantly-behind), the dollar shortfall at retirement, and a ranked list of high-impact actions with 10-year dollar values.',
+    'Compares the user\'s current savings to Fidelity age-based benchmarks. Returns gap status (ahead / on-track / behind / significantly-behind), the projected balance at retirement (from the full projection, same as the Plan screen), the shortfall against a rule-of-thumb need, and a ranked list of high-impact actions with 10-year dollar values. For "will my money last", use get_plan_odds instead.',
   input_schema: {
     type: 'object',
     properties: {},
@@ -264,6 +307,8 @@ function executeGetVerdict(plan: Record<string, unknown>) {
           spouseRetirementAge: plan.spouseRetireAge as number,
         }
       : {}),
+    // Same balance the Plan screen shows, not the quick 7% estimate.
+    projectedBalance: Math.round(computeProjection(plan as Parameters<typeof computeProjection>[0]).portfolioAtRetire),
   };
 
   return computeVerdict(input);
@@ -1178,6 +1223,7 @@ function coerceValue(spec: ProposableFieldSpec, value: unknown): number | boolea
 
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
   getPlanSummaryDefinition,
+  getPlanOddsDefinition,
   runProjectionDefinition,
   getVerdictDefinition,
   runTaxEstimateDefinition,
@@ -1203,6 +1249,9 @@ export function executeTool(
     switch (toolName) {
       case 'get_plan_summary':
         result = executePlanSummary(plan);
+        break;
+      case 'get_plan_odds':
+        result = executeGetPlanOdds(plan, toolInput);
         break;
       case 'run_projection':
         result = executeRunProjection(plan, toolInput);

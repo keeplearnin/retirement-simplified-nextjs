@@ -25,6 +25,11 @@ export interface VerdictInput {
   hasSpouse?: boolean;
   spouseCurrentAge?: number;
   spouseRetirementAge?: number;
+
+  /** Balance at retirement from the full projection, when the caller has
+   *  one (the chat). Replaces the quick 7% growth estimate so every screen
+   *  quotes the same number. The standalone Quick verdict page omits it. */
+  projectedBalance?: number;
 }
 
 export type GapStatus = 'ahead' | 'on-track' | 'behind' | 'significantly-behind';
@@ -302,7 +307,7 @@ export function computeVerdict(input: VerdictInput): VerdictOutput {
 
   const projectedFromCurrent = futureValueLump(input.currentSavings, yearsToRetirement);
   const projectedFromContrib = futureValueStream(input.monthlyContribution, yearsToRetirement);
-  const projectedBalance = Math.round(projectedFromCurrent + projectedFromContrib);
+  const projectedBalance = input.projectedBalance ?? Math.round(projectedFromCurrent + projectedFromContrib);
 
   // Replacement-ratio model — apply 4% SWR to RETIREMENT spending, not
   // pre-retirement income. Fidelity's research uses 55-80% income
