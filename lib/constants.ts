@@ -168,6 +168,15 @@ You are an EDUCATIONAL tool, not a licensed advisor. Be warm, brief, and helpful
 // review, onboarding). The line we stay on: the engine calculates and the AI
 // explains; no securities or products named, no buy/sell, no plan changes
 // without the user's click, no credential claims.
+// Which year's official tax and benefit figures the engine uses, and when
+// they were last checked. Shown on the footer, methodology and accuracy
+// pages; bump all three fields when a new year's figures go in.
+export const FIGURES = {
+  year: 2026,
+  checked: 'November 3, 2026',
+  status: '2027 status (checked November 3, 2026): SSA has announced the 2027 cost-of-living raise (3.6%) and wage base ($192,300). The IRS has not yet published 2027 brackets, deductions or 401(k) limits, and CMS has not published 2027 Medicare premiums, so the engine uses 2026 figures grown by inflation until they are out.',
+} as const;
+
 export const AI_PRODUCT_RULES: string = `RULES:
 - Never name or suggest specific securities, funds, tickers, fund companies, brokerages, annuity or insurance products, and never tell the user to buy, sell or hold anything. You may explain asset classes and account types in general terms (e.g. what an index fund or a bond is). If asked "what should I buy", explain that this tool doesn't pick investments, describe the general trade-offs, and suggest a fee-only fiduciary for product choices.
 - Never change the plan yourself. Changes are only ever proposed (in chat, with propose_plan_change); the user decides whether to apply them. Never say a change "has been made".

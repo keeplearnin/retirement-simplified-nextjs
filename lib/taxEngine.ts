@@ -30,6 +30,15 @@ export interface TaxInput {
    *  provisions like the OBBBA senior bonus deduction (effective 2025-2028).
    *  Defaults to 2026 if absent — matches the rest of the engine's constants. */
   taxYear?: number;
+  /** Price growth since 2026 for this tax year, e.g. (1 + inflation)^years.
+   *  The IRS raises brackets and deductions with inflation every year, so a
+   *  projection that grows income with inflation must grow these too, or a
+   *  steady real income drifts into higher brackets decades out. Scales the
+   *  federal ordinary and capital-gains brackets, the standard and 65+
+   *  deductions and the IRMAA tiers. Thresholds the law never indexes stay
+   *  fixed: Social Security taxation, NIIT, the SALT cap and the OBBBA
+   *  senior bonus. Defaults to 1 (2026 figures as published). */
+  indexFactor?: number;
   deductions?: {
     mortgageInterest?: number;
     propertyTax?: number;
@@ -101,6 +110,7 @@ export function detectIrmaaCliff(
 // ---------------------------------------------------------------------------
 // 2026 Federal Tax Brackets — IRS Rev. Proc. 2025-32
 // Update each January when the IRS publishes new inflation-adjusted thresholds.
+// Later years scale these by TaxInput.indexFactor (see indexBrackets).
 // ---------------------------------------------------------------------------
 
 interface BracketEntry {
@@ -467,6 +477,13 @@ export function computeSSTaxable(
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+// Grow a 2026 bracket table to a later year's prices. The IRS rounds each
+// edge to $25/$50; unrounded is within a few dollars of tax.
+function indexBrackets(brackets: BracketEntry[], factor: number): BracketEntry[] {
+  if (factor === 1) return brackets;
+  return brackets.map(b => ({ min: b.min * factor, max: b.max * factor, rate: b.rate }));
+}
+
 function applyBrackets(taxableIncome: number, brackets: BracketEntry[]): number {
   let tax = 0;
   for (const b of brackets) {
@@ -490,6 +507,7 @@ function getStandardDeduction(
   filingStatus: 'single' | 'mfj',
   age: number,
   spouseAge?: number,
+  indexFactor: number = 1,
 ): number {
   let deduction =
     filingStatus === 'single' ? STANDARD_DEDUCTION_SINGLE : STANDARD_DEDUCTION_MFJ;
@@ -505,7 +523,7 @@ function getStandardDeduction(
     deduction += ADDITIONAL_DEDUCTION_MFJ_65;
   }
 
-  return deduction;
+  return deduction * indexFactor;
 }
 
 /**
@@ -535,15 +553,18 @@ function computeOBBBASeniorDeduction(
   return total;
 }
 
-function computeIRMAA(magi: number, filingStatus: 'single' | 'mfj'): number {
+// IRMAA tiers are CPI-indexed, so a later year compares MAGI in 2026
+// dollars; the surcharge is then grown back to that year's prices.
+function computeIRMAA(magi: number, filingStatus: 'single' | 'mfj', indexFactor: number = 1): number {
   const table = filingStatus === 'single' ? IRMAA_SINGLE : IRMAA_MFJ;
+  const realMagi = magi / indexFactor;
   for (const entry of table) {
-    if (magi <= entry.magiThreshold) {
-      return entry.monthlyPartBSurcharge;
+    if (realMagi <= entry.magiThreshold) {
+      return entry.monthlyPartBSurcharge * indexFactor;
     }
   }
   // Above all thresholds
-  return table[table.length - 1].monthlyPartBSurcharge;
+  return table[table.length - 1].monthlyPartBSurcharge * indexFactor;
 }
 
 // State retirement-income exemptions. Many states fully or partially exempt
@@ -672,11 +693,14 @@ function computeCapitalGainsTax(
   gains: number,
   ordinaryTaxableIncome: number,
   filingStatus: 'single' | 'mfj',
+  indexFactor: number = 1,
 ): number {
   if (gains <= 0) return 0;
 
-  const brackets =
-    filingStatus === 'single' ? CAP_GAINS_BRACKETS_SINGLE : CAP_GAINS_BRACKETS_MFJ;
+  const brackets = indexBrackets(
+    filingStatus === 'single' ? CAP_GAINS_BRACKETS_SINGLE : CAP_GAINS_BRACKETS_MFJ,
+    indexFactor,
+  );
 
   // Capital gains stack on top of ordinary income for bracket purposes.
   // The "base" is the ordinary taxable income; gains fill from there upward.
@@ -726,6 +750,7 @@ export function computeTax(input: TaxInput): TaxResult {
     taxYear = 2026,
     deductions,
   } = input;
+  const indexFactor = input.indexFactor && input.indexFactor > 0 ? input.indexFactor : 1;
 
   // 1. Compute SS taxability
   const { taxableAmount: ssTaxable, taxablePercent: ssTaxablePercent } =
@@ -740,7 +765,7 @@ export function computeTax(input: TaxInput): TaxResult {
   const magi = grossOrdinaryIncome + capitalGains;
 
   // 3. Deductions
-  const standardDeduction = getStandardDeduction(filingStatus, age, spouseAge);
+  const standardDeduction = getStandardDeduction(filingStatus, age, spouseAge, indexFactor);
 
   // Itemized deductions with SALT cap
   const mortgageInterest = deductions?.mortgageInterest ?? 0;
@@ -777,8 +802,10 @@ export function computeTax(input: TaxInput): TaxResult {
   const federalTaxableOrdinary = Math.max(0, grossOrdinaryIncome - deductionAmount);
 
   // 5. Federal ordinary income tax
-  const brackets =
-    filingStatus === 'single' ? FEDERAL_BRACKETS_SINGLE : FEDERAL_BRACKETS_MFJ;
+  const brackets = indexBrackets(
+    filingStatus === 'single' ? FEDERAL_BRACKETS_SINGLE : FEDERAL_BRACKETS_MFJ,
+    indexFactor,
+  );
   const federalTax = applyBrackets(federalTaxableOrdinary, brackets);
 
   // 6. Capital gains tax. The deduction applies to TOTAL taxable income:
@@ -794,6 +821,7 @@ export function computeTax(input: TaxInput): TaxResult {
     taxableGains,
     federalTaxableOrdinary,
     filingStatus,
+    indexFactor,
   );
 
   // 7. NIIT — uses MAGI computed earlier for the OBBBA phase-out
@@ -815,7 +843,7 @@ export function computeTax(input: TaxInput): TaxResult {
   });
 
   // 9. IRMAA (monthly Part B surcharge)
-  const irmaa = computeIRMAA(magi, filingStatus);
+  const irmaa = computeIRMAA(magi, filingStatus, indexFactor);
 
   // 10. Marginal rate
   const marginalRate = getMarginalRate(federalTaxableOrdinary, brackets);
@@ -836,7 +864,7 @@ export function computeTax(input: TaxInput): TaxResult {
     effectiveRate: round4(effectiveRate),
     marginalRate,
     ssTaxablePercent,
-    standardDeduction,
+    standardDeduction: round2(standardDeduction),
     itemizedDeduction: round2(itemizedDeduction),
     deductionUsed,
     obbbaSeniorDeduction: round2(obbbaSeniorDeduction),

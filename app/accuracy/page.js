@@ -1,4 +1,5 @@
 import { REFERENCE_CASES, caseResult } from '@/lib/referenceCases';
+import { FIGURES } from '@/lib/constants';
 
 export const metadata = {
   title: 'How we check the math — Retire Simplified',
@@ -50,7 +51,7 @@ export default function AccuracyPage() {
 
         <h2 style={h2}>Checked against IRS and SSA rules</h2>
         <p style={{ ...muted, marginBottom: 16 }}>
-          {passing} of {rows.length} match exactly.{' '}
+          {passing} of {rows.length} match exactly, using {FIGURES.year} figures (checked {FIGURES.checked}).{' '}
           <a href={`${REPO}/blob/main/tests/referenceCases.test.js`} style={{ color: 'var(--accent)' }}>See the test</a>
           {' · '}
           <a href={`${REPO}/blob/main/lib/referenceCases.js`} style={{ color: 'var(--accent)' }}>See every case and its working</a>

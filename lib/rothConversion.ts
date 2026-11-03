@@ -54,6 +54,9 @@ export interface RothLadderInput {
   conversionStartAge: number;
   /** Last age (inclusive) at which a conversion can happen — typically 72 (year before RMD start). */
   conversionEndAge: number;
+  /** Annual inflation (e.g. 0.025). Brackets and the standard deduction grow
+   *  by it each year, as the IRS indexes them; defaults to 2.5%. */
+  inflationRate?: number;
 }
 
 export interface RothLadderYear {
@@ -155,7 +158,13 @@ function runScenario(input: RothLadderInput, withLadder: boolean): RothLadderSce
   // ages 60-63 (which also produced taxYear < 2026).
   const simStartAge = Math.max(input.retireAge, input.currentAge);
 
+  const inflationRate = input.inflationRate ?? 0.025;
+
   for (let age = simStartAge; age <= input.longevityAge; age++) {
+    // This year's prices relative to 2026 — the IRS indexes brackets and
+    // the standard deduction, so "fill the 22% bracket" means a bigger
+    // dollar conversion each year.
+    const indexFactor = Math.pow(1 + inflationRate, age - input.currentAge);
     const ssGross = ssGrossInYear(input, age);
     const pension = pensionInYear(input, age);
 
@@ -190,7 +199,7 @@ function runScenario(input: RothLadderInput, withLadder: boolean): RothLadderSce
       let taxableSS = 0;
       let headroom = 0;
       for (let pass = 0; pass < 3; pass++) {
-        headroom = Math.max(0, targetTaxableTop + stdDed - ordinaryBeforeConversion - taxableSS);
+        headroom = Math.max(0, (targetTaxableTop + stdDed) * indexFactor - ordinaryBeforeConversion - taxableSS);
         const tentative = Math.min(headroom, tradBal);
         taxableSS = computeSSTaxable(
           ssGross, ordinaryBeforeConversion + tentative, input.filingStatus
@@ -215,6 +224,7 @@ function runScenario(input: RothLadderInput, withLadder: boolean): RothLadderSce
       stateCode: input.stateCode,
       age,
       taxYear,
+      indexFactor,
     });
 
     const totalTax = taxResult.totalTax;

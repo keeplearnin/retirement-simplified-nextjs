@@ -3,7 +3,9 @@
 // Methodology page — documents the assumptions, data sources, and known
 // simplifications so users (and their advisors) can verify the math.
 
-const LAST_REVIEWED = 'November 2026';
+import { FIGURES } from '@/lib/constants';
+
+const LAST_REVIEWED = FIGURES.checked;
 
 const sections = [
   {
@@ -12,6 +14,8 @@ const sections = [
       "Federal income tax brackets, standard deduction, additional standard deduction for age 65+, and long-term capital-gains brackets all use 2026 figures from IRS Rev. Proc. 2025-32.",
       "OBBBA senior bonus deduction: $6,000 per qualifying individual age 65+, on top of the existing additional standard deduction. Effective tax years 2025–2028 only (expires after 2028 absent congressional extension). Phases out 6¢ per dollar of MAGI over $75K single / $150K MFJ; reaches zero at $175K / $250K. The projection engine applies this deduction year-by-year and stops applying it after 2028.",
       "Marginal rates and bracket thresholds update each January when the IRS publishes new inflation adjustments.",
+      "Later years: brackets, the standard and 65+ deductions, capital-gains brackets and IRMAA tiers grow with your inflation assumption, the way the IRS and SSA index them each year. Thresholds the law never indexes stay fixed: Social Security taxation ($25,000 / $32,000), the 3.8% NIIT threshold, the SALT cap and the OBBBA senior deduction phase-out. State brackets stay at 2026 figures.",
+      FIGURES.status,
     ],
     sources: [
       { label: 'IRS Rev. Proc. 2025-32 (2026 inflation adjustments)', url: 'https://www.irs.gov/newsroom/irs-releases-tax-inflation-adjustments-for-tax-year-2026-including-amendments-from-the-one-big-beautiful-bill' },

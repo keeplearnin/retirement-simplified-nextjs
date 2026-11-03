@@ -46,7 +46,7 @@ export default function RothLadder() {
     tradBalance,
     rothBalance,
     expectedReturn: (plan.expectedReturn ?? 7) / 100,
-    retiredReturnPct: (plan.retiredReturnPct ?? 60) / 100,
+    retiredReturnPct: plan.retiredReturnPct ?? 60, // a percent; the ladder divides by 100
     filingStatus,
     stateCode: plan.stateCode || 'CA',
     ssMonthlyBenefit: ssSource?.monthlyBenefit || 0,
@@ -55,6 +55,7 @@ export default function RothLadder() {
     pensionStartAge: pensionSource?.startAge,
     conversionStartAge,
     conversionEndAge,
+    inflationRate: (plan.inflationRate ?? 2.5) / 100,
   }), [plan, filingStatus, tradBalance, rothBalance, ssSource, pensionSource, conversionStartAge, conversionEndAge]);
 
   const result = useMemo(() =>

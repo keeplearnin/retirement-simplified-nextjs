@@ -26,6 +26,7 @@ import CollegePlanner from '@/components/tabs/CollegePlanner';
 import PortfolioBuilder from '@/components/tabs/PortfolioBuilder';
 import GettingStarted from '@/components/tabs/GettingStarted';
 import Icon from '@/components/ui/Icon';
+import { FIGURES } from '@/lib/constants';
 
 function AppContent() {
   const [tab, setTab] = useState('myplan');
@@ -287,7 +288,7 @@ function AppContent() {
           <a href="/calculators/social-security-break-even" style={{ color: 'var(--text-dim)', textDecoration: 'none' }}>SS Break-Even</a>
         </div>
         <p style={{ color: 'var(--text-dim)', fontSize: 11, marginTop: 16, lineHeight: 1.7, opacity: 0.6 }}>
-          Built independently. Not a financial advisor. Free, open source, MIT licensed. Tax + benefits data refreshed annually from the IRS, SSA, and CMS.
+          Built independently. Not a financial advisor. Free, open source, MIT licensed. Tax and benefit figures: {FIGURES.year} from the IRS, SSA and CMS, grown with inflation for later years · checked {FIGURES.checked}.
         </p>
       </footer>
     </div>

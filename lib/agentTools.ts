@@ -431,6 +431,7 @@ function executeRunRothAnalysis(plan: Record<string, unknown>, args: Record<stri
     targetBracket: ((args.targetBracket as number) ?? 22) as Bracket,
     conversionStartAge: (args.conversionStartAge as number) ?? retireAge,
     conversionEndAge: (args.conversionEndAge as number) ?? 72,
+    inflationRate: ((plan.inflationRate as number) ?? 2.5) / 100,
   };
 
   const result = modelRothLadder(input);
@@ -774,6 +775,7 @@ function executeAnalyzeWithdrawalOrder(
     targetBracket: bracket as Bracket,
     conversionStartAge: retireAge,
     conversionEndAge: 72,
+    inflationRate: ((plan.inflationRate as number) ?? 2.5) / 100,
   };
   const ladderResult = modelRothLadder(rothInput);
 
@@ -899,6 +901,7 @@ function executeRunFullOptimization(plan: Record<string, unknown>) {
         targetBracket: 22,
         conversionStartAge: retireAge,
         conversionEndAge: 72,
+        inflationRate: ((plan.inflationRate as number) ?? 2.5) / 100,
       });
       rothTaxSaved = Math.round(ladder.taxSaved);
     } catch {
