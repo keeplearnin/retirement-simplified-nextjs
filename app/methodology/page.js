@@ -80,14 +80,19 @@ const sections = [
   {
     title: 'State income tax',
     body: [
-      "California, New York, New Jersey, and Oregon use full graduated bracket math (per their state revenue department's published 2025 brackets, used for tax year 2026 with minor inflation indexing). High earners in these states see liability matching their actual top-bracket exposure rather than a flat effective rate.",
-      "All other states use a single effective rate — accurate within a few hundred dollars for flat-tax states (PA, IL, IN, etc.) and for typical retiree income levels. Hawaii, Minnesota, Massachusetts, and Wisconsin are still on flat rates and will be migrated to graduated brackets in a future update; high earners in those states see an in-planner warning when affected.",
-      "What this tool does not yet model: NYC's additional 3.876% city tax; California's 1% Mental Health Services tax surcharge on income above $1M; Massachusetts's 4% surtax on income above $1M (the 'Millionaires Tax'); local income taxes in PA, OH, MI cities.",
+      "California, New York, New Jersey, Oregon, Hawaii, Minnesota, Massachusetts, and Wisconsin use full graduated bracket math rather than a flat effective rate. High earners in these states see liability matching their actual top-bracket exposure. Massachusetts's modeling includes the 4% 'Fair Share' surtax on income above the inflation-indexed threshold (~$1.1M for 2026).",
+      "All other states use a single effective rate — accurate within a few hundred dollars for flat-tax states (PA, IL, IN, etc.) and for typical retiree income levels.",
+      "Sourcing confidence varies by state: Hawaii and Minnesota's brackets are confirmed directly against tax.hawaii.gov and revenue.state.mn.us for tax year 2026. Massachusetts's surtax threshold ($1,107,750) and Wisconsin's 2026 bracket thresholds come from secondary sources that agree with each other, because the official 2026 tables weren't reachable (Wisconsin's revenue site still shows 2025 as of November 3, 2026). Both will be checked against the states' own figures when available.",
+      "What this tool does not yet model: NYC's additional 3.876% city tax; California's 1% Mental Health Services tax surcharge on income above $1M; local income taxes in PA, OH, MI cities.",
     ],
     sources: [
       { label: 'CA FTB — 2025 California Tax Rates', url: 'https://www.ftb.ca.gov/file/personal/tax-calculator-tables-rates.html' },
       { label: 'NY DTF — 2025 NY State Tax Rates', url: 'https://www.tax.ny.gov/forms/income_tax/2024_inflation_adjusted_rates.htm' },
       { label: 'NJ DOT — 2024 NJ Tax Rate Schedules', url: 'https://www.nj.gov/treasury/taxation/taxtables.shtml' },
+      { label: 'Hawaii Dept. of Taxation — Tax Rate Schedules', url: 'https://tax.hawaii.gov/forms/d_25table-on/d_25table-on_p13/' },
+      { label: 'Minnesota Dept. of Revenue — 2026 Income Tax Brackets', url: 'https://www.revenue.state.mn.us/press-release/2025-12-16/minnesota-income-tax-brackets-standard-deduction-and-dependent-exemption' },
+      { label: 'Massachusetts DOR — 4% Surtax on Taxable Income', url: 'https://www.mass.gov/info-details/massachusetts-4-surtax-on-taxable-income' },
+      { label: 'Wisconsin Dept. of Revenue — Individual Income Tax Rates (2025 schedule; 2026 thresholds from secondary sources)', url: 'https://www.revenue.wi.gov/Pages/FAQS/pcs-taxrates.aspx' },
     ],
   },
   {

@@ -66,3 +66,118 @@ describe('computeTax — federal', () => {
     }
   });
 });
+
+describe('computeTax — graduated state brackets (HI, MN, MA, WI)', () => {
+  it('Hawaii single: mid-bracket ($60K income, 7.20% bracket)', () => {
+    const r = computeTax({
+      filingStatus: 'single', ordinaryIncome: 60_000,
+      socialSecurityBenefit: 0, capitalGains: 0, stateCode: 'HI', age: 40,
+    });
+    // Taxable = 43,900. Marginal sum across brackets up to the $36K-$48K
+    // (7.20%) tier: 9,600@1.4% + 4,800@3.2% + 4,800@5.5% + 4,800@6.4% +
+    // 12,000@6.8% + 7,900@7.2% = 134.4+153.6+264+307.2+816+568.8 = 2,244.00.
+    // (Hawaii's official printed schedule shows a rounded cumulative base of
+    // $1,675 for this tier — the precise marginal sum is $1,675.20, a few
+    // cents different. applyBrackets computes the precise value.)
+    expect(r.stateTax).toBeCloseTo(2_244.00, 2);
+  });
+
+  it('Hawaii MFJ: upper bracket ($150K income, 7.60% bracket)', () => {
+    const r = computeTax({
+      filingStatus: 'mfj', ordinaryIncome: 150_000,
+      socialSecurityBenefit: 0, capitalGains: 0, stateCode: 'HI', age: 40,
+    });
+    // Taxable = 117,800. Marginal sum up to the $96K-$250K (7.60%) tier:
+    // 19,200@1.4% + 9,600@3.2% + 9,600@5.5% + 9,600@6.4% + 24,000@6.8% +
+    // 24,000@7.2% + 21,800@7.6% = 6,735.20 (same rounded-base caveat as above).
+    expect(r.stateTax).toBeCloseTo(6_735.20, 2);
+  });
+
+  it('Minnesota single: top bracket ($150K income, 7.85% bracket)', () => {
+    const r = computeTax({
+      filingStatus: 'single', ordinaryIncome: 150_000,
+      socialSecurityBenefit: 0, capitalGains: 0, stateCode: 'MN', age: 40,
+    });
+    // Taxable = 133,900. Marginal sum across 3 brackets:
+    // 33,310*5.35% + (109,430-33,310)*6.80% + (133,900-109,430)*7.85%
+    // = 1,782.085 + 5,176.16 + 1,920.895 = 8,879.14
+    expect(r.stateTax).toBeCloseTo(8_879.14, 2);
+  });
+
+  it('Minnesota MFJ: top rate bracket ($300K income, 7.85% bracket)', () => {
+    const r = computeTax({
+      filingStatus: 'mfj', ordinaryIncome: 300_000,
+      socialSecurityBenefit: 0, capitalGains: 0, stateCode: 'MN', age: 40,
+    });
+    // Taxable = 267,800. Marginal sum:
+    // 48,700*5.35% + (193,480-48,700)*6.80% + (267,800-193,480)*7.85%
+    // = 2,605.45 + 9,845.04 + 5,834.12 = 18,284.61
+    expect(r.stateTax).toBeCloseTo(18_284.61, 2);
+  });
+
+  it('Massachusetts: flat 5% below the surtax threshold', () => {
+    const r = computeTax({
+      filingStatus: 'single', ordinaryIncome: 50_000,
+      socialSecurityBenefit: 0, capitalGains: 0, stateCode: 'MA', age: 40,
+    });
+    // Taxable = 33,900, well under the $1,107,750 surtax threshold → flat 5%
+    expect(r.stateTax).toBeCloseTo(33_900 * 0.05, 2);
+  });
+
+  it('Massachusetts: 4% surtax applies above the millionaire threshold', () => {
+    const r = computeTax({
+      filingStatus: 'single', ordinaryIncome: 1_200_000,
+      socialSecurityBenefit: 0, capitalGains: 0, stateCode: 'MA', age: 40,
+    });
+    // Taxable = 1,183,900 → 1,107,750*5% + (1,183,900-1,107,750)*9%
+    // = 55,387.50 + 6,853.50 = 62,241.00
+    expect(r.stateTax).toBeCloseTo(62_241.00, 2);
+  });
+
+  it('Massachusetts: surtax threshold is identical for single and MFJ', () => {
+    const single = computeTax({
+      filingStatus: 'single', ordinaryIncome: 1_150_000,
+      socialSecurityBenefit: 0, capitalGains: 0, stateCode: 'MA', age: 40,
+    });
+    const mfj = computeTax({
+      filingStatus: 'mfj', ordinaryIncome: 1_150_000 + (32_200 - 16_100), // equalize taxable income
+      socialSecurityBenefit: 0, capitalGains: 0, stateCode: 'MA', age: 40,
+    });
+    expect(mfj.stateTax).toBeCloseTo(single.stateTax, 2);
+  });
+
+  it('Wisconsin single: mid-bracket ($80K income, 5.30% bracket)', () => {
+    const r = computeTax({
+      filingStatus: 'single', ordinaryIncome: 80_000,
+      socialSecurityBenefit: 0, capitalGains: 0, stateCode: 'WI', age: 40,
+    });
+    // Taxable = 63,900 (2026 brackets 15,110 / 51,950 / 332,720)
+    // = 3.5% × 15,110 + 4.4% × 36,840 + 5.3% × 11,950
+    // = 528.85 + 1,620.96 + 633.35 = 2,783.16
+    expect(r.stateTax).toBeCloseTo(2_783.16, 2);
+  });
+
+  it('Wisconsin MFJ: top bracket ($500K income, 7.65% bracket)', () => {
+    const r = computeTax({
+      filingStatus: 'mfj', ordinaryIncome: 500_000,
+      socialSecurityBenefit: 0, capitalGains: 0, stateCode: 'WI', age: 40,
+    });
+    // Taxable = 467,800 (2026 MFJ brackets 20,150 / 69,260 / 443,630)
+    // = $22,707.70 through 443,630 + 7.65% × 24,170 (1,849.01) = 24,556.71
+    expect(r.stateTax).toBeCloseTo(24_556.71, 1);
+  });
+
+  it('all four states are monotonic: more income never means less state tax', () => {
+    for (const stateCode of ['HI', 'MN', 'MA', 'WI']) {
+      let prev = 0;
+      for (const income of [20_000, 60_000, 150_000, 400_000, 1_200_000]) {
+        const r = computeTax({
+          filingStatus: 'single', ordinaryIncome: income,
+          socialSecurityBenefit: 0, capitalGains: 0, stateCode, age: 40,
+        });
+        expect(r.stateTax).toBeGreaterThanOrEqual(prev);
+        prev = r.stateTax;
+      }
+    }
+  });
+});

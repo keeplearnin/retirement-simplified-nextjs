@@ -319,8 +319,11 @@ const DEFAULT_STATE_TAX_RATE = 0.05; // fallback
 // rate, run proper bracket math. Threshold for inclusion: top marginal rate
 // at least 2 pp above the flat estimate AND a population large enough that
 // the inaccuracy hits a meaningful number of users. Source: state revenue
-// department 2025 published brackets (used for tax year 2026 — minor index
-// shifts only). Re-verify each January when states publish updated tables.
+// department published brackets. Re-verify each January when states
+// publish updated tables. Per-state sourcing/confidence notes are on each
+// entry below — HI and MN are confirmed directly against tax.hawaii.gov /
+// revenue.state.mn.us; MA and WI use secondary-source 2026 figures (see
+// their comments) because the official 2026 tables weren't reachable.
 //
 // For users not in this table, computeStateTax falls through to the flat
 // rate above, which is accurate for non-graduated / lower-income states.
@@ -412,6 +415,98 @@ const STATE_GRADUATED_BRACKETS: Record<
       { min: 8_600,     max: 21_500,    rate: 0.0675 },
       { min: 21_500,    max: 250_000,   rate: 0.0875 },
       { min: 250_000,   max: Infinity,  rate: 0.0990 },
+    ],
+  },
+  HI: {
+    // Confirmed directly from tax.hawaii.gov's rate schedule ("Tax Rate
+    // Schedules For Taxable Years Beginning After December 31, 2024").
+    // Hawaii's Act 46 (2024) phases in bracket changes in 2025, 2027, and
+    // 2029 only — this table is unchanged for tax year 2026. 12 brackets,
+    // 1.40%-11.00%, among the most brackets of any state.
+    single: [
+      { min: 0,        max: 9_600,     rate: 0.0140 },
+      { min: 9_600,    max: 14_400,    rate: 0.0320 },
+      { min: 14_400,   max: 19_200,    rate: 0.0550 },
+      { min: 19_200,   max: 24_000,    rate: 0.0640 },
+      { min: 24_000,   max: 36_000,    rate: 0.0680 },
+      { min: 36_000,   max: 48_000,    rate: 0.0720 },
+      { min: 48_000,   max: 125_000,   rate: 0.0760 },
+      { min: 125_000,  max: 175_000,   rate: 0.0790 },
+      { min: 175_000,  max: 225_000,   rate: 0.0825 },
+      { min: 225_000,  max: 275_000,   rate: 0.0900 },
+      { min: 275_000,  max: 325_000,   rate: 0.1000 },
+      { min: 325_000,  max: Infinity,  rate: 0.1100 },
+    ],
+    mfj: [
+      { min: 0,        max: 19_200,    rate: 0.0140 },
+      { min: 19_200,   max: 28_800,    rate: 0.0320 },
+      { min: 28_800,   max: 38_400,    rate: 0.0550 },
+      { min: 38_400,   max: 48_000,    rate: 0.0640 },
+      { min: 48_000,   max: 72_000,    rate: 0.0680 },
+      { min: 72_000,   max: 96_000,    rate: 0.0720 },
+      { min: 96_000,   max: 250_000,   rate: 0.0760 },
+      { min: 250_000,  max: 350_000,   rate: 0.0790 },
+      { min: 350_000,  max: 450_000,   rate: 0.0825 },
+      { min: 450_000,  max: 550_000,   rate: 0.0900 },
+      { min: 550_000,  max: 650_000,   rate: 0.1000 },
+      { min: 650_000,  max: Infinity,  rate: 0.1100 },
+    ],
+  },
+  MN: {
+    // Confirmed against two independent revenue.state.mn.us sources: the
+    // official tax-year-2026 press release (Dec 2025) and the general
+    // rates page — both agree exactly. Thresholds are inflation-indexed
+    // annually (2.369% adjustment from TY2025 to TY2026).
+    single: [
+      { min: 0,        max: 33_310,    rate: 0.0535 },
+      { min: 33_310,   max: 109_430,   rate: 0.0680 },
+      { min: 109_430,  max: 203_150,   rate: 0.0785 },
+      { min: 203_150,  max: Infinity,  rate: 0.0985 },
+    ],
+    mfj: [
+      { min: 0,        max: 48_700,    rate: 0.0535 },
+      { min: 48_700,   max: 193_480,   rate: 0.0680 },
+      { min: 193_480,  max: 337_930,   rate: 0.0785 },
+      { min: 337_930,  max: Infinity,  rate: 0.0985 },
+    ],
+  },
+  MA: {
+    // Not a traditional bracket ladder — flat 5% plus a 4% "Fair Share"
+    // (millionaire's) surtax above an inflation-indexed threshold. The
+    // threshold applies regardless of filing status (no separate MFJ
+    // figure exists), so single and mfj are identical here.
+    // APPROXIMATION: mass.gov blocks automated fetches, so the $1,107,750
+    // 2026 threshold is a secondary-source consensus figure (up from $1M
+    // in 2023; re-checked Nov 3, 2026 — sources still agree), not
+    // independently verified against the official DOR TIR.
+    // Re-verify before relying on this for actual filing guidance.
+    single: [
+      { min: 0,          max: 1_107_750, rate: 0.05 },
+      { min: 1_107_750,  max: Infinity,  rate: 0.09 },
+    ],
+    mfj: [
+      { min: 0,          max: 1_107_750, rate: 0.05 },
+      { min: 1_107_750,  max: Infinity,  rate: 0.09 },
+    ],
+  },
+  WI: {
+    // APPROXIMATION: as of Nov 3, 2026 revenue.wi.gov still shows only the
+    // 2025 schedule (single 14,680 / 50,480 / 323,290; MFJ 19,580 / 67,300 /
+    // 431,060). These 2026 thresholds are the consensus of secondary
+    // sources, each edge ~2.9% above 2025 — Wisconsin's statutory
+    // inflation step — with the 4-tier rates unchanged. Replace with the
+    // DOR's own 2026 schedule once it is published.
+    single: [
+      { min: 0,        max: 15_110,    rate: 0.0350 },
+      { min: 15_110,   max: 51_950,    rate: 0.0440 },
+      { min: 51_950,   max: 332_720,   rate: 0.0530 },
+      { min: 332_720,  max: Infinity,  rate: 0.0765 },
+    ],
+    mfj: [
+      { min: 0,        max: 20_150,    rate: 0.0350 },
+      { min: 20_150,   max: 69_260,    rate: 0.0440 },
+      { min: 69_260,   max: 443_630,   rate: 0.0530 },
+      { min: 443_630,  max: Infinity,  rate: 0.0765 },
     ],
   },
 };

@@ -1169,7 +1169,9 @@ export default function MyPlan({ openRange = false }) {
                 {US_STATES.map(st => <option key={st} value={st}>{st}</option>)}
               </select>
               <div style={{ marginTop: 8, fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.5, fontStyle: 'italic' }}>
-                State tax uses one effective rate per state. For graduated states (CA, NY, OR, etc.), high earners may owe more than this estimator shows.
+                {['CA', 'NY', 'NJ', 'OR', 'HI', 'MN', 'MA', 'WI'].includes(plan.stateCode)
+                  ? 'This state uses full graduated bracket math, not a flat effective rate.'
+                  : 'State tax uses one effective rate for this state — accurate for flat-tax states and typical retiree income; high earners in states with steep graduated brackets may owe more than this estimator shows.'}
               </div>
             </div>
           </div>
@@ -1982,29 +1984,6 @@ export default function MyPlan({ openRange = false }) {
         <div style={{ marginTop: 16 }}>
           <HealthcareBreakdown plan={plan} />
         </div>
-
-        {/* State Tax Warning — fires only for states still on flat-rate
-            modeling. CA, NY, NJ, OR now use proper graduated brackets in
-            taxEngine.ts (the four states with the steepest top brackets and
-            the largest user-impact). The remaining high-graduated states
-            (HI, MN, MA, WI) still flat — warning preserved for those until
-            we add bracket math. */}
-        {(() => {
-          const FLAT_RATE_GRADUATED_STATES = ['HI', 'MN', 'MA', 'WI'];
-          if (!FLAT_RATE_GRADUATED_STATES.includes(plan.stateCode)) return null;
-          const isMFJ = plan.filingStatus === 'mfj';
-          const highIncomeThreshold = isMFJ ? 250000 : 150000;
-          // Trigger if any working year hits the threshold. baseIncome on
-          // working years ≈ salary; this catches high earners pre-retirement.
-          const hasHighIncomeYear = combined.some(r => !r.isRetired && (r.salary || 0) > highIncomeThreshold);
-          if (!hasHighIncomeYear) return null;
-          const stateNames = { HI: 'Hawaii', MN: 'Minnesota', MA: 'Massachusetts', WI: 'Wisconsin' };
-          return (
-            <InfoBox title={`${stateNames[plan.stateCode]} state tax is likely understated`} color="var(--warn)" bgColor="rgba(251,191,36,.08)">
-              At your income level, your state's graduated brackets push the marginal rate above the single effective rate this tool uses. Real {stateNames[plan.stateCode]} liability is likely higher than the projection shows — possibly several thousand dollars per year. Graduated-bracket modeling for {stateNames[plan.stateCode]} is on the roadmap; CA, NY, NJ, and OR are already on full graduated brackets.
-            </InfoBox>
-          );
-        })()}
 
         {/* IRMAA Warning */}
         {combined.some(r => r.irmaa > 0) && (
