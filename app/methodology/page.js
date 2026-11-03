@@ -3,7 +3,7 @@
 // Methodology page — documents the assumptions, data sources, and known
 // simplifications so users (and their advisors) can verify the math.
 
-const LAST_REVIEWED = 'May 2026';
+const LAST_REVIEWED = 'November 2026';
 
 const sections = [
   {
@@ -88,7 +88,7 @@ const sections = [
   {
     title: 'Portfolio assumptions and inflation',
     body: [
-      "Default expected return: 7%/yr (a 60/40 stock/bond portfolio assumption).",
+      "Default expected return: 7%/yr, treated as a long-run growth rate (the steady projection is the middle case).",
       "Default retirement allocation shift: 60% of working-years return — i.e., a 7% expected return drops to 4.2% in retirement, modeling a more conservative bond-heavier allocation. This is editable on the Plan tab; users with longer time horizons or higher risk tolerance should bump this up.",
       "Default inflation: 2.5%/yr. Healthcare inflation: 3.5%/yr.",
       "The retirement allocation shift activates only when both household members are retired — gap years where one spouse is still working keep the higher pre-retirement return rate.",
@@ -123,10 +123,12 @@ const sections = [
     ],
   },
   {
-    title: 'Monte Carlo',
+    title: 'Plan odds (Monte Carlo) and the history check',
     body: [
-      "Box-Muller normal distribution. Default 1,000 runs (configurable). Reports P10 / P25 / P50 / P75 / P90 percentiles plus success rate.",
-      "Known limitation: normal-distribution returns underestimate left-tail risk vs. fat-tailed empirical distributions. Real markets have crashes that the Monte Carlo doesn't fully capture.",
+      "The headline \"your money lasts your whole plan in X% of markets\" runs the full projection above — taxes, Social Security, required withdrawals, healthcare, long-term care, survivor years — through 500 market sequences, not a simplified model. A market fails if any year runs short of money. The random seed is fixed, so the same plan always shows the same percentage; sampling alone moves it by about ±3 points.",
+      "Yearly returns are drawn from a normal distribution around your expected return. The plan stores only a return, so the size of yearly swings is read off typical stock/bond mixes (7% is treated like a roughly 50/50 mix swinging about 9% a year). In retirement, returns and swings are both scaled by the retirement allocation shift. The average year is lifted by half the variance so the middle outcome compounds at your stated rate.",
+      "The history check replays every complete run of years since 1928 (S&P 500 and 10-year Treasury, Damodaran/NYU Stern) in their real order, centered on your expected return so it tests bad timing rather than a different average.",
+      "Known limitation: normal-distribution returns underestimate left-tail risk vs. fat-tailed empirical distributions. Real markets have crashes that random draws don't fully capture — the history check is there to cover that.",
     ],
   },
   {
@@ -137,7 +139,8 @@ const sections = [
       "Net Unrealized Appreciation (NUA) on company stock in employer 401(k)s.",
       "K-1 income, deferred compensation, RSU vesting schedules — relevant to executives and business owners.",
       "Concentrated single-stock risk.",
-      "Long-term care insurance specifics (the projection does increase healthcare costs in slow-go / no-go phases generically).",
+      "Long-term care insurance policies. Long-term care itself is modeled: $3,600/month in today's dollars by default (about a 65% chance of needing care × typical assisted-living cost), ramping up over the last ~5 years of the plan and rising with healthcare inflation. You can change or remove it under Expenses.",
+      "Medicare surcharges (IRMAA) are calculated and shown year by year but not yet deducted from savings.",
     ],
   },
 ];
@@ -165,6 +168,7 @@ export default function MethodologyPage() {
         </h1>
         <p style={{ fontSize: 15, color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 4 }}>
           What goes into the projection, where the data comes from, and the things this tool intentionally doesn't try to model. If you're working with an advisor or just like reading the fine print, start here.
+          {' '}To see the engine checked against hand-worked IRS and SSA examples, and why other calculators may differ, read <a href="/accuracy" style={{ color: 'var(--accent)' }}>How we check the math</a>.
         </p>
         <p style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 32, fontStyle: 'italic' }}>
           Last reviewed: {LAST_REVIEWED}. We re-check assumptions each January when the IRS, SSA, and CMS publish next year's figures.

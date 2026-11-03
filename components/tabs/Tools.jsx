@@ -16,6 +16,7 @@ export const TOOLS = [
 
 const PAGES = [
   { href: '/verdict', title: 'Quick verdict' },
+  { href: '/accuracy', title: 'How we check the math' },
   { href: '/report', title: 'Print your plan (PDF)' },
   { href: '/calculators/social-security-break-even', title: 'Social Security break-even' },
   { href: '/calculators/irmaa-cliff-checker', title: 'Medicare surcharge (IRMAA) check' },

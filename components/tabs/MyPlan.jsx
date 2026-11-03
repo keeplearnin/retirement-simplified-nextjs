@@ -1585,7 +1585,7 @@ export default function MyPlan({ openRange = false }) {
                     label="How we calculated this"
                     lines={[
                       `Every year from ${plan.currentAge} to the end of the plan: income − taxes − spending; any shortfall is withdrawn from savings (cash → taxable → 401(k) → Roth${plan.useRealEstateInRetirement ? ' → real estate' : ''}).`,
-                      `We run that plan through ${odds?.runs ?? 500} markets: good and bad years in random order, averaging your ${plan.expectedReturn ?? 7}% return with about ${odds ? odds.stdDev.toFixed(0) : 9}% swings a year. The chance is how many never run short.`,
+                      `We run that plan through ${odds?.runs ?? 500} markets: good and bad years in random order, averaging your ${plan.expectedReturn ?? 7}% return with about ${odds ? odds.stdDev.toFixed(0) : 9}% swings a year. The chance is how many never run short. Sampling alone moves it about ±${odds ? Math.max(1, Math.round(196 * Math.sqrt(odds.successRate * (1 - odds.successRate) / odds.runs))) : 3} points; your return and spending assumptions move it far more. How we check the math: retiresimplified.com/accuracy.`,
                       covered
                         ? 'In a steady market, no year exhausts your available savings.'
                         : `In a steady market, available savings hit $0 at age ${results.moneyLastsAge} with expenses still unpaid.`,
