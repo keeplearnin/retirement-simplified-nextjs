@@ -58,6 +58,11 @@ export interface TaxResult {
   effectiveRate: number;
   marginalRate: number;
   ssTaxablePercent: number;     // 0, 50, or 85
+  /** Provisional income = ordinaryIncome + capitalGains + 50% of gross SS
+   *  benefit. Drives ssTaxablePercent via the statutory thresholds — exposed
+   *  so callers can detect proximity to the next tier (see
+   *  detectProvisionalIncomeCliff), the same way `magi` drives IRMAA. */
+  provisionalIncome: number;
   standardDeduction: number;
   itemizedDeduction: number;
   deductionUsed: 'standard' | 'itemized';
@@ -105,6 +110,57 @@ export function detectIrmaaCliff(
   const annualSurcharge = table[currentTier].monthlyPartBSurcharge * 12;
   const atRisk = distanceToNextCliff > 0 && distanceToNextCliff < warnWindow;
   return { currentTier, distanceToNextCliff, nextThreshold, annualSurcharge, atRisk };
+}
+
+export interface ProvisionalIncomeCliff {
+  /** 0 = 0% of SS taxable, 1 = up to 50% taxable, 2 = up to 85% taxable. */
+  currentTier: number;
+  /** Dollars to the next threshold (0 if already at the 85% tier). */
+  distanceToNextCliff: number;
+  /** Threshold dollar value of the next tier (Infinity if at the top). */
+  nextThreshold: number;
+  /** True when within `warnWindow` of crossing into a higher tier. */
+  atRisk: boolean;
+}
+
+// Social Security taxability thresholds — statutory since 1983/1993, never
+// indexed for inflation (unlike nearly every other tax parameter in this
+// app). Same values computeSSTaxable() uses internally.
+const SS_TAXABILITY_THRESHOLDS = {
+  single: [25_000, 34_000],
+  mfj: [32_000, 44_000],
+} as const;
+
+/**
+ * Detect whether projected provisional income is close to a Social Security
+ * taxability threshold. Same UX pattern as detectIrmaaCliff, but for the
+ * 0% → 50% → 85% SS-taxable tiers — these are unindexed, so inflation alone
+ * pushes more retirees across them every year, and they affect far more
+ * people than the IRMAA cliffs (which only bite Medicare-age high earners).
+ */
+export function detectProvisionalIncomeCliff(
+  provisionalIncome: number,
+  filingStatus: 'single' | 'mfj',
+  warnWindow: number = 5000,
+): ProvisionalIncomeCliff {
+  const [lowerThreshold, upperThreshold] = SS_TAXABILITY_THRESHOLDS[filingStatus];
+  let currentTier: number;
+  let nextThreshold: number;
+  if (provisionalIncome <= lowerThreshold) {
+    currentTier = 0;
+    nextThreshold = lowerThreshold;
+  } else if (provisionalIncome <= upperThreshold) {
+    currentTier = 1;
+    nextThreshold = upperThreshold;
+  } else {
+    currentTier = 2;
+    nextThreshold = Infinity;
+  }
+  const distanceToNextCliff = isFinite(nextThreshold)
+    ? Math.max(0, nextThreshold - provisionalIncome)
+    : 0;
+  const atRisk = distanceToNextCliff > 0 && distanceToNextCliff < warnWindow;
+  return { currentTier, distanceToNextCliff, nextThreshold, atRisk };
 }
 
 // ---------------------------------------------------------------------------
@@ -850,6 +906,9 @@ export function computeTax(input: TaxInput): TaxResult {
   // 1. Compute SS taxability
   const { taxableAmount: ssTaxable, taxablePercent: ssTaxablePercent } =
     computeSSTaxable(socialSecurityBenefit, ordinaryIncome + capitalGains, filingStatus);
+  // Same formula computeSSTaxable uses internally (otherIncome + 50% of
+  // benefit) — captured here so callers can do cliff-proximity detection.
+  const provisionalIncome = ordinaryIncome + capitalGains + socialSecurityBenefit * 0.5;
 
   // 2. Gross income for federal purposes
   const grossOrdinaryIncome = ordinaryIncome + ssTaxable;
@@ -959,6 +1018,7 @@ export function computeTax(input: TaxInput): TaxResult {
     effectiveRate: round4(effectiveRate),
     marginalRate,
     ssTaxablePercent,
+    provisionalIncome: round2(provisionalIncome),
     standardDeduction: round2(standardDeduction),
     itemizedDeduction: round2(itemizedDeduction),
     deductionUsed,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeTax, computeSSTaxable } from '@/lib/taxEngine';
+import { computeTax, computeSSTaxable, detectProvisionalIncomeCliff } from '@/lib/taxEngine';
 
 describe('computeSSTaxable', () => {
   it('returns 0 below the lower threshold', () => {
@@ -67,6 +67,9 @@ describe('computeTax — federal', () => {
   });
 });
 
+// Standard deductions used below (age 40 — no 65+ or OBBBA adjustments):
+// single $16,100, mfj $32,200. No SS/capital gains, so state taxable
+// income = ordinaryIncome - standard deduction, with zero exemption.
 describe('computeTax — graduated state brackets (HI, MN, MA, WI)', () => {
   it('Hawaii single: mid-bracket ($60K income, 7.20% bracket)', () => {
     const r = computeTax({
@@ -179,5 +182,65 @@ describe('computeTax — graduated state brackets (HI, MN, MA, WI)', () => {
         prev = r.stateTax;
       }
     }
+  });
+});
+
+describe('computeTax — provisionalIncome field', () => {
+  it('matches the documented formula: ordinaryIncome + capitalGains + 50% of gross SS benefit', () => {
+    const r = computeTax({
+      filingStatus: 'single', ordinaryIncome: 10_000, capitalGains: 2_000,
+      socialSecurityBenefit: 20_000, stateCode: 'TX', age: 65,
+    });
+    expect(r.provisionalIncome).toBeCloseTo(10_000 + 2_000 + 20_000 * 0.5, 2);
+  });
+});
+
+describe('detectProvisionalIncomeCliff', () => {
+  it('tier 0, not at risk when far from the lower threshold (single, $25K)', () => {
+    const c = detectProvisionalIncomeCliff(10_000, 'single');
+    expect(c.currentTier).toBe(0);
+    expect(c.nextThreshold).toBe(25_000);
+    expect(c.distanceToNextCliff).toBe(15_000);
+    expect(c.atRisk).toBe(false);
+  });
+
+  it('tier 0, at risk within the default $5K window (single)', () => {
+    const c = detectProvisionalIncomeCliff(22_000, 'single');
+    expect(c.currentTier).toBe(0);
+    expect(c.distanceToNextCliff).toBe(3_000);
+    expect(c.atRisk).toBe(true);
+  });
+
+  it('tier 1 (50% band), approaching the 85% threshold (single)', () => {
+    const c = detectProvisionalIncomeCliff(31_000, 'single');
+    expect(c.currentTier).toBe(1);
+    expect(c.nextThreshold).toBe(34_000);
+    expect(c.distanceToNextCliff).toBe(3_000);
+    expect(c.atRisk).toBe(true);
+  });
+
+  it('tier 2 (85% band): no further cliff, never at risk', () => {
+    const c = detectProvisionalIncomeCliff(50_000, 'single');
+    expect(c.currentTier).toBe(2);
+    expect(c.nextThreshold).toBe(Infinity);
+    expect(c.distanceToNextCliff).toBe(0);
+    expect(c.atRisk).toBe(false);
+  });
+
+  it('uses the wider MFJ thresholds ($32K / $44K)', () => {
+    const belowMfj = detectProvisionalIncomeCliff(29_000, 'mfj');
+    expect(belowMfj.currentTier).toBe(0);
+    expect(belowMfj.nextThreshold).toBe(32_000);
+
+    // The same income would already be in tier 1 for a single filer.
+    const asSingle = detectProvisionalIncomeCliff(29_000, 'single');
+    expect(asSingle.currentTier).toBe(1);
+  });
+
+  it('respects a custom warnWindow', () => {
+    const tight = detectProvisionalIncomeCliff(20_000, 'single', 1_000);
+    expect(tight.atRisk).toBe(false); // 5,000 away, outside a 1,000 window
+    const wide = detectProvisionalIncomeCliff(20_000, 'single', 10_000);
+    expect(wide.atRisk).toBe(true); // 5,000 away, inside a 10,000 window
   });
 });
