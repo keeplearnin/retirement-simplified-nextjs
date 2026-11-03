@@ -46,6 +46,7 @@ const sections = [
     body: [
       "2026 Medicare Part B base premium: $202.90/month. Average Medigap Plan G: $165/month. Average Part D premium: $45/month.",
       "IRMAA (income-related Part B surcharge) thresholds and surcharges use 2026 SSA POMS HI 01101.020 figures. Tier 1 single starts at MAGI > $109,000; tier 1 MFJ starts at > $218,000.",
+      "The projection deducts IRMAA as spending for each person on Medicare. Like SSA, it uses MAGI from two years earlier; future thresholds are indexed to inflation and the surcharge grows with healthcare inflation. Only the Part B surcharge is modeled (the smaller Part D surcharge is not).",
     ],
     sources: [
       { label: 'SSA POMS HI 01101.020 — IRMAA Sliding Scale Tables', url: 'https://secure.ssa.gov/poms.nsf/lnx/0601101020' },
@@ -140,7 +141,6 @@ const sections = [
       "K-1 income, deferred compensation, RSU vesting schedules — relevant to executives and business owners.",
       "Concentrated single-stock risk.",
       "Long-term care insurance policies. Long-term care itself is modeled: $3,600/month in today's dollars by default (about a 65% chance of needing care × typical assisted-living cost), ramping up over the last ~5 years of the plan and rising with healthcare inflation. You can change or remove it under Expenses.",
-      "Medicare surcharges (IRMAA) are calculated and shown year by year but not yet deducted from savings.",
     ],
   },
 ];

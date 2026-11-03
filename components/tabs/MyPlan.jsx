@@ -8,7 +8,7 @@ import InfoBox from '@/components/ui/InfoBox';
 import { fmt, fmtFull } from '@/lib/format';
 import { usePlan, INCOME_TEMPLATES, DEBT_TEMPLATES } from '@/components/PlanProvider';
 import { computeProjection } from '@/lib/computeProjection';
-import { runPlanOdds, oddsLabel, ON_TRACK_ODDS } from '@/lib/planOdds';
+import { runPlanOdds, oddsLabel, ON_TRACK_ODDS, sustainableSpend } from '@/lib/planOdds';
 import { LTC_DEFAULT_MONTHLY, ltcStartAge } from '@/lib/expenseEngine';
 import { detectIrmaaCliff } from '@/lib/taxEngine';
 import { RMD_TABLE, RMD_START_AGE } from '@/lib/constants';
@@ -645,6 +645,20 @@ function usePlanOdds(plan) {
   return odds;
 }
 
+// "How much can I spend?" — the retirement spending that keeps an 80%
+// chance. A search over many odds runs (~0.3s), so it starts only once the
+// odds have settled (odds change only after the plan stops changing).
+function useSustainableSpend(plan, odds) {
+  const [spend, setSpend] = useState(null);
+  useEffect(() => {
+    if (!odds) return;
+    const t = setTimeout(() => setSpend(sustainableSpend(plan)), 50);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on settled odds
+  }, [odds]);
+  return spend;
+}
+
 // ---------------------------------------------------------------------------
 // Transparency layer — Explain popover + Ledger table + Assumptions strip
 // ---------------------------------------------------------------------------
@@ -1029,6 +1043,7 @@ export default function MyPlan({ openRange = false }) {
   // fixed) — the two views disagreed. Never duplicate the engine again.
   const results = useMemo(() => computeProjection(plan), [plan]);
   const odds = usePlanOdds(plan);
+  const canSpend = useSustainableSpend(plan, odds);
 
   const { combined, essentialTotal, discretionaryTotal, retireEssentialTotal, retireDiscretionaryTotal } = results;
 
@@ -1542,7 +1557,13 @@ export default function MyPlan({ openRange = false }) {
         const pct = odds ? Math.round(odds.successRate * 100) : null;
         const onTrack = odds ? odds.successRate >= ON_TRACK_ODDS : covered;
         const lastRow = combined[combined.length - 1] || {};
-        const leftAtEnd = Math.max(0, lastRow.portfolioEndBalance || 0);
+        const plannedSpend = plan.retireSpending || Math.round((plan.annualSpending || 0) * 0.8);
+        const overSpending = canSpend != null && plannedSpend > canSpend;
+        // Milestones that explain bends in the net worth curve.
+        const milestones = [
+          ssStartAge && { age: ssStartAge, label: 'Social Security' },
+          ((plan.savings401k || 0) + (plan.spouseSavings401k || 0)) > 0 && { age: RMD_START_AGE, label: 'Required withdrawals' },
+        ].filter(Boolean);
         const planEnd = plan.hasSpouse && plan.spouseLongevityAge ? `${plan.longevityAge} / ${plan.spouseLongevityAge}` : plan.longevityAge;
         const badLasts = odds?.p10LastsAge != null ? `Age ${odds.p10LastsAge}` : `Age ${planEnd}+`;
         const goOptimize = () => window.dispatchEvent(new CustomEvent('navigate-tab', { detail: 'optimize' }));
@@ -1574,7 +1595,7 @@ export default function MyPlan({ openRange = false }) {
                     : <>Your savings run out at {results.moneyLastsAge}, {yearsShort} {yearsShort === 1 ? 'year' : 'years'} before your plan ends.</>}
                 </h1>
                 <p style={{ fontSize: 16, color: 'var(--text-muted)', lineHeight: 1.55, maxWidth: 600 }}>
-                  Retiring at {plan.retireAge} with {fmt(results.portfolioAtRetire)} saved, spending {fmt(plan.annualSpending)} a year, with a plan that runs to {planEnd}.
+                  Retiring at {plan.retireAge} with {fmt(results.portfolioAtRetire)} saved, spending {fmt(plannedSpend)} a year in retirement, with a plan that runs to {planEnd}.
                   {odds && <> In a steady market your money {covered ? 'lasts the whole way' : `runs out at ${results.moneyLastsAge}`}; in a bad one (1 in 10), {badLasts.endsWith('+') ? 'it still lasts' : `it runs out at ${odds.p10LastsAge}`}.</>}
                 </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px 20px', marginTop: 4 }}>
@@ -1601,23 +1622,43 @@ export default function MyPlan({ openRange = false }) {
               <Card style={{ flex: '1 1 280px', minWidth: 0, padding: 28, display: 'flex', flexDirection: 'column', gap: 22, borderRadius: 20 }}>
                 <OddsScore odds={odds} />
                 <dl style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 14 }}>
-                  <div style={dlRow}><dt style={{ color: 'var(--text-muted)' }}>Steady market: lasts to</dt><dd style={{ fontWeight: 600, color: covered ? 'var(--heading)' : 'var(--warn)' }}>{covered ? `Age ${planEnd}+` : `Age ${results.moneyLastsAge}`}</dd></div>
+                  {/* "How much can I spend?" — what savers are stuck on, more
+                      than "will it last". Today's dollars, everyday spending. */}
+                  <div style={dlRow}><dt style={{ color: 'var(--text-muted)' }}>You can spend</dt><dd style={{ fontWeight: 600, color: 'var(--heading)' }}>{canSpend == null ? 'Working it out…' : canSpend === 0 ? 'Not at 80% odds yet' : `${fmt(Math.round(canSpend / 12))}/mo`}</dd></div>
+                  <div style={dlRow}><dt style={{ color: 'var(--text-muted)' }}>You plan to spend</dt><dd style={{ fontWeight: 600, color: overSpending ? 'var(--warn)' : 'var(--heading)' }}>{fmt(Math.round(plannedSpend / 12))}/mo</dd></div>
                   {odds && <div style={dlRow}><dt style={{ color: 'var(--text-muted)' }}>Bad market (1 in 10)</dt><dd style={{ fontWeight: 600, color: badLasts.endsWith('+') ? 'var(--heading)' : 'var(--warn)' }}>{badLasts}</dd></div>}
                   <div style={dlRow}><dt style={{ color: 'var(--text-muted)' }}>At retirement ({plan.retireAge})</dt><dd style={{ fontWeight: 600, color: 'var(--heading)' }}>{fmt(results.portfolioAtRetire)}</dd></div>
-                  <div style={dlRow}><dt style={{ color: 'var(--text-muted)' }}>Left at end of plan</dt><dd style={{ fontWeight: 600, color: 'var(--heading)' }}>{fmt(leftAtEnd)}</dd></div>
                 </dl>
+                <p style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5, margin: 0 }}>
+                  &ldquo;You can spend&rdquo; is the everyday retirement spending that keeps about an 80% chance, in today&apos;s dollars. Healthcare and long-term care come on top.
+                </p>
               </Card>
             </div>
 
             {/* The picture: scrub any year for its exact dollars. */}
             <Card style={{ marginBottom: 20, padding: '28px 32px 20px', borderRadius: 20 }}>
               <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 22, color: 'var(--heading)', marginBottom: 8 }}>Net worth over time</h2>
-              <WealthChart
-                rows={combined}
-                retireAge={plan.retireAge}
-                moneyLastsAge={results.moneyLastsAge}
-                covered={covered}
-              />
+              {/* Chart with the four biggest levers beside it: drag one and
+                  the curve, the verdict and the odds all move. */}
+              <div className="chart-with-levers">
+                <div style={{ flex: '3 1 480px', minWidth: 0 }}>
+                  <WealthChart
+                    rows={combined}
+                    retireAge={plan.retireAge}
+                    moneyLastsAge={results.moneyLastsAge}
+                    covered={covered}
+                    milestones={milestones}
+                  />
+                </div>
+                <div style={{ flex: '1 1 240px', minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)', margin: '14px 0 10px' }}>Try a change</div>
+                  <Slider label="Retire at" value={plan.retireAge} onChange={v => updatePlan('retireAge', v)} min={Math.max(plan.currentAge + 1, 50)} max={80} />
+                  <Slider label="Retirement spending (a year)" value={plannedSpend} onChange={v => { updatePlan('retireSpending', v); updatePlan('_retireSpendManuallySet', true); }} min={20000} max={250000} step={5000} format={fmt} />
+                  <Slider label="Saving each month" value={plan.monthlyContribution} onChange={v => updatePlan('monthlyContribution', v)} min={0} max={10000} step={100} format={fmt} />
+                  <Slider label="Expected return" value={plan.expectedReturn} onChange={v => updatePlan('expectedReturn', v)} min={3} max={12} step={0.5} suffix="%" />
+                  <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '-8px 0 0' }}>Changes save to your plan.</p>
+                </div>
+              </div>
             </Card>
 
             <Collapsible title="See the range" defaultOpen={openRange} badge="How your plan does in good and bad markets, and what moves the odds">

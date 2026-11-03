@@ -15,7 +15,7 @@ const fmtValue = (v, unit) => (unit === '%' ? `${v}%` : `$${v.toLocaleString('en
 // item names the choice we make, so a reader can line it up against
 // whatever other tool they used.
 const DIFFERENCES = [
-  ['Taxes, every year', 'We work out each year’s federal and state tax, how much Social Security is taxed and required withdrawals, and flag the years Medicare surcharges apply (they are shown, not yet deducted from savings). Many calculators use one flat tax rate, or none, which usually makes plans look better than they are.'],
+  ['Taxes, every year', 'We work out each year’s federal and state tax, how much Social Security is taxed and required withdrawals, and charge Medicare surcharges (IRMAA) from your income two years earlier, the way Medicare does. Many calculators use one flat tax rate, or none, which usually makes plans look better than they are.'],
   ['What your return means', 'We treat your expected return as a long-run growth rate, so a steady 7% line is the middle outcome. Tools that treat 7% as the average of yearly returns show lower odds for the same number, because ups and downs drag compound growth below the yearly average.'],
   ['How much markets swing', 'Your plan stores only an expected return, so we read the size of yearly swings off typical stock/bond mixes: 7% is treated like a roughly 50/50 mix swinging about 9% a year. A tool that assumes an all-stock portfolio shows a much wider range.'],
   ['Healthcare and long-term care', 'Healthcare is included and inflates faster than other prices, and long-term care is added in the last years of the plan ($3,600/month in today’s dollars by default — you can change or remove it under Expenses). Many tools leave long-term care out.'],

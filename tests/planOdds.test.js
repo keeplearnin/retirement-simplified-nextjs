@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeProjection } from '@/lib/computeProjection';
-import { runPlanOdds, runPlanHistory, impliedMix } from '@/lib/planOdds';
+import { runPlanOdds, runPlanHistory, impliedMix, sustainableSpend } from '@/lib/planOdds';
 import { HISTORICAL_RETURNS } from '@/lib/historicalReturns';
 
 function plan(overrides = {}) {
@@ -88,5 +88,25 @@ describe('runPlanHistory', () => {
     expect(h.runs).toBe(HISTORICAL_RETURNS.length - years + 1);
     expect(h.failures.length).toBe(h.runs - h.successes);
     for (const f of h.failures) expect(f.startYear).toBeGreaterThanOrEqual(1928);
+  });
+});
+
+describe('sustainableSpend', () => {
+  it('finds the spending level where the odds cross 80%', () => {
+    const spend = sustainableSpend(plan());
+    expect(spend).toBeGreaterThan(0);
+    expect(spend % 600).toBe(0);
+    const at = runPlanOdds(plan({ retireSpending: spend }), { runs: 150 }).successRate;
+    const above = runPlanOdds(plan({ retireSpending: spend + 1_200 }), { runs: 150 }).successRate;
+    expect(at).toBeGreaterThanOrEqual(0.8);
+    expect(above).toBeLessThan(0.8 + 0.05); // at most a hair above the line one step up
+  });
+
+  it('more savings allows more spending', () => {
+    expect(sustainableSpend(plan({ savingsTaxable: 600_000 }))).toBeGreaterThan(sustainableSpend(plan()));
+  });
+
+  it('a plan that fails even at $0 spending returns 0', () => {
+    expect(sustainableSpend(plan({ savings401k: 0, savingsRoth: 0, savingsTaxable: 0, savingsCash: 0, monthlyContribution: 0, incomeSources: [], annualSpending: 80_000 }))).toBe(0);
   });
 });

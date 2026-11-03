@@ -9,7 +9,9 @@ import { fmt } from '@/lib/format';
  * One full-width area chart of household wealth by age with:
  *  - hover/touch scrubbing: a guide line, a dot, and a styled tooltip
  *    showing that year's exact dollars (balance, income, spending, taxes)
- *  - the retirement year marked with a vertical rule + label
+ *  - the retirement year marked with a vertical rule + label, plus optional
+ *    milestones (Social Security, required withdrawals) the same way, so a
+ *    bend in the curve has its reason written next to it
  *  - the shortfall region (after money runs out) shaded in danger tint
  *
  * Pure presentational component — all numbers come from the projection rows.
@@ -21,7 +23,7 @@ const PAD_R = 16;
 const PAD_T = 18;
 const PAD_B = 26;
 
-export default function WealthChart({ rows, retireAge, moneyLastsAge, covered, height = 240 }) {
+export default function WealthChart({ rows, retireAge, moneyLastsAge, covered, milestones = [], height = 240 }) {
   const wrapRef = useRef(null);
   const [hover, setHover] = useState(null); // { idx, px } in wrapper pixels
 
@@ -44,11 +46,19 @@ export default function WealthChart({ rows, retireAge, moneyLastsAge, covered, h
       .map((r, i) => ({ age: r.age, i }))
       .filter(t => t.age % 5 === 0);
 
-    return { maxBal, x, y, line, area, retireIdx, brokeIdx, gridVals, ticks };
-  }, [rows, retireAge, moneyLastsAge, covered]);
+    // Milestones inside the chart's range; labels step down so neighbors
+    // a few years apart don't overprint the retirement label or each other.
+    const marks = milestones
+      .map(m => ({ ...m, i: rows.findIndex(r => r.age === m.age) }))
+      .filter(m => m.i >= 0 && m.i !== retireIdx)
+      .sort((a, b) => a.i - b.i)
+      .map((m, k) => ({ ...m, labelY: PAD_T + 22 + k * 13 }));
+
+    return { maxBal, x, y, line, area, retireIdx, brokeIdx, gridVals, ticks, marks };
+  }, [rows, retireAge, moneyLastsAge, covered, milestones]);
 
   if (!model || !rows || rows.length === 0) return null;
-  const { x, y, line, area, retireIdx, brokeIdx, gridVals, ticks } = model;
+  const { x, y, line, area, retireIdx, brokeIdx, gridVals, ticks, marks } = model;
 
   // Map a pointer event to the nearest row index.
   const scrub = (clientX) => {
@@ -117,6 +127,20 @@ export default function WealthChart({ rows, retireAge, moneyLastsAge, covered, h
             </text>
           </g>
         )}
+
+        {/* Milestones */}
+        {marks.map(m => (
+          <g key={m.label}>
+            <line x1={x(m.i)} y1={PAD_T} x2={x(m.i)} y2={H - PAD_B} stroke="var(--text-dim)" strokeWidth="1" strokeDasharray="1 4" opacity="0.6" />
+            <text
+              x={x(m.i) > W * 0.78 ? x(m.i) - 5 : x(m.i) + 5} y={m.labelY}
+              textAnchor={x(m.i) > W * 0.78 ? 'end' : 'start'}
+              fill="var(--text-dim)" fontSize="10" fontFamily="var(--sans)"
+            >
+              {m.label} · {m.age}
+            </text>
+          </g>
+        ))}
 
         {/* Broke marker */}
         {brokeIdx > 0 && (
