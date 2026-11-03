@@ -18,7 +18,7 @@
 
 import { NextResponse } from 'next/server';
 import { verifyAuth, checkRateLimit, getClientIp } from '@/lib/apiAuth';
-import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/constants';
+import { ONBOARDING_SYSTEM_PROMPT, AI_PRODUCT_RULES } from '@/lib/constants';
 import { CLAUDE_SONNET_BODY, claudeHeaders } from '@/lib/claude';
 
 const MAX_ITERATIONS = 5;
@@ -189,7 +189,7 @@ export async function POST(request: Request) {
       headers: claudeHeaders(apiKey),
       body: JSON.stringify({
         ...CLAUDE_SONNET_BODY,
-        system: ONBOARDING_SYSTEM_PROMPT + `\n\nCurrent plan state (already collected): ${JSON.stringify(plan)}`,
+        system: ONBOARDING_SYSTEM_PROMPT + `\n\n${AI_PRODUCT_RULES}\n\nCurrent plan state (already collected): ${JSON.stringify(plan)}`,
         tools,
         messages: loopMessages,
       }),

@@ -56,9 +56,9 @@ function AppContent() {
     const hasPlan = localStorage.getItem('myplan-v1') !== null;
     setOnboarded(hasOnboarded || hasPlan);
 
-    // Default landing tab: AI Advisor for net-new users (no plan yet),
-    // My Plan for returning users. The AI Advisor is the flagship and
-    // also where the welcome chooser kicks the user after onboarding.
+    // Default landing tab: Ask for net-new users (no plan yet), My Plan
+    // for returning users. Ask is also where the welcome chooser sends the
+    // user after onboarding.
     if (!hasPlan) {
       setTab('advisor');
     }
@@ -104,7 +104,7 @@ function AppContent() {
           setOnboarded(true);
           // Users who finished onboarding (entered real data) land on the
           // Decision Engine — the "here's what your numbers say to do"
-          // moment. Skippers keep the AI Advisor default. Anything without
+          // moment. Skippers keep the Ask default. Anything without
           // an explicit skipped flag (e.g. OnboardingChat's done button
           // passing a click event) counts as completed.
           if (!(result && result.skipped === true)) setTab('optimize');

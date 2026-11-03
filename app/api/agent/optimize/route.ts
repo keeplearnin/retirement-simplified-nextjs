@@ -8,6 +8,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { AI_PRODUCT_RULES } from '@/lib/constants';
 import { verifyAuth, checkRateLimit, getClientIp } from '@/lib/apiAuth';
 import { TOOL_DEFINITIONS, executeTool } from '@/lib/agentTools';
 import type { PlanSnapshot } from '@/lib/planHistory';
@@ -112,7 +113,7 @@ export async function POST(request: Request) {
         headers: claudeHeaders(apiKey),
         body: JSON.stringify({
           ...CLAUDE_SONNET_BODY,
-          system: OPTIMIZE_PROMPT,
+          system: `${OPTIMIZE_PROMPT}\n\n${AI_PRODUCT_RULES}`,
           tools: TOOL_DEFINITIONS,
           messages,
         }),

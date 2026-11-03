@@ -15,6 +15,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { AI_PRODUCT_RULES } from '@/lib/constants';
 import { timingSafeEqual } from 'node:crypto';
 import { getUsersForWeeklyCheck, getUserPlan, getSnapshots, updateLastEmailed } from '@/lib/db';
 import { sendEmail, buildHealthCheckEmail, isEmailConfigured } from '@/lib/email';
@@ -81,7 +82,7 @@ async function runHealthCheckForUser(
       body: JSON.stringify({
         model: CLAUDE_FAST_MODEL,
         ...CLAUDE_REQUEST_DEFAULTS,
-        system: HEALTH_CHECK_PROMPT,
+        system: `${HEALTH_CHECK_PROMPT}\n\n${AI_PRODUCT_RULES}`,
         tools: TOOL_DEFINITIONS,
         messages,
       }),

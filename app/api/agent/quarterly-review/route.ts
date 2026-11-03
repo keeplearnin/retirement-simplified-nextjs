@@ -12,7 +12,7 @@
 import { NextResponse } from 'next/server';
 import { verifyAuth, checkRateLimit, getClientIp } from '@/lib/apiAuth';
 import { TOOL_DEFINITIONS, executeTool } from '@/lib/agentTools';
-import { QUARTERLY_REVIEW_SYSTEM_PROMPT } from '@/lib/constants';
+import { QUARTERLY_REVIEW_SYSTEM_PROMPT, AI_PRODUCT_RULES } from '@/lib/constants';
 import type { PlanSnapshot } from '@/lib/planHistory';
 import { CLAUDE_SONNET_BODY, claudeHeaders } from '@/lib/claude';
 
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
       headers: claudeHeaders(apiKey),
       body: JSON.stringify({
         ...CLAUDE_SONNET_BODY,
-        system: QUARTERLY_REVIEW_SYSTEM_PROMPT,
+        system: `${QUARTERLY_REVIEW_SYSTEM_PROMPT}\n\n${AI_PRODUCT_RULES}`,
         tools: TOOL_DEFINITIONS,
         messages,
       }),

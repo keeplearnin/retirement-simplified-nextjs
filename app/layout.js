@@ -20,10 +20,10 @@ const fraunces = Fraunces({
 
 export const metadata = {
   title: 'Retirement.Simplified — From First Paycheck to Last Withdrawal',
-  description: 'Free investment & retirement planning tools: portfolio builder with ETF analytics, growth projector, Monte Carlo simulation, tax-loss harvesting, Roth vs Traditional, withdrawal strategy, and AI advisor. No advisor needed.',
+  description: 'Free, open-source retirement planner. See the chance your money lasts, which moves are worth the most (Social Security timing, Roth conversions, taxes), and ask questions about your own plan. Every number shows its math.',
   openGraph: {
     title: 'Retirement.Simplified — From First Paycheck to Last Withdrawal',
-    description: 'Everything a financial advisor charges 1% for — free and transparent. From first paycheck to last withdrawal.',
+    description: 'A free, open-source second opinion on your retirement plan — with the math shown.',
   },
 };
 

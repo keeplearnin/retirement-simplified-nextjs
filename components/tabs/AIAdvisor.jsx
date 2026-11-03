@@ -403,9 +403,11 @@ export default function AIAdvisor() {
         return;
       }
       if (res.status === 429) {
+        // Daily cap carries its own message; the per-minute limit doesn't.
+        const data = await res.json().catch(() => null);
         setMessages((prev) => [
           ...prev,
-          { role: 'assistant', content: "You're sending messages too quickly. Please wait a moment." },
+          { role: 'assistant', content: data?.daily ? data.error : "You're sending messages too quickly. Please wait a moment." },
         ]);
         return;
       }
@@ -529,10 +531,10 @@ export default function AIAdvisor() {
       <div style={{ marginBottom: 12, fontFamily: 'var(--sans)' }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, color: 'var(--text)', fontFamily: 'var(--serif)' }}>
           <Icon name="sparkles" size={20} style={{ marginRight: 8, color: 'var(--accent)' }} />
-          AI Advisor
+          Ask about your plan
         </h2>
         <p style={{ color: 'var(--text-muted)', margin: '2px 0 0', fontSize: 13 }}>
-          Ask anything about your retirement plan.
+          Answers use the same engine as your Plan, so the numbers match. It explains your plan; it doesn&apos;t pick investments.
         </p>
       </div>
 
@@ -654,7 +656,7 @@ export default function AIAdvisor() {
                   ? 'Monthly Progress'
                   : 'Progress Review')}
               {activePanel === 'settings' && 'Settings'}
-              {activePanel === 'tour' && 'AI Advisor — 30-second tour'}
+              {activePanel === 'tour' && 'Ask about your plan — 30-second tour'}
             </span>
             <button
               onClick={() => setActivePanel(null)}
@@ -869,7 +871,7 @@ export default function AIAdvisor() {
                       cursor: 'pointer',
                     }}
                   >
-                    Ask the advisor
+                    Ask about this
                   </button>
                 </div>
               </div>
@@ -1212,17 +1214,17 @@ export default function AIAdvisor() {
             {activePanel === 'tour' && (
               <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>
                 <p style={{ margin: '0 0 12px', color: 'var(--text-muted)' }}>
-                  The AI Advisor reads your live retirement plan and runs real calculations on your numbers. Five things to know:
+                  This reads your live retirement plan and runs the same calculations as the Plan and Improve screens. Five things to know:
                 </p>
                 <ol style={{ margin: '0 0 12px', paddingLeft: 20 }}>
                   <li><strong>Real plan calculations</strong> — Ask "am I on track" or "what if I retire at 62" and the AI runs the actual projection engine, not a generic answer.</li>
                   <li><strong>Optimize My Plan</strong> — Click the green chip above for a multi-step analysis (SS timing + Roth conversion + withdrawal order) with dollar impact per change.</li>
                   <li><strong>Plan health</strong> — Color-coded chip auto-runs every 7 days. Green = on track, yellow = needs attention.</li>
                   <li><strong>Portfolio insights</strong> — Proactive recommendations on tax diversification, concentration, cash drag, etc.</li>
-                  <li><strong>Apply to My Plan</strong> — When the AI suggests a specific change ("claim SS at 70"), an inline button writes it to your plan with one click.</li>
+                  <li><strong>You decide every change</strong> — When a modeled scenario points to a specific change ("claim SS at 70"), an Apply button appears. Nothing changes in your plan unless you click it.</li>
                 </ol>
                 <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
-                  Educational tool only — not financial advice. Your data stays in your browser unless you sign in.
+                  Educational tool only — not financial advice, and it never names funds or tells you what to buy. Your data stays in your browser unless you sign in.
                 </p>
               </div>
             )}

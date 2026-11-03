@@ -83,9 +83,9 @@ TOP RECOMMENDATIONS:
 ${recLines}
 
 ---
-Log in at retiresimplified.com to run a full analysis or ask your AI advisor.
+Log in at retiresimplified.com to run a full analysis or ask about your plan.
 
-To unsubscribe from weekly emails, open the AI Advisor tab and turn off Weekly Email Check.
+To unsubscribe from weekly emails, open Ask, then Settings, and turn off "Weekly email digest".
 `.trim();
 
   const html = `
@@ -118,7 +118,7 @@ To unsubscribe from weekly emails, open the AI Advisor tab and turn off Weekly E
   <a href="https://retiresimplified.com" style="display:inline-block;background:#10b981;color:white;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Open My Plan</a>
 
   <p style="margin:24px 0 0;font-size:12px;color:#9ca3af">
-    To unsubscribe, open the AI Advisor tab and turn off Weekly Email Check.<br>
+    To unsubscribe, open Ask, then Settings, and turn off "Weekly email digest".<br>
     Retire.Simplified · Educational tool only · Not financial advice
   </p>
 </body>
