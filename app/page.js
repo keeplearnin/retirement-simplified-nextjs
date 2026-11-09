@@ -1,10 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import AuthProvider, { useAuth } from '@/components/AuthProvider';
 import { PlanProvider } from '@/components/PlanProvider';
 import Onboarding from '@/components/Onboarding';
-import Auth, { isConfigured } from '@/lib/auth';
 
 // Screens: Plan (MyPlan), Improve (Optimize + Scenarios), Ask (AIAdvisor).
 // Everything else is reached from the Tools page. Earlier orphans still on
@@ -32,7 +30,6 @@ function AppContent() {
   const [tab, setTab] = useState('myplan');
   const [loaded, setLoaded] = useState(false);
   const [theme, setTheme] = useState('light');
-  const { user, isConfigured: configured, authLoading, signIn, signOut } = useAuth();
 
   const [onboarded, setOnboarded] = useState(true); // true initially to avoid flash
   const [onboardingSkipped, setOnboardingSkipped] = useState(false);
@@ -146,14 +143,6 @@ function AppContent() {
               <span className="quick-verdict-text">Quick verdict</span>
               <span className="quick-verdict-icon-only" aria-label="Quick verdict"><Icon name="bolt" size={15} /></span>
             </a>
-            {authLoading ? null : user ? (
-              <>
-                {user.picture && <img src={user.picture} alt="" style={{ width: 32, height: 32, borderRadius: '50%' }} referrerPolicy="no-referrer" />}
-                <button type="button" onClick={signOut} className="header-pill header-pill-quiet">Sign out</button>
-              </>
-            ) : configured ? (
-              <button type="button" onClick={signIn} className="header-pill">Sign in</button>
-            ) : null}
             <button
               type="button"
               onClick={toggleTheme}
@@ -297,10 +286,8 @@ function AppContent() {
 
 export default function Home() {
   return (
-    <AuthProvider>
-      <PlanProvider>
-        <AppContent />
-      </PlanProvider>
-    </AuthProvider>
+    <PlanProvider>
+      <AppContent />
+    </PlanProvider>
   );
 }

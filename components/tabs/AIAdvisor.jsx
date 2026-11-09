@@ -95,9 +95,7 @@ export default function AIAdvisor() {
       setReviewSeen(true); // existing report has been seen before
     }
 
-    // Anonymous device-ID is always available; Cognito token is optional.
-    // All API calls work either way — backend resolves identity from
-    // X-Device-Id header when no Bearer token is present.
+    // Identity is this browser's device ID (X-Device-Id); there are no accounts.
     fetchInsights();
     loadHistoryFromDb().then((history) => {
       if (isHealthCheckDue()) runHealthCheck();
@@ -1224,7 +1222,7 @@ export default function AIAdvisor() {
                   <li><strong>You decide every change</strong> — When a modeled scenario points to a specific change ("claim SS at 70"), an Apply button appears. Nothing changes in your plan unless you click it.</li>
                 </ol>
                 <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
-                  Educational tool only — not financial advice, and it never names funds or tells you what to buy. Your data stays in your browser unless you sign in.
+                  Educational tool only — not financial advice, and it never names funds or tells you what to buy. Your plan is tied to this browser — there are no accounts to sign into.
                 </p>
               </div>
             )}

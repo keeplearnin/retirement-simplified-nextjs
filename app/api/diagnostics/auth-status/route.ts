@@ -1,6 +1,7 @@
 /**
  * /api/diagnostics/auth-status — gated diagnostic endpoint that reports
- * what the running Lambda thinks about auth configuration.
+ * what the running Lambda thinks about its configuration. Identity is
+ * device-ID only (no accounts); see lib/apiAuth.ts.
  *
  * Returns booleans only, no secret values. Access requires the
  * DIAGNOSTICS_KEY env var passed as ?key=... — without a valid key the
@@ -10,7 +11,7 @@
 import { NextResponse } from 'next/server';
 import { timingSafeEqual } from 'node:crypto';
 
-const CODE_VERSION = 'anonymous-fallback-v1';
+const CODE_VERSION = 'device-id-only-v2';
 
 function notFound() {
   return new NextResponse('Not Found', { status: 404 });
@@ -33,18 +34,9 @@ export async function GET(request: Request) {
   return NextResponse.json({
     codeVersion: CODE_VERSION,
     timestamp: new Date().toISOString(),
-    cognito: {
-      regionSet: Boolean(process.env.NEXT_PUBLIC_AWS_REGION),
-      userPoolIdSet: Boolean(process.env.NEXT_PUBLIC_USER_POOL_ID),
-      clientIdSet: Boolean(process.env.NEXT_PUBLIC_USER_POOL_CLIENT_ID),
-      issuerComputed: Boolean(
-        process.env.NEXT_PUBLIC_AWS_REGION && process.env.NEXT_PUBLIC_USER_POOL_ID,
-      ),
-    },
-    anonymous: {
-      flagPresent: process.env.ALLOW_ANONYMOUS_USERS !== undefined,
-      flagValue: process.env.ALLOW_ANONYMOUS_USERS ?? null,
-      enabled: process.env.ALLOW_ANONYMOUS_USERS === '1',
+    identity: {
+      mode: 'device-id',
+      accounts: false,
     },
     other: {
       anthropicKeySet: Boolean(process.env.ANTHROPIC_API_KEY),

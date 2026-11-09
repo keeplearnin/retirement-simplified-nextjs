@@ -1,0 +1,27 @@
+name: AI health check
+
+# Daily probe of the AI layer. A failed run emails the repo owner (GitHub's
+# default for scheduled workflows), so a retired model ID or a missing API key
+# is noticed within a day instead of weeks.
+
+on:
+  schedule:
+    - cron: '17 13 * * *' # daily, 13:17 UTC (08:17 Eastern)
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe /api/health/ai
+        run: |
+          url="${{ secrets.APP_URL }}/api/health/ai"
+          body=$(curl -sS --max-time 60 -w '\n%{http_code}' "$url")
+          status=$(printf '%s' "$body" | tail -n1)
+          json=$(printf '%s' "$body" | sed '$d')
+          echo "HTTP $status"
+          echo "$json"
+          if [ "$status" != "200" ]; then
+            echo "::error::AI health check failed (HTTP $status). See response above."
+            exit 1
+          fi

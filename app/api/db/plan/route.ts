@@ -4,7 +4,7 @@
  * GET → returns user's saved plan from DB
  * PUT → saves current plan to DB
  *
- * Auth: Cognito JWT required.
+ * Auth: X-Device-Id required (see lib/apiAuth.ts).
  */
 
 import { NextResponse } from 'next/server';

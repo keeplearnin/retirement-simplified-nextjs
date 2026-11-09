@@ -25,12 +25,12 @@ Live at **[retiresimplified.com](https://retiresimplified.com)** · [How the mat
 
 - **Open source.** Every formula in this repo — audit the [tax engine](lib/taxEngine.ts), the [projection](lib/computeProjection.js), the [backtester](lib/backtestEngine.js). Competitors' math is a black box; ours is the pitch.
 - **Tested.** Pure-function engines with a vitest suite: IRS golden cases, Social Security taxability boundaries, RMD forcing, regression tests for every bug we've fixed. `npm test`.
-- **Private by default.** Plans live in your browser's localStorage. Sign-in (Google via Cognito) and cross-device sync are optional. We never sell or share data.
+- **No accounts.** Your plan is stored in your browser and tied to a random device ID, which also keys the optional server-side features (chat history, weekly email). Nothing to sign up for; clear your site data and it's gone. We never sell or share data.
 - **Free.** No paywall in front of Monte Carlo, scenarios, or the Decision Engine.
 
 ## Stack
 
-Next.js 16 · React 19 · zero UI/chart dependencies (hand-rolled SVG) · DynamoDB (optional sync) · Cognito (optional auth) · Claude (AI advisor) · AWS Amplify hosting
+Next.js 16 · React 19 · zero UI/chart dependencies (hand-rolled SVG) · DynamoDB (per-device sync) · Claude (AI advisor) · AWS Amplify hosting
 
 All financial math lives in **pure, framework-free modules** under [`lib/`](lib/) — one source of truth shared by the UI, the AI agent tools, and the test suite.
 

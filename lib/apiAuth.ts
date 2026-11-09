@@ -1,181 +1,70 @@
 import { NextResponse } from 'next/server';
-import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
 
 // ---------------------------------------------------------------------------
-// Auth strategy
+// Auth strategy: there are no accounts.
 //
-// 1. If Cognito env vars are present AND the request carries a Bearer token,
-//    verify the JWT against Cognito's JWKS (signature, issuer, audience,
-//    token_use, sub). This is the secure production path.
+// Every browser generates a random UUID on first visit (lib/auth.ts) and sends
+// it as X-Device-Id. Server-side data (plan sync, chat history, weekly-email
+// preferences) is keyed on `dev:<uuid>`. That is the whole identity model.
 //
-// 2. If ALLOW_ANONYMOUS_USERS=1 AND the request carries a valid X-Device-Id
-//    header (UUID v4), accept it and return a synthetic identity prefixed
-//    with `dev:` to keep anonymous and Cognito sub spaces disjoint. This is
-//    the pilot-mode path — zero-friction onboarding, isolated per-browser
-//    data, no sign-up flow.
+// What this means, stated plainly so nobody oversells it:
+//   - A plan is tied to one browser. Clear site data and it is gone from that
+//     browser; the server copy becomes unreachable.
+//   - Anyone who obtains a device UUID can read and write that plan. The UUID
+//     is random (122 bits) and never shown in a URL, so the practical exposure
+//     is a shared or compromised device — the same exposure as localStorage.
+//   - Per-identity and per-IP rate limits bound what a leaked UUID can do.
 //
-// 3. Otherwise, return 401.
-//
-// Note: anonymous mode is NOT secure. Anyone who steals the deviceId can
-// read/write that "user's" data. Acceptable for pilots, never for prod.
+// An earlier version carried a half-wired Cognito/Google sign-in path that was
+// never configured in production. It was removed rather than left as a false
+// promise of account security. If real accounts are ever needed, add them as
+// a separate, fully configured path — don't bolt a token check onto this one.
 // ---------------------------------------------------------------------------
 
-const COGNITO_REGION = process.env.NEXT_PUBLIC_AWS_REGION ?? '';
-const USER_POOL_ID = process.env.NEXT_PUBLIC_USER_POOL_ID ?? '';
-const APP_CLIENT_ID = process.env.NEXT_PUBLIC_USER_POOL_CLIENT_ID ?? '';
-const ALLOW_ANONYMOUS_USERS = process.env.ALLOW_ANONYMOUS_USERS === '1';
-
-const ISSUER = COGNITO_REGION && USER_POOL_ID
-  ? `https://cognito-idp.${COGNITO_REGION}.amazonaws.com/${USER_POOL_ID}`
-  : '';
-
-// createRemoteJWKSet handles caching, rotation, and cooldown automatically.
-// One instance shared across requests; jose internally caches keys per kid.
-let jwksCache: ReturnType<typeof createRemoteJWKSet> | null = null;
-
-function getJwks() {
-  if (!ISSUER) return null;
-  if (!jwksCache) {
-    jwksCache = createRemoteJWKSet(new URL(`${ISSUER}/.well-known/jwks.json`));
-  }
-  return jwksCache;
-}
-
-export interface TokenPayload extends JWTPayload {
+export interface TokenPayload {
   sub: string;
-  email?: string;
-  token_use?: string;
-  client_id?: string;
-  aud?: string | string[];
-  anonymous?: boolean;
+  anonymous: true;
 }
 
-// Loose UUID v4-ish check — exact RFC parsing isn't worth it. We just want
-// to reject obviously bogus strings (SQL, path traversal, etc.) before they
-// reach DynamoDB as a partition key.
+// Loose UUID check — exact RFC parsing isn't worth it. We just want to reject
+// obviously bogus strings (SQL, path traversal, etc.) before they reach
+// DynamoDB as a partition key.
 const UUID_RE = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 
-function tryAnonymousIdentity(request: Request): TokenPayload | null {
-  if (!ALLOW_ANONYMOUS_USERS) return null;
+function deviceIdentity(request: Request): TokenPayload | null {
   const deviceId = request.headers.get('X-Device-Id');
   if (!deviceId || !UUID_RE.test(deviceId)) return null;
   return { sub: `dev:${deviceId.toLowerCase()}`, anonymous: true };
 }
 
-// Per-identity rate limit. Defends against the deviceId-enumeration attack:
-// an attacker who guesses or scrapes a UUID can normally hit the per-IP limit
-// from anywhere on the internet, so the per-IP limit alone doesn't bound how
-// many requests a single LEAKED identity can produce. The per-identity limit
-// caps it at 60 req/min/identity across ALL routes — same UUID from 100 IPs
-// still hits the cap.
-const PER_IDENTITY_LIMIT = 60;          // req/min/identity (anonymous mode)
-const PER_IDENTITY_LIMIT_COGNITO = 120; // req/min/identity (verified Cognito user)
+// Per-identity rate limit. Caps what a single leaked or scripted device ID can
+// do regardless of how many IPs it comes from.
+const PER_IDENTITY_LIMIT = 60; // req/min/identity
 const PER_IDENTITY_WINDOW_MS = 60_000;
 
 /**
- * Validates the Authorization header and returns the verified token payload.
- * Returns a NextResponse error on any failure — never throws.
- *
- * Applies a per-identity rate limit AFTER identity is resolved. This catches
- * the case where a leaked anonymous deviceId is replayed from many IPs.
- *
- * Async: signature verification fetches the JWKS (cached after first call).
+ * Resolves the caller's identity from X-Device-Id and applies the
+ * per-identity rate limit. Returns a NextResponse error on any failure —
+ * never throws.
  */
 export async function verifyAuth(request: Request): Promise<TokenPayload | NextResponse> {
-  const authHeader = request.headers.get('Authorization');
-  const hasBearerToken = authHeader?.startsWith('Bearer ');
-
-  let identity: TokenPayload | null = null;
-
-  // Path 1: Cognito JWT (production)
-  if (ISSUER && hasBearerToken) {
-    const result = await verifyCognitoToken(request);
-    if (result instanceof NextResponse) return result;
-    identity = result;
-  } else {
-    // Path 2: Anonymous device-ID (pilot mode)
-    identity = tryAnonymousIdentity(request);
-  }
-
-  // Path 3: No valid path — explain what's wrong
+  const identity = deviceIdentity(request);
   if (!identity) {
-    if (!ISSUER && !ALLOW_ANONYMOUS_USERS) {
-      console.error('Neither Cognito nor anonymous mode is configured');
-      return NextResponse.json(
-        { error: 'Auth not configured', hint: 'Set ALLOW_ANONYMOUS_USERS=1 (pilot) or Cognito vars (prod)' },
-        { status: 503 },
-      );
-    }
     return NextResponse.json(
-      { error: 'Unauthorized', hint: ALLOW_ANONYMOUS_USERS ? 'Provide X-Device-Id header (UUID)' : 'Provide Bearer token' },
+      { error: 'Unauthorized', hint: 'Provide X-Device-Id header (UUID)' },
       { status: 401 },
     );
   }
 
-  // Per-identity rate limit. Returns 429 if exceeded.
-  const limit = identity.anonymous ? PER_IDENTITY_LIMIT : PER_IDENTITY_LIMIT_COGNITO;
-  const limited = checkRateLimit(`identity:${identity.sub}`, limit, PER_IDENTITY_WINDOW_MS);
+  const limited = checkRateLimit(`identity:${identity.sub}`, PER_IDENTITY_LIMIT, PER_IDENTITY_WINDOW_MS);
   if (limited) return limited;
 
   return identity;
 }
 
-async function verifyCognitoToken(request: Request): Promise<TokenPayload | NextResponse> {
-  const authHeader = request.headers.get('Authorization') ?? '';
-  const token = authHeader.slice(7).trim();
-  if (!token) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const jwks = getJwks();
-  if (!jwks) {
-    return NextResponse.json({ error: 'Auth not configured' }, { status: 503 });
-  }
-
-  try {
-    const { payload } = await jwtVerify(token, jwks, {
-      issuer: ISSUER,
-    });
-
-    const tp = payload as TokenPayload;
-
-    // token_use must be 'access' or 'id'. Cognito sets this on every token.
-    if (tp.token_use !== 'access' && tp.token_use !== 'id') {
-      return NextResponse.json({ error: 'Invalid token use' }, { status: 401 });
-    }
-
-    // When the App Client ID is configured, verify audience:
-    //  - id tokens: aud === APP_CLIENT_ID
-    //  - access tokens: client_id === APP_CLIENT_ID (no aud claim)
-    if (APP_CLIENT_ID) {
-      const matchesAud = tp.token_use === 'id'
-        ? (Array.isArray(tp.aud) ? tp.aud.includes(APP_CLIENT_ID) : tp.aud === APP_CLIENT_ID)
-        : tp.client_id === APP_CLIENT_ID;
-
-      if (!matchesAud) {
-        return NextResponse.json({ error: 'Invalid token audience' }, { status: 401 });
-      }
-    }
-
-    if (!tp.sub) {
-      return NextResponse.json({ error: 'Token missing subject' }, { status: 401 });
-    }
-
-    return tp;
-  } catch (err) {
-    // jose throws specific error codes. Map expiry to a clearer message;
-    // collapse everything else to a generic 401 to avoid leaking which
-    // check failed (signature vs. issuer vs. structure).
-    const code = (err as { code?: string })?.code;
-    if (code === 'ERR_JWT_EXPIRED') {
-      return NextResponse.json({ error: 'Token expired' }, { status: 401 });
-    }
-    return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-  }
-}
-
 // ---------------------------------------------------------------------------
-// In-memory IP-based rate limiter (unchanged from previous implementation)
+// In-memory rate limiter. Per Lambda instance, so it is a soft cap — good
+// enough to blunt abuse and runaway clients, not a billing guarantee.
 // ---------------------------------------------------------------------------
 
 interface RateLimitEntry {
