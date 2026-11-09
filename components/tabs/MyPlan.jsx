@@ -1604,7 +1604,10 @@ export default function MyPlan({ openRange = false }) {
                     : <>Your savings run out at {results.moneyLastsAge}, {yearsShort} {yearsShort === 1 ? 'year' : 'years'} before your plan ends.</>}
                 </h1>
                 <p style={{ fontSize: 16, color: 'var(--text-muted)', lineHeight: 1.55, maxWidth: 600 }}>
-                  Retiring at {plan.retireAge} with {fmt(results.portfolioAtRetire)} saved, spending {fmt(plannedSpend)} a year in retirement, with a plan that runs to {planEnd}.
+                  {/* "projected" — $X here is the balance AT retirement, not
+                      today's savings; "saved" read as current savings and
+                      undermined trust in the sidebar total next to it. */}
+                  Retiring at {plan.retireAge} with a projected {fmt(results.portfolioAtRetire)}, spending {fmt(plannedSpend)} a year in retirement, with a plan that runs to {planEnd}.
                   {odds && <> In a steady market your money {covered ? 'lasts the whole way' : `runs out at ${results.moneyLastsAge}`}; in a bad one (1 in 10), {badLasts.endsWith('+') ? 'it still lasts' : `it runs out at ${odds.p10LastsAge}`}.</>}
                 </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px 20px', marginTop: 4 }}>
@@ -1718,7 +1721,7 @@ export default function MyPlan({ openRange = false }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
               <h2 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 22, color: 'var(--heading)' }}>Your next best moves</h2>
               <button type="button" onClick={goOptimize} style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', color: 'var(--accent)', fontSize: 14, fontWeight: 500, fontFamily: 'var(--sans)' }}>
-                See dollar impact in Optimize →
+                See dollar impact in Improve →
               </button>
             </div>
             {ordered.map((s, i) => (

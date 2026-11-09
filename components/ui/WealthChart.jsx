@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { fmt } from '@/lib/format';
 
 /**
@@ -17,15 +17,42 @@ import { fmt } from '@/lib/format';
  * Pure presentational component — all numbers come from the projection rows.
  */
 const W = 920;
-const H = 250;
-const PAD_L = 54;
-const PAD_R = 16;
-const PAD_T = 18;
-const PAD_B = 26;
 
-export default function WealthChart({ rows, retireAge, moneyLastsAge, covered, milestones = [], height = 240 }) {
+// Compact labels for narrow screens, where the full milestone names overrun
+// a 340px-wide chart.
+const COMPACT_LABELS = {
+  'Social Security': 'SS',
+  'Required withdrawals': 'RMDs',
+};
+
+export default function WealthChart({ rows, retireAge, moneyLastsAge, covered, milestones = [] }) {
   const wrapRef = useRef(null);
   const [hover, setHover] = useState(null); // { idx, px } in wrapper pixels
+  const [cw, setCw] = useState(0);          // measured container width (CSS px)
+
+  // The SVG has a fixed 920-unit viewBox, so anything sized in viewBox units
+  // shrinks with the container — at a 343px phone width, a fontSize of 10
+  // rendered at ~3.7 physical px. Measure the container and size text,
+  // strokes, and padding in PHYSICAL pixels instead (unit = px × scale).
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const measure = () => setCw(el.getBoundingClientRect().width);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const scale = W / Math.max(cw || 700, 300); // viewBox units per physical px
+  const compact = cw > 0 && cw < 480;
+  const px = (n) => n * scale;                // n physical px → viewBox units
+  // Consistent physical height: ~180px of chart on every screen.
+  const H = Math.round(Math.min(520, Math.max(230, px(compact ? 190 : 180))));
+  const PAD_L = px(44);
+  const PAD_R = px(12);
+  const PAD_T = px(14);
+  const PAD_B = px(22);
 
   const model = useMemo(() => {
     if (!rows || rows.length === 0) return null;
@@ -41,10 +68,12 @@ export default function WealthChart({ rows, retireAge, moneyLastsAge, covered, m
 
     // Y gridlines at quarter steps of a rounded-up max.
     const gridVals = [0.25, 0.5, 0.75, 1].map(f => maxBal * f);
-    // X ticks every 5 years, aligned to multiples of 5.
+    // X ticks every 5 years (every 10 when narrow — bigger physical text
+    // needs more room per label).
+    const tickStep = compact ? 10 : 5;
     const ticks = rows
       .map((r, i) => ({ age: r.age, i }))
-      .filter(t => t.age % 5 === 0);
+      .filter(t => t.age % tickStep === 0);
 
     // Milestones inside the chart's range; labels step down so neighbors
     // a few years apart don't overprint the retirement label or each other.
@@ -52,10 +81,14 @@ export default function WealthChart({ rows, retireAge, moneyLastsAge, covered, m
       .map(m => ({ ...m, i: rows.findIndex(r => r.age === m.age) }))
       .filter(m => m.i >= 0 && m.i !== retireIdx)
       .sort((a, b) => a.i - b.i)
-      .map((m, k) => ({ ...m, labelY: PAD_T + 22 + k * 13 }));
+      .map((m, k) => ({
+        ...m,
+        shownLabel: compact ? (COMPACT_LABELS[m.label] || m.label) : m.label,
+        labelY: PAD_T + px(18) + k * px(12),
+      }));
 
     return { maxBal, x, y, line, area, retireIdx, brokeIdx, gridVals, ticks, marks };
-  }, [rows, retireAge, moneyLastsAge, covered, milestones]);
+  }, [rows, retireAge, moneyLastsAge, covered, milestones, cw]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!model || !rows || rows.length === 0) return null;
   const { x, y, line, area, retireIdx, brokeIdx, gridVals, ticks, marks } = model;
@@ -73,8 +106,12 @@ export default function WealthChart({ rows, retireAge, moneyLastsAge, covered, m
   };
 
   const hovered = hover ? rows[hover.idx] : null;
-  // Keep the tooltip inside the wrapper: flip side past the midpoint.
-  const tipLeft = hover ? (hover.px > hover.width * 0.62 ? hover.px - 236 : hover.px + 14) : 0;
+  // Keep the tooltip inside the wrapper: flip side past the midpoint, then
+  // clamp so it can never overflow a narrow container.
+  const tipW = 222;
+  const tipLeft = hover
+    ? Math.min(Math.max(2, hover.px > hover.width * 0.62 ? hover.px - tipW - 14 : hover.px + 14), Math.max(2, hover.width - tipW - 4))
+    : 0;
 
   return (
     <div
@@ -106,23 +143,23 @@ export default function WealthChart({ rows, retireAge, moneyLastsAge, covered, m
         {/* Gridlines + Y labels */}
         {gridVals.map((v, gi) => (
           <g key={gi}>
-            <line x1={PAD_L} y1={y(v)} x2={W - PAD_R} y2={y(v)} stroke="var(--border)" strokeWidth="0.6" />
-            <text x={PAD_L - 8} y={y(v) + 3} textAnchor="end" fill="var(--text-dim)" fontSize="10" fontFamily="var(--sans)">
+            <line x1={PAD_L} y1={y(v)} x2={W - PAD_R} y2={y(v)} stroke="var(--border)" strokeWidth={px(0.5)} />
+            <text x={PAD_L - px(6)} y={y(v) + px(3)} textAnchor="end" fill="var(--text-dim)" fontSize={px(9.5)} fontFamily="var(--sans)">
               {fmt(Math.round(v))}
             </text>
           </g>
         ))}
-        <line x1={PAD_L} y1={H - PAD_B} x2={W - PAD_R} y2={H - PAD_B} stroke="var(--border)" strokeWidth="1" />
+        <line x1={PAD_L} y1={H - PAD_B} x2={W - PAD_R} y2={H - PAD_B} stroke="var(--border)" strokeWidth={px(0.8)} />
 
         {/* Area + line */}
         <path d={area} fill="url(#wealth-fill)" />
-        <path d={line} fill="none" stroke="var(--accent)" strokeWidth="2.25" strokeLinejoin="round" />
+        <path d={line} fill="none" stroke="var(--accent)" strokeWidth={px(2.25)} strokeLinejoin="round" />
 
         {/* Retirement marker */}
         {retireIdx >= 0 && (
           <g>
-            <line x1={x(retireIdx)} y1={PAD_T} x2={x(retireIdx)} y2={H - PAD_B} stroke="var(--text-dim)" strokeWidth="1" strokeDasharray="3 4" opacity="0.7" />
-            <text x={x(retireIdx) + 5} y={PAD_T + 9} fill="var(--text-dim)" fontSize="10" fontFamily="var(--sans)">
+            <line x1={x(retireIdx)} y1={PAD_T} x2={x(retireIdx)} y2={H - PAD_B} stroke="var(--text-dim)" strokeWidth={px(0.8)} strokeDasharray={`${px(3)} ${px(4)}`} opacity="0.7" />
+            <text x={x(retireIdx) + px(4)} y={PAD_T + px(8)} fill="var(--text-dim)" fontSize={px(10)} fontFamily="var(--sans)">
               Retire · {retireAge}
             </text>
           </g>
@@ -131,20 +168,20 @@ export default function WealthChart({ rows, retireAge, moneyLastsAge, covered, m
         {/* Milestones */}
         {marks.map(m => (
           <g key={m.label}>
-            <line x1={x(m.i)} y1={PAD_T} x2={x(m.i)} y2={H - PAD_B} stroke="var(--text-dim)" strokeWidth="1" strokeDasharray="1 4" opacity="0.6" />
+            <line x1={x(m.i)} y1={PAD_T} x2={x(m.i)} y2={H - PAD_B} stroke="var(--text-dim)" strokeWidth={px(0.8)} strokeDasharray={`${px(1)} ${px(4)}`} opacity="0.6" />
             <text
-              x={x(m.i) > W * 0.78 ? x(m.i) - 5 : x(m.i) + 5} y={m.labelY}
+              x={x(m.i) > W * 0.78 ? x(m.i) - px(4) : x(m.i) + px(4)} y={m.labelY}
               textAnchor={x(m.i) > W * 0.78 ? 'end' : 'start'}
-              fill="var(--text-dim)" fontSize="10" fontFamily="var(--sans)"
+              fill="var(--text-dim)" fontSize={px(10)} fontFamily="var(--sans)"
             >
-              {m.label} · {m.age}
+              {m.shownLabel} · {m.age}
             </text>
           </g>
         ))}
 
         {/* Broke marker */}
         {brokeIdx > 0 && (
-          <text x={x(brokeIdx) + 5} y={H - PAD_B - 8} fill="var(--danger)" fontSize="10" fontWeight="600" fontFamily="var(--sans)">
+          <text x={x(brokeIdx) + px(4)} y={H - PAD_B - px(7)} fill="var(--danger)" fontSize={px(10)} fontWeight="600" fontFamily="var(--sans)">
             Runs out · {moneyLastsAge}
           </text>
         )}
@@ -152,14 +189,14 @@ export default function WealthChart({ rows, retireAge, moneyLastsAge, covered, m
         {/* Scrub guide + dot */}
         {hovered && (
           <g>
-            <line x1={x(hover.idx)} y1={PAD_T} x2={x(hover.idx)} y2={H - PAD_B} stroke="var(--text-muted)" strokeWidth="1" opacity="0.55" />
-            <circle cx={x(hover.idx)} cy={y(hovered.portfolioEndBalance)} r="4.5" fill="var(--accent)" stroke="var(--card, #fff)" strokeWidth="2" />
+            <line x1={x(hover.idx)} y1={PAD_T} x2={x(hover.idx)} y2={H - PAD_B} stroke="var(--text-muted)" strokeWidth={px(0.8)} opacity="0.55" />
+            <circle cx={x(hover.idx)} cy={y(hovered.portfolioEndBalance)} r={px(4.5)} fill="var(--accent)" stroke="var(--card, #fff)" strokeWidth={px(2)} />
           </g>
         )}
 
         {/* X ticks */}
         {ticks.map(t => (
-          <text key={t.age} x={x(t.i)} y={H - 8} textAnchor="middle" fill="var(--text-dim)" fontSize="10" fontFamily="var(--sans)">
+          <text key={t.age} x={x(t.i)} y={H - px(7)} textAnchor="middle" fill="var(--text-dim)" fontSize={px(9.5)} fontFamily="var(--sans)">
             {t.age}
           </text>
         ))}

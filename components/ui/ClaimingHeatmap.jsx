@@ -110,7 +110,7 @@ export default function ClaimingHeatmap({ grid, best }) {
           <span style={{ width: 12, height: 12, borderRadius: 3, outline: '2px dashed var(--text-dim)', outlineOffset: -1, display: 'inline-block' }} />
           Your current plan
         </span>
-        <span>Darker = more wealth left at the end of the plan. Hover any cell for its number.</span>
+        <span>Darker = more wealth left at the end of the plan. Hover or tap any cell for its number.</span>
       </div>
 
       {/* Styled tooltip — instant, on-brand */}

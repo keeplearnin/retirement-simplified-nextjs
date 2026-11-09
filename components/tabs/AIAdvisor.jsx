@@ -541,6 +541,7 @@ export default function AIAdvisor() {
           The horizontal scroll on narrow viewports is preserved by the
           flex container, not the chip itself. */}
       <div
+        className="chip-row"
         style={{
           display: 'flex',
           gap: 8,

@@ -228,15 +228,28 @@ input[type=range]::-moz-range-thumb {
 .bg-purple-dim{background:var(--purple-dim)}.bg-bg{background:var(--bg)}
 .pointer{cursor:pointer}.trans{transition:all .2s ease}.w-full{width:100%}
 
-/* Glass morphism card variant */
+/* Horizontally scrollable chip rows: keep the swipe, hide the scrollbar —
+   the thumb otherwise paints as a stray grey bar under the chips on
+   platforms with visible scrollbars. */
+.chip-row { scrollbar-width: none; }
+.chip-row::-webkit-scrollbar { display: none; }
+
+/* Glass morphism card variant.
+   NOTE: keep `backdrop-filter` and `-webkit-backdrop-filter` in SEPARATE
+   rules — this Next version's CSS minifier silently drops BOTH when they
+   sit in the same declaration block (verified against the served
+   stylesheet), which shipped a blur-less 60%-opaque header that let page
+   text collide with the logo on scroll. */
 .glass-card {
   background: var(--glass);
   backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius);
   transition: all .25s ease;
 }
+/* Doubled selector: unmergeable with the rule above, so the minifier
+   can't recombine the pair and drop both. */
+.glass-card.glass-card { -webkit-backdrop-filter: blur(16px); }
 .glass-card:hover { border-color: rgba(255,255,255,0.1); }
 :root:not([data-theme="dark"]) .glass-card {
   background: var(--card);
@@ -264,11 +277,16 @@ input[type=range]::-moz-range-thumb {
 .app-header {
   border-bottom: 1px solid var(--border);
   background: var(--glass);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px); /* prefix lives in its own rule — see .glass-card note */
   position: sticky;
   top: 0;
   z-index: 20;
+}
+.app-header.app-header { -webkit-backdrop-filter: blur(20px); }
+/* Engines without backdrop-filter get a near-opaque header instead of
+   crisp page text bleeding through the logo. */
+@supports not (backdrop-filter: blur(1px)) {
+  .app-header { background: rgba(23, 29, 24, 0.97); }
 }
 :root:not([data-theme="dark"]) .app-header {
   background: rgba(255,255,255,0.96);
