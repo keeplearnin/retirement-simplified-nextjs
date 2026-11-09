@@ -1,12 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/components/AuthProvider';
-import API from '@/lib/api';
-import { isConfigured } from '@/lib/auth';
 
 export default function SavePlanButton({ getCurrentSettings, tabName }) {
-  const { user } = useAuth();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [planName, setPlanName] = useState('');
@@ -28,12 +24,7 @@ export default function SavePlanButton({ getCurrentSettings, tabName }) {
         ...settings,
       };
 
-      if (user && isConfigured()) {
-        // Authenticated: save to backend
-        await API.savePlan(plan);
-      }
-
-      // Always save to localStorage (works for all users)
+      // Plans live in this browser's localStorage — there are no accounts.
       const existing = JSON.parse(localStorage.getItem('rs_plans') || '[]');
       const idx = existing.findIndex(p => p.name === plan.name && p.type === plan.type);
       if (idx >= 0) {

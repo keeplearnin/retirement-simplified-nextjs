@@ -4,7 +4,7 @@
  * GET  → returns user's snapshot history (last 90 days)
  * POST → upserts today's snapshot (conflicts on user_id + saved_at)
  *
- * Auth: Cognito JWT required. user_id = payload.sub.
+ * Auth: X-Device-Id required (see lib/apiAuth.ts). user_id = payload.sub.
  * Gracefully returns empty history if DB is not configured.
  */
 

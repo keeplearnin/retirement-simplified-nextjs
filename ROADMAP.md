@@ -83,11 +83,11 @@ A status-report pass through `AUDIT.md` surfaced several items still marked `tod
 ## Tech stack
 
 - **Frontend**: Next.js 16 (App Router), React 19
-- **Backend**: AWS Lambda (Python), DynamoDB, API Gateway (used only for the AI Advisor proxy and authenticated plan saving)
-- **Auth**: AWS Cognito + Google OAuth (optional — the app fully works without an account)
+- **Backend**: AWS Lambda (Python), DynamoDB, API Gateway (legacy; current API routes run inside Next.js on Amplify)
+- **Auth**: none. Each browser has a random device ID; there are no accounts (the half-built Cognito path was removed in Nov 2026)
 - **AI**: Anthropic Claude API via server-side proxy
 - **Hosting**: AWS Amplify, auto-deploy from `main`
-- **Persistence**: localStorage by default; Cognito-backed plan saving when signed in
+- **Persistence**: localStorage, plus DynamoDB keyed on the device ID for chat history and email preferences
 
 ---
 

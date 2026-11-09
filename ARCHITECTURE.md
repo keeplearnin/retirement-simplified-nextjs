@@ -7,7 +7,7 @@ Covers the agent endpoints, tool catalog, data flow, and scheduled pipeline adde
 
 ## 1. Overview
 
-Retire.Simplified is a Next.js 16 / React 19 retirement planning app deployed to AWS Amplify, authenticated via Cognito. The agentic layer adds:
+Retire.Simplified is a Next.js 16 / React 19 retirement planning app deployed to AWS Amplify. There are no user accounts: each browser carries a random device ID that keys its server-side data (see `lib/apiAuth.ts`). The agentic layer adds:
 
 - **11 Claude tools** wrapping the existing financial calculators (`computeProjection`, `taxEngine`, `verdict`, `rothConversion`, `portfolioInsights`, etc.) as callable functions
 - **4 agent endpoints** that run an agentic tool-use loop (one conversational, three autonomous), plus **1 non-LLM endpoint** for cheap inline recommendations
@@ -28,7 +28,7 @@ graph TB
     end
 
     subgraph API["Next.js API Routes (server)"]
-        Auth[apiAuth.ts<br/>JWKS verify]
+        Auth[apiAuth.ts<br/>device-ID + rate limit]
         Chat["/api/chat<br/>conversational agent"]
         HC["/api/agent/health-check<br/>autonomous"]
         Opt["/api/agent/optimize<br/>autonomous"]
@@ -44,7 +44,6 @@ graph TB
     end
 
     subgraph External["External Services"]
-        Cognito[AWS Cognito<br/>auth + JWKS]
         Claude[Anthropic API<br/>Sonnet 4 / Haiku 4.5]
         Supabase[(DynamoDB<br/>plan_snapshots<br/>user_plans<br/>user_preferences)]
         Resend[Resend<br/>email]
@@ -67,7 +66,6 @@ graph TB
     DBSnap --> Auth
     DBPlan --> Auth
     DBPrefs --> Auth
-    Auth -.JWKS.-> Cognito
 
     Chat --> Tools
     HC --> Tools
@@ -138,7 +136,7 @@ The most ambitious agent — chains multi-step reasoning across SS timing, Roth 
 **Model:** `claude-haiku-4-5`
 **Max iterations:** 8
 **Triggered by:** GitHub Actions (`weekly-check.yml`) every Monday 08:00 UTC
-**Auth:** `Authorization: Bearer ${CRON_SECRET}` (not Cognito)
+**Auth:** `Authorization: Bearer ${CRON_SECRET}` (not a device ID)
 **Batch size:** 10 users per invocation ⚠️ *no resumption — see Known Issues*
 
 For each opted-in user:
@@ -184,7 +182,7 @@ sequenceDiagram
     participant P as Financial Engines
 
     U->>R: POST { messages, plan, planHistory }
-    R->>R: verifyAuth (JWKS)
+    R->>R: verifyAuth (X-Device-Id)
 
     loop until stop_reason = end_turn (max N iterations)
         R->>C: messages.create<br/>(tools, system, messages)
@@ -226,18 +224,18 @@ Created via [scripts/create-dynamodb-tables.sh](scripts/create-dynamodb-tables.s
 ```mermaid
 erDiagram
     user_plans {
-        string userId PK "Cognito sub"
+        string userId PK "dev:<device uuid>"
         map plan
         string updatedAt
     }
     plan_snapshots {
-        string userId PK "Cognito sub"
+        string userId PK "dev:<device uuid>"
         string savedAt SK "YYYY-MM-DD"
         map data
         string createdAt
     }
     user_preferences {
-        string userId PK "Cognito sub"
+        string userId PK "dev:<device uuid>"
         string email
         bool weeklyCheckEnabled
         string lastEmailedAt
@@ -249,7 +247,7 @@ All tables use PAY_PER_REQUEST billing — no provisioned capacity, no minimum b
 
 **Sync model:** localStorage is the offline cache; DynamoDB is the source of truth. `savePlanSnapshot()` writes both. `loadHistoryFromDb()` merges DB rows over the local cache on mount.
 
-**Access control:** DynamoDB access is governed by the Amplify SSR IAM role (one policy attached, scoped to the three tables). Row-level isolation is enforced by API routes — every read/write keys on the Cognito-verified `sub` claim from `verifyAuth()`. Unlike Supabase + service-role, there's no separate RLS layer to enable/forget. The trust chain is: Cognito → JWKS-verified JWT → `sub` claim → DynamoDB key.
+**Access control:** DynamoDB access is governed by the Amplify SSR IAM role (one policy attached, scoped to the three tables). Row-level isolation is enforced by API routes — every read/write keys on the `dev:<uuid>` identity from `verifyAuth()`. Unlike Supabase + service-role, there's no separate RLS layer to enable/forget. The trust chain is: browser device UUID → `X-Device-Id` header → DynamoDB key. This isolates browsers from each other; it does not authenticate a person. Anyone holding a device UUID can read and write that browser's data, so the UUID is never placed in a URL, and per-identity rate limits bound what a leaked one can do.
 
 ---
 
@@ -279,9 +277,9 @@ flowchart LR
 
 | Layer | Mechanism | Notes |
 |-------|-----------|-------|
-| User auth | Cognito JWT verified via JWKS (`lib/apiAuth.ts`) | ✅ Signature + issuer + audience + token_use + sub |
+| User identity | Random per-browser device UUID in `X-Device-Id` (`lib/apiAuth.ts`) | ⚠️ Isolation, not authentication — no accounts by design |
 | Cron auth | `CRON_SECRET` bearer token | ⚠️ Non-constant-time compare (see Known Issues) |
-| DB access | DynamoDB via Amplify IAM role | Server-only; row filtering by Cognito sub in API routes |
+| DB access | DynamoDB via Amplify IAM role | Server-only; row filtering by device ID in API routes |
 | Rate limiting | In-memory per-IP (`checkRateLimit`) | Per-instance; replace with Redis for multi-instance |
 | Anthropic key | `ANTHROPIC_API_KEY` env, server-only | Never exposed to client |
 | Resend key | `RESEND_API_KEY` env, server-only | Same |
@@ -296,12 +294,6 @@ flowchart LR
 ## 9. Environment Variables
 
 ```bash
-# Cognito (client + server)
-NEXT_PUBLIC_AWS_REGION=
-NEXT_PUBLIC_USER_POOL_ID=
-NEXT_PUBLIC_USER_POOL_CLIENT_ID=
-NEXT_PUBLIC_COGNITO_DOMAIN=
-NEXT_PUBLIC_API_URL=
 
 # DynamoDB (server-only)
 AWS_REGION=us-east-1
@@ -326,7 +318,7 @@ See [.env.local.example](.env.local.example).
 | ~~CRITICAL~~ ✅ fixed | `agentTools.ts:678` — `analyze_withdrawal_order` | Roth-first balance-swap strategy removed. Tool now compares default waterfall vs bracket-fill only. Added absolute-bound sanity check on Roth ladder output. True Roth-first comparison deferred until `computeProjection` accepts a `withdrawalOrder` parameter. |
 | ~~CRITICAL~~ ✅ fixed | `weekly-check/route.ts` | Model ID corrected to `claude-haiku-4-5`. |
 | ~~CRITICAL~~ ✅ fixed | `weekly-check/route.ts` | Cost cap: `WEEKLY_CHECK_BATCH_SIZE` (default 50, hard ceiling 200), kill switch `WEEKLY_CHECK_DISABLED`, timing-safe `CRON_SECRET` compare. |
-| ~~CRITICAL~~ ✅ resolved | DB access control | Migrated from Supabase (which would have required RLS) to DynamoDB. Access is now controlled by the Amplify SSR IAM role + Cognito-verified `sub` claim — no service-role bypass concern. |
+| ~~CRITICAL~~ ✅ resolved | DB access control | Migrated from Supabase (which would have required RLS) to DynamoDB. Access is now controlled by the Amplify SSR IAM role + the device-ID identity — no service-role bypass concern. |
 | SIGNIFICANT | `agentTools.ts:512` | SS lifetime benefit formula uses FV-of-annuity, not PV. Overstates by ~1.5×, biases "claim at 70" recommendation. |
 | SIGNIFICANT | `weekly-check/route.ts` | Processes first 10 users only, no cursor/resumption. Users 11+ never get emailed. |
 | SIGNIFICANT | All 4 agent endpoints | Agentic loop duplicated. Extract to `lib/agentLoop.ts`. |
@@ -357,7 +349,7 @@ app/
 lib/
   agentTools.ts                      11 tool definitions + executors
   portfolioInsights.ts               Pure-calc portfolio recommendation engine (7 checks)
-  apiAuth.ts                         JWKS-verified Cognito auth
+  apiAuth.ts                         device-ID identity + rate limits
   constants.ts                       AI_AGENT_SYSTEM_PROMPT
   db.ts                              Supabase REST client
   email.ts                           Resend helper + email template

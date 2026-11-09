@@ -97,15 +97,15 @@ Either way, `AWS_REGION` must be set (`.env.local.example` includes it).
 After tables are created and credentials are wired:
 
 ```bash
-# Smoke test from the running app — assumes you're signed in
+# Smoke test — any UUID works as the device ID
 curl -X POST http://localhost:3000/api/db/preferences \
-  -H "Authorization: Bearer <COGNITO_ID_TOKEN>" \
+  -H "X-Device-Id: 11111111-2222-4333-8444-555555555555" \
   -H "Content-Type: application/json" \
   -d '{"weeklyCheckEnabled": true, "email": "you@example.com"}'
 
 # Confirm it persisted:
 curl http://localhost:3000/api/db/preferences \
-  -H "Authorization: Bearer <COGNITO_ID_TOKEN>"
+  -H "X-Device-Id: 11111111-2222-4333-8444-555555555555"
 # → { "preferences": { "email": "you@example.com", "weeklyCheckEnabled": true }, "dbConfigured": true }
 ```
 

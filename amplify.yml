@@ -17,7 +17,6 @@ frontend:
         - touch .env.production
         - echo "Writing env vars to .env.production"
         - env | grep -E '^ANTHROPIC_API_KEY=' >> .env.production || true
-        - env | grep -E '^ALLOW_ANONYMOUS_USERS=' >> .env.production || true
         - env | grep -E '^CRON_SECRET=' >> .env.production || true
         - env | grep -E '^RESEND_API_KEY=' >> .env.production || true
         - env | grep -E '^WEEKLY_CHECK_DISABLED=' >> .env.production || true
