@@ -1611,6 +1611,13 @@ export default function MyPlan({ openRange = false }) {
                   {pct !== null
                     ? (onTrack
                       ? <>You&apos;re on track. Your money lasts your whole plan in {pct}% of markets.</>
+                      // Positive human mindset, honest numbers: when the
+                      // current plan is short, lead with the plan that
+                      // WORKS (the 80%-chance spending the engine already
+                      // solved for), not with the failure rate — the ring
+                      // beside it still carries the strict number.
+                      : canSpend > 0
+                      ? <>A strong plan is within reach: {fmt(Math.round(canSpend / 12))}/mo of spending gives you an 80% chance.</>
                       : <>Your money lasts your whole plan in only {pct}% of markets.</>)
                     : covered
                     // "Funded through the full plan" not "lasts to age N" —
@@ -1626,6 +1633,11 @@ export default function MyPlan({ openRange = false }) {
                   {/* "projected" — $X here is the balance AT retirement, not
                       today's savings; "saved" read as current savings and
                       undermined trust in the sidebar total next to it. */}
+                  {pct !== null && !onTrack && canSpend > 0 && (
+                    // "Trim, not teardown" only when it IS one (within 25%
+                    // of the planned spend) — hope must stay honest.
+                    <>Your planned {fmt(Math.round(plannedSpend / 12))}/mo holds up in only {pct}% of markets{canSpend >= plannedSpend * 0.75 ? ' — the fix is a trim, not a teardown' : ''}. </>
+                  )}
                   Retiring at {plan.retireAge} with a projected {fmt(results.portfolioAtRetire)}, spending {fmt(plannedSpend)} a year in retirement, with a plan that runs to {planEnd}.
                   {odds && <> In a steady market your money {covered ? 'lasts the whole way' : `runs out at ${brokeLabel}`}; in a bad one (1 in 10), {badLasts.endsWith('+') ? 'it still lasts' : `it runs out at ${odds.p10LastsAge}`}.</>}
                 </p>
