@@ -253,8 +253,19 @@ const NIIT_THRESHOLD_MFJ = 250_000;
 // SALT Cap
 // ---------------------------------------------------------------------------
 
-const SALT_CAP = 10_000;
-// const SALT_CAP_2026 = 40_000; // if TCJA extension passes — not yet active
+// OBBBA (July 2025) raised the SALT cap to $40,000 for 2025, $40,400 for
+// 2026, then +1%/yr through 2029, reverting to $10,000 in 2030. The cap
+// phases DOWN by 30% of MAGI over $500,000 (2025, +1%/yr), floored at
+// $10,000. (The old flat $10,000 overstated federal tax ~$2K/yr for
+// itemizing high-SALT households.)
+function saltCapFor(taxYear: number, magi: number): number {
+  if (taxYear < 2025 || taxYear > 2029) return 10_000;
+  const yearsIn = taxYear - 2025;
+  const baseCap = 40_000 * Math.pow(1.01, yearsIn);
+  const threshold = 500_000 * Math.pow(1.01, yearsIn);
+  const phaseDown = Math.max(0, (magi - threshold) * 0.3);
+  return Math.max(10_000, baseCap - phaseDown);
+}
 
 // ---------------------------------------------------------------------------
 // IRMAA Thresholds (2026 figures — based on MAGI from 2 years prior).
@@ -273,7 +284,9 @@ const IRMAA_SINGLE: IrmaaEntry[] = [
   { magiThreshold: 137_000, monthlyPartBSurcharge: 81.20 },
   { magiThreshold: 171_000, monthlyPartBSurcharge: 202.90 },
   { magiThreshold: 205_000, monthlyPartBSurcharge: 324.60 },
-  { magiThreshold: 500_000, monthlyPartBSurcharge: 446.30 },
+  // SSA: the top tier is "$500,000 OR MORE", so exactly $500,000 pays the
+  // top surcharge — the tier-4 band ends just below it (same at MFJ $750K).
+  { magiThreshold: 499_999.99, monthlyPartBSurcharge: 446.30 },
   { magiThreshold: Infinity, monthlyPartBSurcharge: 487.00 },
 ];
 
@@ -282,7 +295,7 @@ const IRMAA_MFJ: IrmaaEntry[] = [
   { magiThreshold: 274_000, monthlyPartBSurcharge: 81.20 },
   { magiThreshold: 342_000, monthlyPartBSurcharge: 202.90 },
   { magiThreshold: 410_000, monthlyPartBSurcharge: 324.60 },
-  { magiThreshold: 750_000, monthlyPartBSurcharge: 446.30 },
+  { magiThreshold: 749_999.99, monthlyPartBSurcharge: 446.30 },
   { magiThreshold: Infinity, monthlyPartBSurcharge: 487.00 },
 ];
 
@@ -325,21 +338,21 @@ const STATE_TAX_RATES: Record<string, number> = {
   DE: 0.066,
   DC: 0.065,
   FL: 0,
-  GA: 0.055,
+  GA: 0.0519, // 2025 cut; a further 2026 step is scheduled — verify when GA DOR publishes
   HI: 0.072,
   ID: 0.058,
   IL: 0.0495, // flat
-  IN: 0.0305, // flat
-  IA: 0.044,
+  IN: 0.0295, // flat (2026 step of the phased cut)
+  IA: 0.038,  // flat 3.8% since 2025
   KS: 0.057,
-  KY: 0.040,  // flat
+  KY: 0.035,  // flat (HB 1 cut effective 2026)
   LA: 0.0425,
   ME: 0.0715,
   MD: 0.0575,
   MA: 0.050,  // flat (plus 4% surtax on >$1M not modeled here)
   MI: 0.0425, // flat
   MN: 0.0785,
-  MS: 0.050,
+  MS: 0.044,  // 2026 step of the phased elimination
   MO: 0.048,
   MT: 0.059,
   NE: 0.0564,
@@ -348,7 +361,7 @@ const STATE_TAX_RATES: Record<string, number> = {
   NJ: 0.0637,
   NM: 0.049,
   NY: 0.0685, // top bracket 10.9%, using ~6.85% for typical retiree
-  NC: 0.045,  // flat
+  NC: 0.0399, // flat (2026 step of the scheduled cut)
   ND: 0.0195,
   OH: 0.035,
   OK: 0.0475,
@@ -392,7 +405,11 @@ const DEFAULT_STATE_TAX_RATE = 0.05; // fallback
 // scales them by TaxInput.indexFactor like the federal brackets. NY, NJ and
 // HI set their brackets in statute with no indexing — they stay fixed, and
 // inflation alone does push incomes there into higher brackets.
-const STATE_BRACKETS_INDEXED = new Set(['CA', 'OR', 'MN', 'WI', 'MA']);
+// OR is deliberately absent: ORS 316.037 forbids indexing the top bracket
+// ($125K/$250K), so inflating OR's thresholds understated later-year OR tax.
+// (OR's lower brackets ARE indexed in law; holding all of them fixed is the
+// conservative approximation until per-bracket indexing is modeled.)
+const STATE_BRACKETS_INDEXED = new Set(['CA', 'MN', 'WI', 'MA']);
 
 const STATE_GRADUATED_BRACKETS: Record<
   string,
@@ -615,11 +632,14 @@ export function computeSSTaxable(
     );
   } else {
     // 85% formula: lesser of (a) 85% of benefit or
-    // (b) 50% of (upperThreshold - lowerThreshold) + 85% of (provisional - upperThreshold)
+    // (b) 85% of (provisional − upper) + the 50%-tier amount, where the
+    // 50%-tier component is itself capped at BOTH 50% of the tier width
+    // AND 50% of the benefit (IRS worksheet lines 8-9). Omitting the
+    // 50%-of-benefit cap overtaxed small benefits: $8K benefit + $31K
+    // other → engine said $5,350 taxable vs the worksheet's $4,850.
     const amountA = 0.85 * benefit;
-    const amountB =
-      0.5 * (upperThreshold - lowerThreshold) +
-      0.85 * (provisionalIncome - upperThreshold);
+    const tier1 = Math.min(0.5 * (upperThreshold - lowerThreshold), 0.5 * benefit);
+    const amountB = tier1 + 0.85 * (provisionalIncome - upperThreshold);
     taxableAmount = Math.min(amountA, amountB);
   }
 
@@ -783,7 +803,10 @@ function stateRetirementExemption(
 
     // SC: full SS exemption, partial retirement exemption
     case 'SC': {
-      const cap = age >= 65 ? 15_000 : 10_000;
+      // §12-6-1170: $3,000 under 65; $10,000 at 65+ (the engine's 15,000
+      // models the 65+ $10K retirement deduction + $15K-minus-overlap
+      // senior deduction as a single figure).
+      const cap = age >= 65 ? 15_000 : 3_000;
       return ssTaxable + Math.min(retirementIncome, cap);
     }
 
@@ -797,15 +820,29 @@ function stateRetirementExemption(
     case 'NY':
       return ssTaxable + (age >= 60 ? Math.min(retirementIncome, 20_000) : 0);
 
-    // MI: SS exempt; $20K/$40K retirement income exempt for 67+
+    // MI: SS exempt. PA 4 of 2023's phase-in completed in 2026: full
+    // retirement-income subtraction up to the (indexed) Tier-1 caps,
+    // broadly age-independent — the old $20K/$40K-at-67+ rule is repealed.
+    // Caps are the 2023 statutory $61,518/$123,036 indexed ≈ 4% to 2026;
+    // verify against Form 4884 instructions when MI publishes them.
     case 'MI': {
-      if (age < 67) return ssTaxable;
-      const cap = filingStatus === 'mfj' ? 40_000 : 20_000;
+      const cap = filingStatus === 'mfj' ? 128_000 : 64_000;
       return ssTaxable + Math.min(retirementIncome, cap);
     }
 
+    // Everywhere else: Social Security is STATE-EXEMPT. Only 8 states tax
+    // SS at all in 2026 (CO, CT, MN, MT, NM, RI, UT, VT — WV's phase-out
+    // completed in 2026), and each of those applies income-based
+    // subtractions we conservatively do not credit. The old default of 0
+    // taxed SS in ~35 exempt states — including CA and WI, two of the
+    // engine's own graduated-bracket states — overstating state tax by
+    // $1.5–2.2K/yr for typical SS-heavy retirees.
+    case 'CO': case 'CT': case 'MN': case 'MT':
+    case 'NM': case 'RI': case 'UT': case 'VT':
+      return 0; // SS taxable here (ignoring their partial subtractions — conservative)
+
     default:
-      return 0;
+      return ssTaxable;
   }
 }
 
@@ -943,7 +980,7 @@ export function computeTax(input: TaxInput): TaxResult {
   const charitableGiving = deductions?.charitableGiving ?? 0;
 
   const saltTotal = propertyTax + stateLocalTax;
-  const saltCapped = Math.min(saltTotal, SALT_CAP);
+  const saltCapped = Math.min(saltTotal, saltCapFor(taxYear ?? 2026, magi));
 
   const itemizedDeduction = mortgageInterest + saltCapped + charitableGiving;
 

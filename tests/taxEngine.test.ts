@@ -244,3 +244,60 @@ describe('detectProvisionalIncomeCliff', () => {
     expect(wide.atRisk).toBe(true); // 5,000 away, inside a 10,000 window
   });
 });
+
+describe('audit 2026-11-11 — state SS exemption, SALT, small-benefit SS, MI', () => {
+  // ~35 states exempt Social Security entirely; the old default taxed it
+  // everywhere outside the explicit switch (CA retiree overtaxed ~$2.2K/yr).
+  it('CA and WI exempt Social Security from state tax', () => {
+    const base = { filingStatus: 'single' as const, capitalGains: 0, age: 70, taxYear: 2026 };
+    const caNoSS = computeTax({ ...base, ordinaryIncome: 80_000, socialSecurityBenefit: 0, stateCode: 'CA' });
+    const caWithSS = computeTax({ ...base, ordinaryIncome: 80_000, socialSecurityBenefit: 30_000, stateCode: 'CA' });
+    // Federal tax rises with SS; CA state tax must not rise materially.
+    // (A ~$120 residual remains because the OBBBA senior-deduction
+    // phase-out keys off MAGI incl. taxable SS and the engine applies the
+    // federal deduction to state income — the old bug was ~$2,100.)
+    expect(caWithSS.stateTax - caNoSS.stateTax).toBeLessThan(300);
+    const wi = computeTax({ ...base, ordinaryIncome: 60_000, socialSecurityBenefit: 40_000, stateCode: 'WI', filingStatus: 'mfj', spouseAge: 67 });
+    const wiNoSS = computeTax({ ...base, ordinaryIncome: 60_000, socialSecurityBenefit: 0, stateCode: 'WI', filingStatus: 'mfj', spouseAge: 67 });
+    expect(wi.stateTax - wiNoSS.stateTax).toBeLessThan(300);
+  });
+
+  it('the 8 SS-taxing states still include taxable SS (conservative)', () => {
+    const mn = computeTax({ filingStatus: 'single', ordinaryIncome: 80_000, socialSecurityBenefit: 30_000, capitalGains: 0, stateCode: 'MN', age: 70, taxYear: 2026 });
+    const mnNoSS = computeTax({ filingStatus: 'single', ordinaryIncome: 80_000, socialSecurityBenefit: 0, capitalGains: 0, stateCode: 'MN', age: 70, taxYear: 2026 });
+    expect(mn.stateTax).toBeGreaterThan(mnNoSS.stateTax);
+  });
+
+  // OBBBA SALT: $40,400 cap in 2026, 30% phase-down over $505K MAGI, $10K floor.
+  it('OBBBA SALT cap: $25K SALT fully deductible in 2026 for a $200K couple', () => {
+    const r = computeTax({
+      filingStatus: 'mfj', ordinaryIncome: 200_000, socialSecurityBenefit: 0, capitalGains: 0,
+      stateCode: 'TX', age: 67, spouseAge: 67, taxYear: 2026,
+      deductions: { stateLocalTax: 15_000, propertyTax: 10_000, mortgageInterest: 20_000 },
+    });
+    // Itemized 45K beats the 35.5K standard+age; the old $10K cap forced standard.
+    expect(r.deductionUsed).toBe('itemized');
+  });
+
+  it('OBBBA SALT phase-down floors at $10K for very high MAGI', () => {
+    const r = computeTax({
+      filingStatus: 'mfj', ordinaryIncome: 800_000, socialSecurityBenefit: 0, capitalGains: 0,
+      stateCode: 'TX', age: 50, taxYear: 2026,
+      deductions: { stateLocalTax: 40_000, mortgageInterest: 0 },
+    });
+    // (800K − 505K) × 30% ≫ cap ⇒ floor $10K SALT; itemized 10K < standard.
+    expect(r.deductionUsed).toBe('standard');
+  });
+
+  // IRS worksheet: the 50%-tier component caps at HALF THE BENEFIT.
+  it('small SS benefits: $8K benefit + $31K other ⇒ $4,850 taxable, not $5,350', () => {
+    const { taxableAmount } = computeSSTaxable(8_000, 31_000, 'single');
+    expect(taxableAmount).toBeCloseTo(4_850, 0);
+  });
+
+  // MI PA 4 of 2023 phase-in complete: full subtraction to the Tier-1 caps.
+  it('Michigan 2026: a 60-year-old retiree deducts retirement income up to the cap', () => {
+    const young = computeTax({ filingStatus: 'single', ordinaryIncome: 70_000, socialSecurityBenefit: 0, capitalGains: 0, stateCode: 'MI', age: 60, taxYear: 2026, retirementIncome: 70_000 });
+    expect(young.stateTax).toBe(0); // fully exempt under the $64K... cap plus deduction
+  });
+});

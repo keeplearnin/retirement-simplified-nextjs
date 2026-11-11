@@ -35,12 +35,17 @@ describe('Medicare IRMAA in the projection', () => {
     expect(high.totalExpense - low.totalExpense).toBe(Math.round(202.9 * 12));
   });
 
-  it('thresholds rise with inflation: a flat $150K pension drops a tier; the surcharge grows with healthcare costs', () => {
+  it('thresholds rise with inflation: a flat $150K pension drops tiers; the surcharge grows with healthcare costs', () => {
+    // SSA compares the lookback MAGI against the PREMIUM year's indexed
+    // thresholds, so the deflator is the premium year's index (^i) — the
+    // old ^(i−2) ran the thresholds two years of inflation low and held
+    // this pension in higher tiers too long (audit 2026-11-11).
     const p = plan({ inflationRate: 3, healthcareInflation: 5 });
-    // Year 4 looks back to year 2: $150K / 1.03^2 = $141.4K in 2026 dollars → $202.90 tier.
-    expect(row(p, 74).irmaa).toBeCloseTo(202.9 * 1.05 ** 4, 1);
-    // Year 6 looks back to year 4: $150K / 1.03^4 = $133.3K → $81.20 tier.
-    expect(row(p, 76).irmaa).toBeCloseTo(81.2 * 1.05 ** 6, 1);
+    // Premium year 4: $150K vs thresholds ×1.03^4 ⇒ $150K/1.1255 = $133.3K
+    // in 2026 dollars → $81.20 tier.
+    expect(row(p, 74).irmaa).toBeCloseTo(81.2 * 1.05 ** 4, 1);
+    // Premium year 11: $150K/1.03^11 = $108.4K → below the first threshold.
+    expect(row(p, 81).irmaa).toBe(0);
   });
 
   it('uses income from two years earlier: a high salary at 63–64 sets the surcharge at 65–66', () => {
