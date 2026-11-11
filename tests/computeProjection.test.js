@@ -299,3 +299,80 @@ describe('computeProjection — long-term care input', () => {
     expect(at(base, 90)).toBeGreaterThan(at(none, 90));
   });
 });
+
+describe('computeProjection — money conservation (audit regressions)', () => {
+  // CRITICAL regression: Monthly Investing was credited to balances with no
+  // funding source. In a gap year (salary ended, income $0) the engine
+  // withdrew to cover expenses AND still minted $24K/yr of contributions
+  // from nowhere. The old gap-year test used monthlyContribution: 0, so it
+  // could never see this.
+  it('gap years fund NO contributions — savings come only from income', () => {
+    const r = computeProjection(basePlan({
+      currentAge: 52, retireAge: 60, longevityAge: 90,
+      savingsCash: 2_000_000,
+      monthlyContribution: 2_000,
+      annualSpending: 100_000, retireSpending: 100_000,
+      incomeSources: [
+        { id: 1, type: 'salary', label: 'Salary', amount: 165_000, growthRate: 3, endAge: 50, owner: 'primary' },
+      ],
+    }));
+    for (const row of r.combined.filter(x => x.age >= 52 && x.age < 60)) {
+      expect(row.contributions, `contributions at ${row.age}`).toBe(0);
+      // 0% return: the ledger must close with NO phantom inflow.
+      expect(row.portfolioEndBalance, `ledger at ${row.age}`)
+        .toBe(row.portfolioBalance - row.totalWithdrawals + row.contributions);
+    }
+  });
+
+  it('thin-surplus working years fund contributions only up to the actual surplus', () => {
+    const r = computeProjection(basePlan({
+      currentAge: 55, retireAge: 60, longevityAge: 70,
+      savingsCash: 50_000,
+      monthlyContribution: 2_000, // $24K/yr planned
+      annualSpending: 95_000, retireSpending: 60_000,
+      incomeSources: [
+        { id: 1, type: 'salary', label: 'Salary', amount: 130_000, growthRate: 0, owner: 'primary' },
+      ],
+    }));
+    const row = r.combined[0];
+    // Surplus = net after tax − spending < $24K here, so contributions must
+    // be capped at the surplus (not the planned $24K).
+    expect(row.contributions).toBeLessThan(24_000);
+    expect(row.contributions).toBeGreaterThanOrEqual(0);
+    expect(row.totalWithdrawals).toBe(0);
+  });
+
+  // SIGNIFICANT regression: the gross-up loop regrossed the ENTIRE need at
+  // the top marginal rate, over-drawing ~19% every retirement year ($226K
+  // for a $155K spend on a $4M 401(k)) — extra tax and IRMAA tiers the
+  // correct draw never touches. The bisection must land the surplus near 0.
+  it('withdrawals land within a rounding hair of spending (no systematic overshoot)', () => {
+    const r = computeProjection(basePlan({
+      currentAge: 65, retireAge: 65, longevityAge: 75,
+      savings401k: 4_000_000,
+      annualSpending: 155_400, retireSpending: 155_400,
+    }));
+    const first = r.combined.find(x => x.isRetired && x.rmd === 0);
+    expect(first).toBeTruthy();
+    expect(first.gap, `gap at ${first.age}`).toBeGreaterThanOrEqual(-1);
+    expect(first.gap, `gap at ${first.age}`).toBeLessThan(200);
+    // Spending here is $155.4K + the $5.4K Medicare premium ⇒ correct gross
+    // ≈ $196K. The old loop regrossed to ~$232K for the same expenses.
+    expect(first.withdrawal401k).toBeLessThan(200_000);
+  });
+
+  // SIGNIFICANT regression: the forced RMD was invisible to the waterfall,
+  // so taxable was sold (realizing phantom gains) even when the RMD alone
+  // covered spending.
+  it('when the RMD alone covers spending, nothing else is sold', () => {
+    const r = computeProjection(basePlan({
+      currentAge: 75, retireAge: 75, longevityAge: 80,
+      savings401k: 2_000_000, savingsTaxable: 1_000_000,
+      annualSpending: 61_800, retireSpending: 61_800,
+    }));
+    const row = r.combined[0];
+    expect(row.rmd).toBeGreaterThan(70_000); // 2M / 24.6
+    expect(row.withdrawalTaxable, 'taxable sold despite RMD covering spending').toBe(0);
+    expect(row.withdrawal401k).toBeGreaterThanOrEqual(row.rmd);
+  });
+});
