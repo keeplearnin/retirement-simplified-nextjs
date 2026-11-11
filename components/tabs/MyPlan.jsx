@@ -1638,7 +1638,7 @@ export default function MyPlan({ openRange = false }) {
                       // solved for), not with the failure rate — the ring
                       // beside it still carries the strict number.
                       : canSpend > 0
-                      ? <>A strong plan is within reach: {fmt(Math.round(canSpend / 12))}/mo of spending gives you an 80% chance.</>
+                      ? <>A strong plan is within reach: {fmt(Math.round(canSpend / 12))}/mo gives you an 80% chance.</>
                       : <>Your money lasts your whole plan in only {pct}% of markets.</>)
                     : covered
                     // "Funded through the full plan" not "lasts to age N" —
@@ -1650,17 +1650,15 @@ export default function MyPlan({ openRange = false }) {
                     ? <>You&apos;re on track. Your money lasts through your whole plan.</>
                     : <>Your savings run out at {brokeLabel}, {yearsShort} {yearsShort === 1 ? 'year' : 'years'} before your plan ends.</>}
                 </h1>
+                {/* ONE line under the headline — everything else lives in
+                    the ⓘ popover and the odds card. A verdict that needs a
+                    paragraph isn't a verdict. */}
                 <p style={{ fontSize: 16, color: 'var(--text-muted)', lineHeight: 1.55, maxWidth: 600 }}>
-                  {/* "projected" — $X here is the balance AT retirement, not
-                      today's savings; "saved" read as current savings and
-                      undermined trust in the sidebar total next to it. */}
-                  {pct !== null && !onTrack && canSpend > 0 && (
+                  {pct !== null && !onTrack && canSpend > 0
                     // "Trim, not teardown" only when it IS one (within 25%
                     // of the planned spend) — hope must stay honest.
-                    <>Your planned {fmt(Math.round(plannedSpend / 12))}/mo holds up in only {pct}% of markets{canSpend >= plannedSpend * 0.75 ? ' — the fix is a trim, not a teardown' : ''}. </>
-                  )}
-                  Retiring at {plan.retireAge} with a projected {fmt(results.portfolioAtRetire)}, spending {fmt(plannedSpend)} a year in retirement, with a plan that runs to {planEnd}.
-                  {odds && <> In a steady market your money {covered ? 'lasts the whole way' : `runs out at ${brokeLabel}`}; in a bad one (1 in 10), {badLasts.endsWith('+') ? 'it still lasts' : `it runs out at ${odds.p10LastsAge}`}.</>}
+                    ? <>Your planned {fmt(Math.round(plannedSpend / 12))}/mo holds up in {pct}% of markets{canSpend >= plannedSpend * 0.75 ? ' — the fix is a trim, not a teardown' : ''}.</>
+                    : <>Retiring at {plan.retireAge} with a projected {fmt(results.portfolioAtRetire)} · plan runs to {planEnd}.</>}
                 </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px 20px', marginTop: 4 }}>
                   <button type="button" onClick={goOptimize} className="verdict-cta">
@@ -1669,16 +1667,20 @@ export default function MyPlan({ openRange = false }) {
                   <Explain
                     label="How we calculated this"
                     lines={[
+                      `The plan: retire at ${plan.retireAge} with a projected ${fmt(results.portfolioAtRetire)}, spending ${fmt(plannedSpend)} a year, running to ${planEnd}.`,
                       `Every year from ${plan.currentAge} to the end of the plan: income − taxes − spending; any shortfall is withdrawn from savings (cash → taxable → 401(k) → Roth${plan.useRealEstateInRetirement ? ' → real estate' : ''}).`,
                       `We run that plan through ${odds?.runs ?? 500} markets: good and bad years in random order, averaging your ${plan.expectedReturn ?? 7}% return with about ${odds ? odds.stdDev.toFixed(0) : 9}% swings a year. The chance is how many never run short. Sampling alone moves it about ±${odds ? Math.max(1, Math.round(196 * Math.sqrt(odds.successRate * (1 - odds.successRate) / odds.runs))) : 3} points; your return and spending assumptions move it far more. How we check the math: retiresimplified.com/accuracy.`,
                       covered
                         ? 'In a steady market, no year exhausts your available savings.'
                         : `In a steady market, available savings hit $0 at ${brokeLabel} with expenses still unpaid.`,
+                      odds ? `In a bad market (1 in 10), it ${odds.p10LastsAge != null ? `runs out at ${odds.p10LastsAge}` : 'still lasts'}${flexOdds?.p10LastsAge > (odds.p10LastsAge ?? 0) ? ` — trimming in bad years pushes that to ${flexOdds.p10LastsAge}` : ''}.` : null,
                       (plan.ltcMonthly ?? LTC_DEFAULT_MONTHLY) > 0
                         ? `Includes long-term care of ${fmt(plan.ltcMonthly ?? LTC_DEFAULT_MONTHLY)}/month (today’s dollars) from age ${ltcStartAge(lastRow.age ?? plan.longevityAge)}. Change it under Expenses.`
                         : 'Long-term care is left out (set to $0 under Expenses).',
+                      flexOdds ? `“If you trim”: the same markets, with everyday cuts deepening 5%/yr (up to ${Math.round((flexOdds.cut ?? FLEX_TRIM) * 100)}%) whenever you fall 15%+ behind plan, easing back on recovery. Healthcare and long-term care never trim.` : null,
+                      lighterOdds && Math.round(lighterOdds.successRate * 100) >= (pct ?? 0) + 10 ? `“Lighter tools”: your exact inputs the way most calculators model them — no long-term care, plan ending at your own ${plan.longevityAge}${plan.hasSpouse ? ' (no survivor years)' : ''}, full ${plan.expectedReturn ?? 7}% return kept in retirement. Replaying every real market since 1928 sides with our stricter number.` : null,
                       'The Ledger below shows every year’s exact dollars — start, growth, contributions, withdrawals, end.',
-                    ]}
+                    ].filter(Boolean)}
                   />
                 </div>
               </Card>
@@ -1747,13 +1749,10 @@ export default function MyPlan({ openRange = false }) {
                   </div>
                 )}
                 <p style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5, margin: 0 }}>
-                  &ldquo;You can spend&rdquo; is the everyday retirement spending that keeps about an 80% chance, in today&apos;s dollars. Healthcare and long-term care come on top.
-                  {flexOdds && (
-                    <> The headline chance assumes you never adjust. &ldquo;If you trim&rdquo; re-runs the same markets with everyday cuts that deepen 5%/yr (up to {Math.round((flexOdds.cut ?? FLEX_TRIM) * 100)}%) whenever you fall 15%+ behind plan, easing back on recovery — healthcare and long-term care never trim.</>
-                  )}
-                  {lighterOdds && odds && Math.round(lighterOdds.successRate * 100) >= (pct ?? 0) + 10 && (
-                    <> &ldquo;Lighter tools&rdquo; re-runs your exact inputs the way most calculators model them — no long-term care, plan ending at your own {plan.longevityAge}{plan.hasSpouse ? ' (no survivor years)' : ''}, and your full {plan.expectedReturn ?? 7}% return kept through retirement. Same math engine, lighter assumptions; replaying every real market since 1928 sides with our stricter number.</>
-                  )}
+                  {/* One line. The trim rule and the lighter-tools
+                      reconciliation are explained in “How we calculated
+                      this” — a footnote that needs a scroll isn't a footnote. */}
+                  &ldquo;You can spend&rdquo; holds about an 80% chance, in today&apos;s dollars — healthcare and long-term care come on top. The ⓘ above explains every row.
                 </p>
               </Card>
             </div>
