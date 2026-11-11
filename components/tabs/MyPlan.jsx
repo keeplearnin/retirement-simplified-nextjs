@@ -8,7 +8,7 @@ import InfoBox from '@/components/ui/InfoBox';
 import { fmt, fmtFull } from '@/lib/format';
 import { usePlan, INCOME_TEMPLATES, DEBT_TEMPLATES } from '@/components/PlanProvider';
 import { computeProjection } from '@/lib/computeProjection';
-import { runPlanOdds, oddsLabel, ON_TRACK_ODDS, sustainableSpend, spendingRange, MARKET_MOVE } from '@/lib/planOdds';
+import { runPlanOdds, runFlexOdds, oddsLabel, ON_TRACK_ODDS, sustainableSpend, spendingRange, MARKET_MOVE, FLEX_TRIM } from '@/lib/planOdds';
 import { LTC_DEFAULT_MONTHLY, ltcStartAge } from '@/lib/expenseEngine';
 import { detectIrmaaCliff } from '@/lib/taxEngine';
 import { RMD_TABLE, RMD_START_AGE } from '@/lib/constants';
@@ -635,14 +635,21 @@ function OddsScore({ odds }) {
 
 // Odds take ~150ms (500 full projections), so recompute only once the plan
 // stops changing — dragging a slider stays smooth and the ring catches up.
+// The flexible-spending companion (same markets, retiree trims 15% in bad
+// stretches) runs right after the headline figure has painted.
 function usePlanOdds(plan) {
   const [odds, setOdds] = useState(null);
+  const [flexOdds, setFlexOdds] = useState(null);
   useEffect(() => {
-    const t = setTimeout(() => setOdds(runPlanOdds(plan)), odds ? 250 : 0);
-    return () => clearTimeout(t);
+    let t2;
+    const t = setTimeout(() => {
+      setOdds(runPlanOdds(plan));
+      t2 = setTimeout(() => setFlexOdds(runFlexOdds(plan)), 30);
+    }, odds ? 250 : 0);
+    return () => { clearTimeout(t); clearTimeout(t2); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `odds` only picks the delay
   }, [plan]);
-  return odds;
+  return { odds, flexOdds };
 }
 
 // "How much can I spend?" — the retirement spending that keeps an 80%
@@ -1049,7 +1056,7 @@ export default function MyPlan({ openRange = false }) {
   // from the lib (it still taxed cash withdrawals after the lib was
   // fixed) — the two views disagreed. Never duplicate the engine again.
   const results = useMemo(() => computeProjection(plan), [plan]);
-  const odds = usePlanOdds(plan);
+  const { odds, flexOdds } = usePlanOdds(plan);
   const { spend: canSpend, range: spendRange } = useSustainableSpend(plan, odds);
 
   const { combined, essentialTotal, discretionaryTotal, retireEssentialTotal, retireDiscretionaryTotal } = results;
@@ -1650,7 +1657,39 @@ export default function MyPlan({ openRange = false }) {
                       than "will it last". Today's dollars, everyday spending. */}
                   <div style={dlRow}><dt style={{ color: 'var(--text-muted)' }}>You can spend</dt><dd style={{ fontWeight: 600, color: 'var(--heading)' }}>{canSpend == null ? 'Working it out…' : canSpend === 0 ? 'Not at 80% odds yet' : `${fmt(Math.round(canSpend / 12))}/mo`}</dd></div>
                   <div style={dlRow}><dt style={{ color: 'var(--text-muted)' }}>You plan to spend</dt><dd style={{ fontWeight: 600, color: overSpending ? 'var(--warn)' : 'var(--heading)' }}>{fmt(Math.round(plannedSpend / 12))}/mo</dd></div>
-                  {odds && <div style={dlRow}><dt style={{ color: 'var(--text-muted)' }}>Bad market (1 in 10)</dt><dd style={{ fontWeight: 600, color: badLasts.endsWith('+') ? 'var(--heading)' : 'var(--warn)' }}>{badLasts}</dd></div>}
+                  {/* The headline rate never adapts — a path pushed from 9
+                      unfunded years to 3 by trimming still "fails". The
+                      honest flexible-spending story is the OUTCOME shift:
+                      how much later the bad market breaks you, and how much
+                      smaller the typical miss gets, when you trim. */}
+                  {odds && <div style={dlRow}><dt style={{ color: 'var(--text-muted)' }}>Bad market (1 in 10)</dt><dd style={{ fontWeight: 600, color: badLasts.endsWith('+') ? 'var(--heading)' : 'var(--warn)' }}>
+                    {badLasts}
+                    {flexOdds && !badLasts.endsWith('+') && flexOdds.p10LastsAge != null && flexOdds.p10LastsAge > odds.p10LastsAge && (
+                      <span style={{ color: 'var(--accent)' }}> → {flexOdds.p10LastsAge} if you trim</span>
+                    )}
+                    {flexOdds && !badLasts.endsWith('+') && flexOdds.p10LastsAge == null && (
+                      <span style={{ color: 'var(--accent)' }}> → lasts if you trim</span>
+                    )}
+                  </dd></div>}
+                  {odds && odds.medianYearsShort != null && odds.successRate < ON_TRACK_ODDS && (
+                    <div style={dlRow}>
+                      <dt style={{ color: 'var(--text-muted)' }}>When it falls short</dt>
+                      <dd style={{ fontWeight: 600, color: 'var(--heading)' }}>
+                        typically the last {odds.medianYearsShort} {odds.medianYearsShort === 1 ? 'year' : 'years'}
+                        {flexOdds && flexOdds.medianYearsShort != null && flexOdds.medianYearsShort < odds.medianYearsShort && (
+                          <span style={{ color: 'var(--accent)' }}> → {flexOdds.medianYearsShort} if you trim</span>
+                        )}
+                      </dd>
+                    </div>
+                  )}
+                  {/* Only when adapting moves the binary odds themselves
+                      (short horizons / shallow failures) is the % worth a row. */}
+                  {flexOdds && odds && Math.round(flexOdds.successRate * 100) >= (pct ?? 0) + 5 && (
+                    <div style={dlRow}>
+                      <dt style={{ color: 'var(--text-muted)' }}>If you trim in bad years</dt>
+                      <dd style={{ fontWeight: 600, color: 'var(--accent)' }}>{Math.round(flexOdds.successRate * 100)}% chance</dd>
+                    </div>
+                  )}
                   <div style={dlRow}><dt style={{ color: 'var(--text-muted)' }}>At retirement ({plan.retireAge})</dt><dd style={{ fontWeight: 600, color: 'var(--heading)' }}>{fmt(results.portfolioAtRetire)}</dd></div>
                 </dl>
                 {/* Guardrails: what to do after a big market move, so a bad
@@ -1666,6 +1705,9 @@ export default function MyPlan({ openRange = false }) {
                 )}
                 <p style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5, margin: 0 }}>
                   &ldquo;You can spend&rdquo; is the everyday retirement spending that keeps about an 80% chance, in today&apos;s dollars. Healthcare and long-term care come on top.
+                  {flexOdds && (
+                    <> The headline chance assumes you never adjust. &ldquo;If you trim&rdquo; re-runs the same markets with everyday cuts that deepen 5%/yr (up to {Math.round((flexOdds.cut ?? FLEX_TRIM) * 100)}%) whenever you fall 15%+ behind plan, easing back on recovery — healthcare and long-term care never trim.</>
+                  )}
                 </p>
               </Card>
             </div>

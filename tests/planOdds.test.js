@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeProjection } from '@/lib/computeProjection';
-import { runPlanOdds, runPlanHistory, impliedMix, sustainableSpend, spendingRange } from '@/lib/planOdds';
+import { runPlanOdds, runFlexOdds, runPlanHistory, impliedMix, sustainableSpend, spendingRange } from '@/lib/planOdds';
 import { HISTORICAL_RETURNS } from '@/lib/historicalReturns';
 
 function plan(overrides = {}) {
@@ -132,5 +132,59 @@ describe('spendingRange', () => {
     const { low, high } = spendingRange(p);
     expect(low).toBe(sustainableSpend(p));
     expect(high).toBe(low);
+  });
+});
+
+describe('runFlexOdds — flexible-spending guardrails', () => {
+  // A knife-edge plan: tight enough that volatility produces plenty of
+  // failures for the trim to rescue.
+  const knifeEdge = () => plan({ retireSpending: 86_000 });
+
+  it('adapting never hurts: flexible odds >= strict odds on the same markets', () => {
+    const strict = runPlanOdds(knifeEdge(), { runs: 200 });
+    const flex = runFlexOdds(knifeEdge(), { runs: 200 });
+    expect(flex.runs).toBe(strict.runs);
+    expect(flex.successRate).toBeGreaterThanOrEqual(strict.successRate);
+  });
+
+  it('the trim materially improves OUTCOMES: later bad-market broke age, smaller typical shortfall', () => {
+    // On long horizons, binary success barely moves (a path pushed from 9
+    // unfunded years to 3 still "fails") — the honest wins are the p10
+    // broke age and the failure magnitude. Same seed → same sequences; the
+    // only difference is the behavior.
+    const strict = runPlanOdds(knifeEdge(), { runs: 200 });
+    const flex = runFlexOdds(knifeEdge(), { runs: 200 });
+    expect(flex.p10LastsAge).toBeGreaterThan(strict.p10LastsAge);
+    expect(flex.medianYearsShort).toBeLessThan(strict.medianYearsShort);
+  });
+
+  it('a zero cut reproduces the strict odds exactly (same sequences)', () => {
+    const strict = runPlanOdds(knifeEdge(), { runs: 100 });
+    const flex = runFlexOdds(knifeEdge(), { runs: 100, cut: 0 });
+    expect(flex.successRate).toBe(strict.successRate);
+  });
+
+  it('reports failure magnitude: median short age inside the plan, years short >= 1', () => {
+    const strict = runPlanOdds(knifeEdge(), { runs: 200 });
+    if (strict.successRate < 1) {
+      expect(strict.medianShortAge).toBeGreaterThan(knifeEdge().retireAge);
+      expect(strict.medianShortAge).toBeLessThanOrEqual(strict.horizonAge);
+      expect(strict.medianYearsShort).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('spendTrim never fires on a healthy steady path (never behind its own reference or near the floor)', () => {
+    // A comfortably-funded plan: the zero-shock path tracks its own
+    // reference exactly and never nears the 15%-of-start danger floor, so
+    // no year trims. (A knife-edge steady path CAN trim near the end — by
+    // design: circling $0 is the danger zone whether or not it was planned.)
+    const healthy = plan({ retireSpending: 40_000 });
+    const steady = computeProjection(healthy);
+    const ref = steady.combined.map(r => r.portfolioBalance);
+    const trimmed = computeProjection(healthy, {
+      returnShocks: steady.combined.map(() => 0),
+      spendTrim: { refBalances: ref, cut: 0.25 },
+    });
+    expect(trimmed.combined.map(r => r.totalExpense)).toEqual(steady.combined.map(r => r.totalExpense));
   });
 });
