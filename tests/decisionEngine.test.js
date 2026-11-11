@@ -62,7 +62,10 @@ describe('runDecisionEngine', () => {
   });
 
   it('finds a Roth conversion opportunity for a large pre-RMD 401k', () => {
-    const result = runDecisionEngine(basePlan());
+    // $1.5M: large enough that RMDs push later years into higher brackets
+    // even with federal and California brackets growing with inflation
+    // (at $900K the indexed RMD-year tax leaves too little to gain).
+    const result = runDecisionEngine(basePlan({ savings401k: 1_500_000 }));
     const roth = result.actions.find(a => a.id === 'roth-ladder');
     expect(roth).toBeDefined();
     expect(roth.dollarValue).toBeGreaterThan(0);

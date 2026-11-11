@@ -35,9 +35,11 @@ export interface TaxInput {
    *  projection that grows income with inflation must grow these too, or a
    *  steady real income drifts into higher brackets decades out. Scales the
    *  federal ordinary and capital-gains brackets, the standard and 65+
-   *  deductions and the IRMAA tiers. Thresholds the law never indexes stay
-   *  fixed: Social Security taxation, NIIT, the SALT cap and the OBBBA
-   *  senior bonus. Defaults to 1 (2026 figures as published). */
+   *  deductions, the IRMAA tiers, and the brackets of states that index
+   *  theirs (see STATE_BRACKETS_INDEXED). Thresholds the law never indexes
+   *  stay fixed: Social Security taxation, NIIT, the SALT cap, the OBBBA
+   *  senior bonus, and NY/NJ/HI brackets. Defaults to 1 (2026 figures as
+   *  published). */
   indexFactor?: number;
   deductions?: {
     mortgageInterest?: number;
@@ -383,6 +385,15 @@ const DEFAULT_STATE_TAX_RATE = 0.05; // fallback
 //
 // For users not in this table, computeStateTax falls through to the flat
 // rate above, which is accurate for non-graduated / lower-income states.
+//
+// Later tax years: these states raise their brackets with inflation each
+// year by law (CA R&TC 17041(h), OR ORS 316.037, MN 290.06 subd. 2d, WI
+// 71.06(2e), MA's surtax threshold under Art. 44 §4), so a projection
+// scales them by TaxInput.indexFactor like the federal brackets. NY, NJ and
+// HI set their brackets in statute with no indexing — they stay fixed, and
+// inflation alone does push incomes there into higher brackets.
+const STATE_BRACKETS_INDEXED = new Set(['CA', 'OR', 'MN', 'WI', 'MA']);
+
 const STATE_GRADUATED_BRACKETS: Record<
   string,
   { single: BracketEntry[]; mfj: BracketEntry[] }
@@ -807,6 +818,7 @@ function computeStateTax(
     spouseAge?: number;
     ssTaxable?: number;
     retirementIncome?: number;
+    indexFactor?: number;
   } = {},
 ): number {
   const code = stateCode.toUpperCase();
@@ -832,7 +844,10 @@ function computeStateTax(
   // estimator showed (tester report from Fisherman Investments review).
   const graduated = STATE_GRADUATED_BRACKETS[code];
   if (graduated) {
-    const brackets = filingStatus === 'mfj' ? graduated.mfj : graduated.single;
+    const base = filingStatus === 'mfj' ? graduated.mfj : graduated.single;
+    const brackets = STATE_BRACKETS_INDEXED.has(code)
+      ? indexBrackets(base, options.indexFactor ?? 1)
+      : base;
     return Math.max(0, applyBrackets(adjustedTaxable, brackets));
   }
   // Fallback: flat effective rate for non-graduated / less-impactful states.
@@ -994,6 +1009,7 @@ export function computeTax(input: TaxInput): TaxResult {
     spouseAge: input.spouseAge,
     ssTaxable, // already computed above (line 709)
     retirementIncome: input.retirementIncome ?? 0,
+    indexFactor,
   });
 
   // 9. IRMAA (monthly Part B surcharge)

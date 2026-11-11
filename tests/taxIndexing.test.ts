@@ -62,6 +62,32 @@ describe('computeTax indexFactor', () => {
   });
 });
 
+describe('state brackets in later years', () => {
+  const at = (stateCode: string, ordinaryIncome: number, indexFactor = 1) =>
+    computeTax({ ...base, filingStatus: 'single', stateCode, ordinaryIncome, indexFactor }).stateTax;
+
+  it('Minnesota indexes its brackets: double the prices, exactly double the tax', () => {
+    // 2026: $100K − 16,100 deduction = 83,900 taxable
+    //   5.35% × 33,310 = 1,782.09; 6.80% × 50,590 = 3,440.12 → 5,222.21
+    expect(at('MN', 100_000)).toBeCloseTo(5_222.21, 1);
+    // 2× prices: $200K − 32,200 = 167,800 against brackets 66,620 / 218,860
+    //   5.35% × 66,620 = 3,564.17; 6.80% × 101,180 = 6,880.24 → 10,444.41
+    expect(at('MN', 200_000, 2)).toBeCloseTo(10_444.41, 1);
+  });
+
+  it('New York does not index: the same real income pays more', () => {
+    expect(at('NY', 200_000, 2)).toBeGreaterThan(2 * at('NY', 100_000));
+  });
+
+  it('Massachusetts grows its surtax threshold', () => {
+    // 2× prices: threshold 1,107,750 × 2 = 2,215,500. $2.1M − 32,200 =
+    // 2,067,800 taxable is under it, so all at 5% = 103,390.
+    expect(at('MA', 2_100_000, 2)).toBeCloseTo(103_390, 0);
+    // At 2026 thresholds the same income would owe the 4% surtax.
+    expect(at('MA', 2_100_000)).toBeGreaterThan(0.05 * (2_100_000 - 16_100));
+  });
+});
+
 describe('Roth ladder with indexing', () => {
   it('fills a bracket that grows each year', () => {
     // MFJ at 60, no SS or pension yet: filling the 22% bracket means taxable
