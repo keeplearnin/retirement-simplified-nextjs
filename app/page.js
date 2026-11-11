@@ -266,6 +266,8 @@ function AppContent() {
         <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 18, flexWrap: 'wrap', fontSize: 11 }}>
           <a href="/methodology" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>How the math works</a>
           <a href="/accuracy" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>How we check it</a>
+          <a href="/how-it-works" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>How it works</a>
+          <a href="/assistant-rules" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>What the assistant won’t do</a>
           <a href="https://github.com/keeplearnin/retirement-simplified-nextjs" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-dim)', textDecoration: 'none' }}>Source on GitHub</a>
           <a href="/verdict" style={{ color: 'var(--text-dim)', textDecoration: 'none' }}>Quick Verdict</a>
           <a href="/report" style={{ color: 'var(--text-dim)', textDecoration: 'none' }}>PDF Report</a>

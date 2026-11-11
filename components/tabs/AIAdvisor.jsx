@@ -1223,7 +1223,8 @@ export default function AIAdvisor() {
                   <li><strong>You decide every change</strong> — When a modeled scenario points to a specific change ("claim SS at 70"), an Apply button appears. Nothing changes in your plan unless you click it.</li>
                 </ol>
                 <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
-                  Educational tool only — not financial advice, and it never names funds or tells you what to buy. Your plan is tied to this browser — there are no accounts to sign into.
+                  Educational tool only — not financial advice, and it never names funds or tells you what to buy. Your plan is tied to this browser — there are no accounts to sign into.{' '}
+                  <a href="/assistant-rules" style={{ color: 'var(--accent)' }}>What it will and won’t do</a>
                 </p>
               </div>
             )}
