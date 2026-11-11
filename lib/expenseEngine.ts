@@ -54,6 +54,10 @@ export interface ExpensePlan {
    *  strength (see longTermCareCost). Defaults to LTC_DEFAULT_MONTHLY;
    *  0 = leave long-term care out of the plan. */
   ltcMonthly?: number;
+  /** Per-person long-term-care windows in the PRIMARY's age frame; each
+   *  window costs ltcMonthly for that person's last ~5 years. Defaults to
+   *  one window ending at longevityAge. */
+  ltcWindows?: Array<{ endAge: number }>;
 }
 
 export type RetirementPhase = 'working' | 'go-go' | 'slow-go' | 'no-go';
@@ -132,10 +136,11 @@ function longTermCareCost(
   currentAge: number,
   healthcareInflation: number,
   baseMonthlyCost: number,
+  generalInflation: number = 0.025,
 ): number {
   // Only applies in the last ~5 years of projected life
   const startAge = ltcStartAge(longevityAge);
-  if (age < startAge || baseMonthlyCost <= 0) return 0;
+  if (age < startAge || age > longevityAge || baseMonthlyCost <= 0) return 0;
 
   // Probability-weighted monthly LTC cost in today's dollars. Genworth Cost
   // of Care survey: 2026-equivalent median assisted living ~$5,500/mo,
@@ -162,7 +167,8 @@ function longTermCareCost(
   // 55+-year horizons who compound that gap for decades. Use a rate between
   // general and full healthcare inflation, capped at 4.5% so a very long
   // horizon doesn't compound into an unrealistic blow-up.
-  const ltcInflationRate = Math.min(healthcareInflation, 0.045);
+  // Floored at general inflation (LTC never lags CPI), capped at 4.5%.
+  const ltcInflationRate = Math.min(0.045, Math.max(generalInflation, healthcareInflation));
   return inflated(annualBase, ltcInflationRate, age - currentAge);
 }
 
@@ -206,14 +212,24 @@ export function projectExpenses(plan: ExpensePlan): YearlyExpense[] {
         yearsFromNow,
       );
     }
-    // Add long-term care estimate
-    healthcare += longTermCareCost(
-      age,
-      plan.longevityAge,
-      plan.currentAge,
-      plan.healthcareInflation,
-      plan.ltcMonthly ?? LTC_DEFAULT_MONTHLY,
-    );
+    // Add long-term care — PER PERSON, each in their own final-years
+    // window. For couples the plan carries one window per spouse (in the
+    // primary's age frame); keying one window off the household horizon
+    // costed only the survivor's last years and only ONE person's care,
+    // understating couple LTC roughly by half.
+    const ltcWindows = plan.ltcWindows?.length
+      ? plan.ltcWindows
+      : [{ endAge: plan.longevityAge }];
+    for (const w of ltcWindows) {
+      healthcare += longTermCareCost(
+        age,
+        w.endAge,
+        plan.currentAge,
+        plan.healthcareInflation,
+        plan.ltcMonthly ?? LTC_DEFAULT_MONTHLY,
+        plan.inflationRate,
+      );
+    }
 
     // --- Debt payments ---
     let debtPayments = 0;

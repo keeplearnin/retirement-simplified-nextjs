@@ -376,3 +376,72 @@ describe('computeProjection — money conservation (audit regressions)', () => {
     expect(row.withdrawal401k).toBeGreaterThanOrEqual(row.rmd);
   });
 });
+
+describe('computeProjection — household expenses (audit regressions)', () => {
+  // Couples: LTC fires for EACH person's final years, and both pay the
+  // Medicare base premium. The old model costed one person's LTC only in
+  // the survivor's window and one base premium for two IRMAAs.
+  it('a couple pays two Medicare premiums while both are 65+, one in survivor years', () => {
+    const r = computeProjection(basePlan({
+      currentAge: 66, retireAge: 66, longevityAge: 80,
+      hasSpouse: true, filingStatus: 'mfj',
+      spouseCurrentAge: 66, spouseRetireAge: 66, spouseLongevityAge: 90,
+      savingsCash: 3_000_000, ltcMonthly: 0,
+      annualSpending: 60_000, retireSpending: 60_000,
+    }));
+    const both = r.combined.find(x => x.age === 70);  // both alive, both 65+
+    const widow = r.combined.find(x => x.age === 85); // survivor only
+    // Zero inflation plan: premiums are flat $450/mo each.
+    expect(both.healthcare).toBeGreaterThanOrEqual(2 * 450 * 12);
+    expect(widow.healthcare).toBeLessThan(both.healthcare);
+    expect(widow.healthcare).toBeGreaterThanOrEqual(450 * 12);
+  });
+
+  it('LTC is costed per person: the primary\'s own last years carry care costs too', () => {
+    const mk = (ltc) => computeProjection(basePlan({
+      currentAge: 66, retireAge: 66, longevityAge: 90,
+      hasSpouse: true, filingStatus: 'mfj',
+      spouseCurrentAge: 66, spouseRetireAge: 66, spouseLongevityAge: 96,
+      savingsCash: 3_000_000, ltcMonthly: ltc,
+      annualSpending: 60_000, retireSpending: 60_000,
+    }));
+    const r = mk(3_000);
+    const zero = mk(0);
+    // Primary's own window (85..90) — the old single-window model skipped it.
+    const at88 = r.combined.find(x => x.age === 88);
+    const at88zero = zero.combined.find(x => x.age === 88);
+    expect(at88.healthcare, 'primary final-years LTC missing').toBeGreaterThan(at88zero.healthcare);
+    // Survivor's window (spouse 91..96 = primary frame 91..96) also costed.
+    const at94 = r.combined.find(x => x.age === 94);
+    const at94zero = zero.combined.find(x => x.age === 94);
+    expect(at94.healthcare, 'survivor LTC missing').toBeGreaterThan(at94zero.healthcare);
+  });
+
+  it('rental income continues through the survivor years', () => {
+    const r = computeProjection(basePlan({
+      currentAge: 70, retireAge: 70, longevityAge: 80,
+      hasSpouse: true, filingStatus: 'mfj',
+      spouseCurrentAge: 70, spouseRetireAge: 70, spouseLongevityAge: 94,
+      savingsCash: 1_000_000,
+      incomeSources: [
+        { id: 1, type: 'rental', label: 'Rental', monthlyNet: 2_000, appreciation: 0 },
+      ],
+    }));
+    const widow = r.combined.find(x => x.age === 88); // primary dead, spouse 88
+    expect(widow.rental, 'rental vanished for the survivor').toBeGreaterThan(0);
+  });
+
+  it('a 60-month debt costs exactly 60 payments, not 72', () => {
+    const r = computeProjection(basePlan({
+      currentAge: 65, retireAge: 65, longevityAge: 75,
+      savingsCash: 2_000_000, ltcMonthly: 0,
+      annualSpending: 40_000, retireSpending: 40_000,
+      debts: [{ id: 1, name: 'Car', monthlyPayment: 1_000, remainingBalance: 60_000, interestRate: 0 }],
+    }));
+    const charged = r.combined.filter(x => x.totalExpense > r.combined[6].totalExpense + 1);
+    // Zero-inflation plan: exactly 5 years (ages 65-69) carry the $12K/yr payment.
+    const totalDebtPaid = r.combined.reduce((s, x) => s + Math.max(0, x.totalExpense - r.combined[6].totalExpense), 0);
+    expect(charged.length).toBe(5);
+    expect(Math.round(totalDebtPaid)).toBe(60_000);
+  });
+});

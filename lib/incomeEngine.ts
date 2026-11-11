@@ -375,7 +375,10 @@ export function projectIncome(plan: RetirementPlan): YearlyProjection[] {
     // ------ Rental Income ------
     let rentalAmt = 0;
     if (rental) {
-      const endAge = rental.endAge ?? longevityAge;
+      // Rental is a HOUSEHOLD asset: it keeps paying through the survivor's
+      // years, not just to the primary's longevity (a $2K/mo rental was
+      // dropping $336K of survivor income for a spouse living 14 more years).
+      const endAge = rental.endAge ?? projectionEndAge;
       if (age <= endAge) {
         const appreciation = rental.annualAppreciation ?? 0.03;
         rentalAmt = rental.monthlyNetIncome * 12 * Math.pow(1 + appreciation, yearsFromStart);
