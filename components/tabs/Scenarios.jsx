@@ -15,7 +15,8 @@ const SCENARIO_COLORS = ['var(--accent)', 'var(--blue)', 'var(--purple, #8b5cf6)
 const MAX_COMPARE = 3;
 
 function metricRows(results) {
-  const covered = (r) => r.proj.moneyLastsAge >= (r.plan.longevityAge || 95);
+  // Household horizon (survivor years included), not primary longevity.
+  const covered = (r) => r.proj.moneyLastsAge >= (r.proj.horizonAge ?? r.plan.longevityAge ?? 95);
   return [
     { label: 'Retire at', value: (r) => `Age ${r.plan.retireAge}` },
     { label: 'Money lasts to', value: (r) => `Age ${r.proj.moneyLastsAge}`, highlight: (r) => (covered(r) ? 'var(--accent)' : 'var(--danger)') },

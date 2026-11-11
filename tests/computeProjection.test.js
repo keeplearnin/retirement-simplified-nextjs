@@ -165,6 +165,38 @@ describe('computeProjection — pre-retirement gap years draw down (regression)'
   });
 });
 
+describe('computeProjection — household horizon (survivor years)', () => {
+  // Live-site regression: a 50/43 couple planning to 95/95 projects to
+  // primary-age 102 (the spouse's 95). The steady path went broke at ~97 —
+  // DURING the survivor's years — but every screen compared moneyLastsAge
+  // to plan.longevityAge (95) and declared the plan "lasts the whole way"
+  // while the survivor was penniless for her last five years.
+  it('exposes horizonAge = the last projected age, past the primary longevity', () => {
+    const r = computeProjection(basePlan({
+      currentAge: 50, retireAge: 57, longevityAge: 95,
+      hasSpouse: true, filingStatus: 'mfj',
+      spouseCurrentAge: 43, spouseRetireAge: 57, spouseLongevityAge: 95,
+      savings401k: 1_000_000, savingsTaxable: 500_000,
+      annualSpending: 150_000, retireSpending: 124_000,
+      incomeSources: [
+        { id: 1, type: 'salary', label: 'Salary', amount: 180_000, growthRate: 3, owner: 'primary' },
+      ],
+    }));
+    // Spouse reaches 95 at primary-age 102 — the true household horizon.
+    expect(r.horizonAge).toBe(102);
+    expect(r.combined[r.combined.length - 1].age).toBe(102);
+    // A broke age in the survivor window must NOT count as covering the plan.
+    if (r.moneyLastsAge > 95 && r.moneyLastsAge < 102) {
+      expect(r.moneyLastsAge >= r.horizonAge).toBe(false);
+    }
+  });
+
+  it('for singles, horizonAge equals longevityAge', () => {
+    const r = computeProjection(basePlan({ longevityAge: 90 }));
+    expect(r.horizonAge).toBe(90);
+  });
+});
+
 describe('computeProjection — ledger identity (transparency layer)', () => {
   // The Ledger view derives growth as the residual of the exact identity:
   //   end = start + growth + contributions − withdrawals

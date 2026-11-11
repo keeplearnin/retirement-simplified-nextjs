@@ -160,7 +160,11 @@ export default function Optimize() {
   }
 
   const { baseline, actions, totalOpportunity } = result;
-  const covered = baseline.moneyLastsAge >= baseline.longevityAge;
+  // Compare against the household horizon (survivor years included), not
+  // the primary's longevity — "lasts to 96, covers your plan to 92" read
+  // as covered even when the younger spouse's last years were unfunded.
+  const horizon = baseline.horizonAge ?? baseline.longevityAge;
+  const covered = baseline.moneyLastsAge >= horizon;
 
   return (
     <div className="fade-up">
@@ -169,7 +173,7 @@ export default function Optimize() {
         <Stat
           label="Money Lasts To"
           value={`Age ${baseline.moneyLastsAge}`}
-          sub={covered ? `Covers your plan to ${baseline.longevityAge}` : `Plan runs to ${baseline.longevityAge} — gap to close`}
+          sub={covered ? `Covers your plan to ${horizon}` : `Plan runs to ${horizon} — gap to close`}
           color={covered ? 'var(--accent)' : 'var(--danger)'}
         />
         {/* Color only where it encodes status — neutral facts stay in text

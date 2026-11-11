@@ -1561,8 +1561,20 @@ export default function MyPlan({ openRange = false }) {
         }
         // `covered` = the steady-return path (chart, ledger). The verdict
         // itself is the odds across many markets once they're computed.
-        const covered = results.moneyLastsAge >= plan.longevityAge;
-        const yearsShort = plan.longevityAge - results.moneyLastsAge;
+        // Compare against the HOUSEHOLD horizon, not the primary's
+        // longevityAge — for couples the plan runs into the younger
+        // spouse's survivor years, and a path that goes broke there is NOT
+        // "lasting the whole way" even though it outlived the primary.
+        const horizonAge = results.horizonAge ?? plan.longevityAge;
+        const covered = results.moneyLastsAge >= horizonAge;
+        const yearsShort = horizonAge - results.moneyLastsAge;
+        // When the broke year falls in the survivor period, say it in the
+        // survivor's age — "runs out at 97" reads as nonsense when the
+        // primary's plan ends at 95.
+        const brokeRow = covered ? null : combined.find(r => r.age === results.moneyLastsAge);
+        const brokeLabel = brokeRow && brokeRow.widowed && brokeRow.spouseAlive && brokeRow.spouseAge != null
+          ? `your spouse's age ${brokeRow.spouseAge}`
+          : `age ${results.moneyLastsAge}`;
         const pct = odds ? Math.round(odds.successRate * 100) : null;
         const onTrack = odds ? odds.successRate >= ON_TRACK_ODDS : covered;
         const lastRow = combined[combined.length - 1] || {};
@@ -1601,14 +1613,14 @@ export default function MyPlan({ openRange = false }) {
                     // funded through the spouse's 94) undersells and
                     // confuses. The subline carries the exact ages.
                     ? <>You&apos;re on track. Your money lasts through your whole plan.</>
-                    : <>Your savings run out at {results.moneyLastsAge}, {yearsShort} {yearsShort === 1 ? 'year' : 'years'} before your plan ends.</>}
+                    : <>Your savings run out at {brokeLabel}, {yearsShort} {yearsShort === 1 ? 'year' : 'years'} before your plan ends.</>}
                 </h1>
                 <p style={{ fontSize: 16, color: 'var(--text-muted)', lineHeight: 1.55, maxWidth: 600 }}>
                   {/* "projected" — $X here is the balance AT retirement, not
                       today's savings; "saved" read as current savings and
                       undermined trust in the sidebar total next to it. */}
                   Retiring at {plan.retireAge} with a projected {fmt(results.portfolioAtRetire)}, spending {fmt(plannedSpend)} a year in retirement, with a plan that runs to {planEnd}.
-                  {odds && <> In a steady market your money {covered ? 'lasts the whole way' : `runs out at ${results.moneyLastsAge}`}; in a bad one (1 in 10), {badLasts.endsWith('+') ? 'it still lasts' : `it runs out at ${odds.p10LastsAge}`}.</>}
+                  {odds && <> In a steady market your money {covered ? 'lasts the whole way' : `runs out at ${brokeLabel}`}; in a bad one (1 in 10), {badLasts.endsWith('+') ? 'it still lasts' : `it runs out at ${odds.p10LastsAge}`}.</>}
                 </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px 20px', marginTop: 4 }}>
                   <button type="button" onClick={goOptimize} className="verdict-cta">
@@ -1621,7 +1633,7 @@ export default function MyPlan({ openRange = false }) {
                       `We run that plan through ${odds?.runs ?? 500} markets: good and bad years in random order, averaging your ${plan.expectedReturn ?? 7}% return with about ${odds ? odds.stdDev.toFixed(0) : 9}% swings a year. The chance is how many never run short. Sampling alone moves it about ±${odds ? Math.max(1, Math.round(196 * Math.sqrt(odds.successRate * (1 - odds.successRate) / odds.runs))) : 3} points; your return and spending assumptions move it far more. How we check the math: retiresimplified.com/accuracy.`,
                       covered
                         ? 'In a steady market, no year exhausts your available savings.'
-                        : `In a steady market, available savings hit $0 at age ${results.moneyLastsAge} with expenses still unpaid.`,
+                        : `In a steady market, available savings hit $0 at ${brokeLabel} with expenses still unpaid.`,
                       (plan.ltcMonthly ?? LTC_DEFAULT_MONTHLY) > 0
                         ? `Includes long-term care of ${fmt(plan.ltcMonthly ?? LTC_DEFAULT_MONTHLY)}/month (today’s dollars) from age ${ltcStartAge(lastRow.age ?? plan.longevityAge)}. Change it under Expenses.`
                         : 'Long-term care is left out (set to $0 under Expenses).',
