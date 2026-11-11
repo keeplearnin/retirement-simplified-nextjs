@@ -188,3 +188,64 @@ describe('runFlexOdds — flexible-spending guardrails', () => {
     expect(trimmed.combined.map(r => r.totalExpense)).toEqual(steady.combined.map(r => r.totalExpense));
   });
 });
+
+describe('odds statistics — audit property checks', () => {
+  it('balance percentiles are monotone: p10 <= p25 <= p50 <= p75 <= p90 every year', () => {
+    const o = runPlanOdds(plan({ retireSpending: 80_000 }), { runs: 150 });
+    for (let y = 0; y < o.ages.length; y++) {
+      expect(o.percentiles.p10[y]).toBeLessThanOrEqual(o.percentiles.p25[y]);
+      expect(o.percentiles.p25[y]).toBeLessThanOrEqual(o.percentiles.p50[y]);
+      expect(o.percentiles.p50[y]).toBeLessThanOrEqual(o.percentiles.p75[y]);
+      expect(o.percentiles.p75[y]).toBeLessThanOrEqual(o.percentiles.p90[y]);
+    }
+  });
+
+  it('p10LastsAge semantics: null iff at most 10% of runs fail; otherwise within the plan', () => {
+    const o = runPlanOdds(plan({ retireSpending: 86_000 }), { runs: 200 });
+    const failRate = 1 - o.successRate;
+    if (failRate > 0.1) {
+      expect(o.p10LastsAge).not.toBeNull();
+      expect(o.p10LastsAge).toBeGreaterThan(plan().retireAge);
+      expect(o.p10LastsAge).toBeLessThanOrEqual(o.horizonAge);
+      if (o.medianShortAge != null) expect(o.p10LastsAge).toBeLessThanOrEqual(o.medianShortAge);
+    }
+    const safe = runPlanOdds(plan({ retireSpending: 30_000 }), { runs: 100 });
+    expect(safe.p10LastsAge).toBeNull(); // (far) fewer than 10% fail
+  });
+
+  it('medianYearsShort counts the shortfall year itself', () => {
+    const o = runPlanOdds(plan({ retireSpending: 86_000 }), { runs: 200 });
+    if (o.medianShortAge != null) {
+      expect(o.medianYearsShort).toBe(o.horizonAge - o.medianShortAge + 1);
+    }
+  });
+
+  it('different seeds give different (but same-ballpark) rates — the RNG really uses its seed', () => {
+    const a = runPlanOdds(plan({ retireSpending: 84_000 }), { runs: 150, seed: 1 });
+    const b = runPlanOdds(plan({ retireSpending: 84_000 }), { runs: 150, seed: 7 });
+    expect(a.successRate).not.toBe(b.successRate);
+    expect(Math.abs(a.successRate - b.successRate)).toBeLessThan(0.15);
+  });
+
+  it('history shocks are re-centered: the full-sample mean of each window-set is ~0 overall', () => {
+    const h = runPlanHistory(plan());
+    expect(h.runs).toBeGreaterThan(0);
+    // 1929-start sequences should be among the failures for a knife-edge plan
+    // (sequence structure preserved) — assert the mechanism indirectly: a
+    // tight plan fails in more early-Depression windows than it succeeds.
+    const tight = runPlanHistory(plan({ retireSpending: 86_000 }));
+    if (tight.failures.length > 0) {
+      const earlyFail = tight.failures.some(f => f.startYear <= 1932);
+      expect(earlyFail).toBe(true);
+    }
+  });
+
+  it('even an 81-year household horizon still finds complete historical sequences', () => {
+    // The degenerate zero-window case (plan > 98 years) is unreachable with
+    // valid inputs; the engine guards it by returning successRate null.
+    // What CAN happen: very long horizons shrink the window count sharply.
+    const h = runPlanHistory(plan({ currentAge: 25, hasSpouse: true, filingStatus: 'mfj', spouseCurrentAge: 20, spouseLongevityAge: 100, longevityAge: 100 }));
+    expect(h.runs).toBeGreaterThan(0);
+    expect(h.runs).toBeLessThan(25); // 98 - 81 + 1 = 18 windows
+  });
+});

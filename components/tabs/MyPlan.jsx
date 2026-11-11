@@ -635,7 +635,7 @@ function OddsScore({ odds }) {
 
 // Odds take ~150ms (500 full projections), so recompute only once the plan
 // stops changing — dragging a slider stays smooth and the ring catches up.
-// The flexible-spending companion (same markets, retiree trims 15% in bad
+// The flexible-spending companion (same markets, retiree trims progressively in bad
 // stretches) runs right after the headline figure has painted.
 function usePlanOdds(plan) {
   const [odds, setOdds] = useState(null);
@@ -654,7 +654,7 @@ function usePlanOdds(plan) {
         // Cross-checked 2026-11-11: this reproduces the ~80-85% that
         // lighter tools report for a plan our strict model scores ~15-35%,
         // while replaying every real market sequence since 1928 lands
-        // within ~4 points of OUR number — strict is the honest read;
+        // near OUR number (plan-dependent) — strict is the honest read;
         // this one exists to explain the difference, on screen.
         t3 = setTimeout(() => {
           const ageGap = (plan.currentAge || 0) - (plan.spouseCurrentAge ?? plan.currentAge);
