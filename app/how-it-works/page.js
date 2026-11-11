@@ -71,7 +71,7 @@ export default function HowItWorksPage() {
           result is the same every time you look. The share of runs where money lasts the whole plan is the headline odds.
         </Item>
         <Item title="Every real sequence since 1928.">
-          The same projection also replays every complete run of historical US returns and inflation, so you see how the plan would have
+          The same projection also replays every complete run of historical US stock and bond returns (re-centered on your own expected return, with your plan's inflation), so you see how the plan would have
           fared starting in 1929, 1966, 2000 and every other year.
         </Item>
         <Item title="The bad-market age.">Alongside the odds, the Plan screen shows the age money runs out in the worst 1-in-10 case.</Item>
@@ -87,8 +87,8 @@ export default function HowItWorksPage() {
       <p style={body}>Three design decisions follow from “one engine, one answer”:</p>
       <ul style={ol}>
         <Item title="Tools, not arithmetic.">
-          The assistant is instructed that every plan-specific number must come from a tool result in the conversation. Tests tie each
-          tool to the function behind the matching screen, so chat and screen can’t drift apart.
+          The assistant is instructed that every plan-specific number must come from a tool result in the conversation. Tests tie the
+          core tools (the projection, the odds, the verdict) to the functions behind the matching screens, so chat and screen can’t drift apart.
         </Item>
         <Item title="Proposals, not changes.">
           The one tool that touches the plan only records a suggestion. The app renders an Apply button; nothing changes until you click

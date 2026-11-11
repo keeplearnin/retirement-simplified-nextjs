@@ -7,6 +7,10 @@ frontend:
         - echo "=== Env vars visible to the build ==="
         - env | grep -E '^(ANTHROPIC|ALLOW_|CRON_|RESEND|WEEKLY_|NEXT_PUBLIC_|AWS_REGION|DYNAMODB_)' | sed 's/=.*/=<REDACTED>/' || true
         - npm ci --cache .npm --prefer-offline
+        # The /accuracy page promises the reference cases "run as automated
+        # tests on every change" - make that literally true: a red suite
+        # blocks the deploy.
+        - npx vitest run
     build:
       commands:
         # CRITICAL: Amplify Hosting Gen 1 for Next.js SSR does NOT propagate

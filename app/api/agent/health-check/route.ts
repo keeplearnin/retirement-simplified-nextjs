@@ -2,7 +2,7 @@
  * /api/agent/health-check — autonomous plan health check agent.
  *
  * Called weekly by the client (or by any external cron / AWS EventBridge).
- * Claude uses all 8 tools without a user prompt to produce a structured
+ * Claude free-runs the engine tools without a user prompt to produce a structured
  * health report + email-ready summary.
  *
  * To wire to AWS EventBridge: create a rule targeting a Lambda that POSTs
@@ -155,15 +155,18 @@ export async function POST(request: Request) {
       const parsed = JSON.parse(clean) as Omit<HealthReport, 'generatedAt'>;
       report = { ...parsed, generatedAt: new Date().toISOString() };
     } catch {
-      // Fallback: build a basic report if JSON parsing fails
+      // Parsing failed: report the FAILURE, never a plausible-looking plan
+      // verdict — a fabricated "needs attention" score reads as a judgment
+      // about the user's plan when it is actually a judgment about this
+      // request. (Audit 2026-11-11.)
       report = {
         generatedAt: new Date().toISOString(),
         overallScore: 'needs_attention',
-        scoreLabel: 'Review Needed',
-        alerts: [{ severity: 'medium', message: 'Could not fully analyze your plan. Please review manually.' }],
-        recommendations: ['Open My Plan and verify your income sources are up to date.'],
+        scoreLabel: 'Analysis failed — not a plan verdict',
+        alerts: [{ severity: 'medium', message: 'This health check could not be completed (the analysis response was unreadable). This says nothing about your plan — it will retry next week, or run it again now.' }],
+        recommendations: [],
         keyMetrics: { moneyLastsAge: null, gapStatus: 'unknown', savingsGap: 0, portfolioAtRetire: 0 },
-        emailSummary: 'Your weekly retirement plan health check encountered an issue. Please log in to review your plan.',
+        emailSummary: 'Your weekly health check could not be completed this run. This is a tooling error, not a change in your plan.',
       };
     }
 

@@ -1,0 +1,19 @@
+# Runs the full engine test suite (reference cases included) on every push
+# and pull request — the backing for /accuracy's "automated tests on every
+# change" claim. The Amplify build runs the same suite before deploying.
+name: tests
+on:
+  push:
+    branches: ['**']
+  pull_request:
+jobs:
+  vitest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run

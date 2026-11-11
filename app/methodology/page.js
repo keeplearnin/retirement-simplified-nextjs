@@ -61,7 +61,6 @@ const sections = [
     title: 'Required Minimum Distributions',
     body: [
       "RMDs begin at age 73 per the SECURE Act 2.0. Divisors come from the IRS Uniform Lifetime Table (2022 revision).",
-      "Known limitation: when both members of a household have separate 401(k) balances, the projection uses primary's age for the divisor on the combined household pool. This may over-state RMDs when the spouse is younger and not yet 73. Per-spouse divisor handling is on the roadmap.",
     ],
     sources: [
       { label: 'IRS Pub 590-B — Uniform Lifetime Table', url: 'https://www.irs.gov/publications/p590b' },
