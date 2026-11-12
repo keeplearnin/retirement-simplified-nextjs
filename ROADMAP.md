@@ -2,81 +2,55 @@
 
 ## What it is
 
-A free, open-source retirement planning tool for the mass-affluent ($100K–$1M households). Three questions on `/verdict` produce a specific dollar gap vs. the Fidelity benchmark in 90 seconds, no account required. From there, a full plan editor exposes the math the paid tools hide: RMD avalanche, IRMAA cliffs, the Social Security tax torpedo, Roth conversion ladders, the pre-Medicare healthcare bridge.
+A free, open-source retirement planner for people roughly 55–70 with $100K–$1M saved and no advisor. It answers the question they are actually stuck on — *how much can I spend, and will it last?* — with a tax-aware, year-by-year engine, then ranks the moves that would improve the plan by dollar value. Every number shows its math, the engine is checked against published IRS and SSA examples, and the code is MIT-licensed.
 
-Live at **retiresimplified.com**. Methodology and assumptions documented at **/methodology**. Source on GitHub.
+Live at **retiresimplified.com**. How it works: **/how-it-works**. Assumptions and sources: **/methodology**. Checked cases: **/accuracy**. What the AI will and won't do: **/assistant-rules**.
 
 ---
 
-## What's shipped
+## The product today: three screens
 
-### Top-of-funnel
-- **Verdict screen** (`/verdict`) — three inputs, ninety seconds, one specific dollar gap vs. the Fidelity age-based benchmark. Gap status is calibrated to the user's time horizon (a 40-year-old at 50% of benchmark sees "behind" with a 25-year catch-up message, not "significantly behind"). Result includes the household-aware healthcare bridge cost and three quantified actions ranked by 10-year dollar impact.
-- **3 SEO calculators** (`/calculators/irmaa-cliff-checker`, `/calculators/social-security-break-even`, `/calculators/tax-torpedo`) — standalone, no-signup single-purpose tools built on the same engines as the full app, for organic entry points beyond `/verdict`.
+The Nov 2026 redesign cut the app to three screens; everything else is a Tool, one click away.
 
-### Plan editor (full app)
-- **Plan tab** — inputs for ages, income, savings (10 account types), debts, expenses, assumptions. Year-by-year projection with retirement-detail and RMD-avalanche tables.
-- **Smart Action Items card** — the plan's "what should I do next" surface, adapting to the user's specific gaps (e.g. "Build an emergency fund," "Savings run out at age X," "Personalize your plan for accurate tax projections"). Supersedes the old "smart next-step card" idea — this and the Decision Engine (below) both cover that ground now.
-- **Stress Test tab** (formerly "Dashboard new") — return-shock sensitivity. "Money lasts to age X" with a sensitivity slider that finds the smallest return shock that breaks the plan.
-- **Liquid vs. total net worth** — both shown on the projection chart so users with real estate / 529 holdings can see when their *spendable* portfolio is exhausted, even while total net worth keeps appreciating.
-- **Plan import/export** — download the current plan as a versioned JSON file (backup, device moves, sharing with a spouse/advisor) and re-import it elsewhere (Scenarios tab).
-- **PDF / share export** (`/report`) — single-page printable retirement summary for sharing with a spouse, advisor, or parent.
+### Plan — "Am I okay?"
+- **One verdict.** A headline and one line. Below the 80% bar it leads with the spending that works ("A strong plan is within reach: $9.0K/mo gives you an 80% chance"), with the strict rate on the ring.
+- **Plan odds.** 500 seeded markets (same plan, same answer) plus a replay of every real market sequence since 1928, judged against the household horizon (the surviving spouse's last year, not the primary's).
+- **You can spend.** The everyday spending that keeps an 80% chance, beside what you plan to spend, plus *If markets move*: what to trim to after a 20% fall and what you could spend after a 20% rise.
+- **Flexible spending.** What trimming in bad markets buys ("Bad market: age 82 → 97 if you trim"), from Guyton-style guardrails run on the same market paths.
+- **Lighter tools' number.** When our odds differ from what most calculators would show by 10+ points, the card shows their number for the user's own plan and names the assumptions that explain the gap.
+- **Wealth chart** with retirement, Social Security and required-withdrawal milestones, and four *Try a change* sliders beside it (retire age, spending, saving, return).
+- **Details:** the dollar-by-dollar Ledger, the Assumptions strip, and inputs (basics plus Debts and Assumptions under More).
 
-### Decision Engine, Scenarios, and simulation
-- **Decision Engine** — one screen that re-runs the full plan across the decision space (SS claiming ages 62–70, Roth conversions, IRMAA proximity) and returns ranked, dollar-quantified recommendations with an auditable "show the math" trail and one-click Apply to My Plan.
-- **Scenario comparison** — snapshot the plan, change anything, compare futures side-by-side; each column runs the full tax-aware projection.
-- **Monte Carlo** — Box-Muller normal-distribution simulation with P10/P25/P50/P75/P90 bands and plain-language interpretation.
-- **Historical backtesting** — replays the user's exact plan through every real market sequence since 1928 (Damodaran/NYU data), with era-accurate CPI (a 1966 start suffers both the sideways market and the 1970s price spiral, not the user's flat inflation assumption). This is the "historical sequence-of-returns stress test" that captures fat-tail risk the normal-distribution Monte Carlo misses.
+### Improve — "What should I change?"
+- **Ranked moves** from the Decision Engine, each re-running the full plan, with *Show the math* and one-click Apply: Social Security claiming (joint sweep for couples), Roth conversions (IRMAA-aware ladder optimizer), the pre-65 healthcare bridge, Medicare surcharge (IRMAA) cliffs, Social Security tax thresholds, and plan rescue.
+- **Scenarios:** snapshot, change, compare side by side.
 
-### Phased retirement
-Salary income carries an editable "stops at age" field; pair with a Part-time / consulting income source covering the gap until full retirement. Common pattern: full-time → 60, part-time $40K/yr 60–65, full retirement 65+. Per-spouse for couples mode. Income flows into ordinary tax (correctly affects SS taxability tier and IRMAA timing in those bridge years).
+### Ask — "Explain my plan"
+- Claude chat that reaches the engine only through tools, so its numbers match the Plan screen. It explains; it does not pick investments.
+- Daily caps (30 questions per device, 100 per IP), cached system prompt, daily model health probe.
 
-### Optimize tabs (six tools, ordered by user journey)
-- **Roth vs Trad** — accumulation-phase comparison; inputs both bracket-now and bracket-in-retirement, with a real-dollar/inflation toggle.
-- **Social Security** — PIA estimator with the IRS two-tier early-claiming formula; capped delayed-credit at age 70.
-- **Roth Ladder** — fills a target tax bracket each gap year between retirement and age 73. Reports lifetime tax saved, total converted, RMD reduction at 73, and flags every year the ladder pushes MAGI over an IRMAA threshold. **Optimizer** runs every target bracket and recommends the winner (or recommends skipping conversions if your future bracket is already lower).
-- **Withdrawal** — drawdown sequence (Cash → Taxable → 401k → Roth) taxed through the same canonical `computeTax()` engine as the rest of the app (filing status, state, current-year brackets — not a hand-rolled approximation), with proper tax gross-up that iterates when withdrawals cross brackets.
-- **Tax Torpedo** — interactive slider showing the marginal-rate spike when each $1 of IRA withdrawal drags $0.85 of SS into the taxable base.
-- **Monte Carlo** — see above.
+### Tools
+Social Security and income (claiming, withdrawal order, healthcare before 65), Roth (contributions and conversion ladder), Your accounts, Portfolio, Stock compensation, College, Inheritance, Getting started — plus Quick verdict (`/verdict`), the PDF report (`/report`), and three standalone calculators (Social Security break-even, IRMAA check, tax torpedo).
 
-### Couples mode (Phases A–F)
-End-to-end household modeling: per-spouse ages, retirement ages, longevity, 401(k)/Roth/HSA/pension balances, monthly contributions. Income engine projects each spouse's salary, SS, and pension on independent timelines. Per-spouse contribution gating handles "primary retires at 60, spouse keeps earning to 65" correctly. Auto-MFJ filing status with override.
+---
 
-**Phase F — survivor analysis:**
-- **Per-spouse RMD divisor.** Each spouse's 401(k) tracked separately so RMD math uses each person's own age and balance — closes a known over-RMD bug for younger spouses with separate 401(k)s.
-- **SS step-up on first death.** Survivor automatically claims the higher of (their own benefit) or (the deceased's), often a meaningful jump for non-working / lower-earning spouses.
-- **MFJ → single filing flip.** Year of death stays MFJ per IRS rule; year after flips to single (the brackets compress at the top, so the survivor's effective rate often rises even on the same income).
-- **Spousal rollover.** Tax-deferred and Roth balances roll into the survivor's bucket on first death — no immediate distribution.
-- **Pension survivor benefit.** When elected at retirement (e.g., 50% / 75% / 100% joint-and-survivor), surviving spouse continues to receive that fraction of the deceased's pension.
+## What the engine models
 
-### IRMAA / RMD / Healthcare features
-- **IRMAA cliff detector** flags any year where projected MAGI lands within $5K of a Medicare surcharge tier; quantifies the annual cost of crossing.
-- **RMD projection table** shows year-by-year forced 401(k) withdrawals from age 73 with bracket bumps and SS-taxability flags.
-- **Healthcare bridge** estimates ACA marketplace premiums + subsidy for retire-before-65 users; Medicare Part B + Medigap + Part D baseline for 65+. Compared against Fidelity's lifetime healthcare benchmark ($172.5K individual / $345K couple).
-- **Healthcare bridge breakdown** — explicit pre-Medicare (retirement age–65) vs. Medicare (65+) cost split with per-year line items, not just the rolled-up lifetime number.
-- **Healthcare cost multiplier** (0.5×–3.0×) lets users with chronic conditions or unusually healthy histories scale the auto-estimate to their actual situation.
-- **Long-term care modeling** — probability-weighted cost ramp in the final years before longevity age, inflated at a capped LTC-specific rate so long-horizon (young) users get a realistic real-dollar estimate instead of an understated flat rate.
+- **Federal tax every year:** 2026 brackets and deductions grown with inflation in later years, capital gains and the 0% bracket, NIIT, Social Security taxation (statutory, unindexed thresholds), the OBBBA senior deduction and SALT cap, required withdrawals from 73 with per-spouse divisors.
+- **State tax:** full bracket math for CA, NY, NJ, OR, HI, MN, MA and WI (indexed in later years where state law indexes: CA, MN, WI and the MA surtax threshold); effective rates elsewhere; Social Security exempt except in the 8 states that tax it; state retirement-income exclusions.
+- **Healthcare:** ACA bridge before 65, Medicare per beneficiary from each person's own 65, IRMAA charged as spending from MAGI two years earlier, healthcare inflation above CPI.
+- **Long-term care:** per person, over each spouse's own final years ($3,600/mo in today's dollars by default; editable or off).
+- **Couples and survivors:** per-spouse balances, contributions and timelines; Social Security step-up, MFJ → single filing flip, spousal rollover, pension survivor benefit, rental income continuing for the survivor.
+- **Cash flow that conserves money:** contributions funded only from real surplus, RMDs counted as income before the withdrawal waterfall, a damped gross-up that lands within ~$50 of spending.
 
-### State and federal tax
-- **Graduated state-tax brackets** for CA, NY, NJ, OR — full multi-tier math matching the state revenue department's published brackets. Closes the $5K–$15K/yr undershoot the flat-rate model produced for high earners. HI, MN, MA, WI still flat-rate (warning surfaced in the planner) and are next up — see Now/Soon below.
-- **OBBBA senior bonus deduction** ($6K/person 65+, 2025–2028) modeled with full phase-out math. Year-gated so projections beyond 2028 correctly drop the bonus.
-- **NIIT** (3.8% on investment income above $200K single / $250K MFJ) modeled in the projection engine.
-- **SECURE 2.0 mandatory Roth catch-up** flagged on Roth vs Traditional for users 50+ earning over the $150K FICA-wages threshold.
+---
 
-### Notifications
-- **Weekly email digest (opt-in)** — a autonomous AI health-check agent reviews the user's plan and emails a summary if they've opted in via the AI Advisor settings panel. Broader in scope than the originally-envisioned "notify me when brackets ship," but the mechanism (opt-in, stored preference, scheduled send) is built and live.
+## Trust and credibility
 
-### Trust signals
-- **`/methodology` page** documents every assumption with citations to IRS Rev. Proc. 2025-32, IRS Notice 2025-67, SSA POMS HI 01101.020, CMS Medicare premium fact sheets, and HHS poverty guidelines. Includes an explicit "what this tool intentionally does not model" section (estate tax, AMT, NUA, K-1 income).
-- **Constants are 2026** throughout: federal brackets, std deduction, 401(k) limit ($24,500), SS wage base ($184,500), SS bend points ($1,286 / $7,749), HSA limits, IRMAA tiers, FPL.
-
-### Recent correctness hardening (2026-07-15)
-A status-report pass through `AUDIT.md` surfaced several items still marked `todo` — three turned out to already be fixed in code (the audit doc had drifted, not the app), and three got real fixes:
-- **WithdrawalStrategy tax estimate** now runs through the canonical `computeTax()` engine instead of a hand-rolled, single-filer-only, stale-bracket approximation — picks up MFJ and state tax for free.
-- **TaxAware inflation toggle** — Roth vs. Traditional comparison can now show today's-dollars alongside nominal.
-- **Long-term care realism** — base cost and inflation-rate assumptions updated (see above).
-- **MyPlan "Entering Retirement" label** clarified (the underlying number was already correct; only the label was ambiguous).
-- `AUDIT.md` and this roadmap were reconciled against the actual code so both stop drifting from reality.
+- **/accuracy:** 15 hand-worked IRS/SSA cases, asserted as tests and rendered live with the engine's result.
+- **CI gate:** the full suite (274 tests) runs on every push and PR, and Amplify runs it before building — a red suite blocks the deploy.
+- **Dated figures:** every page says which year's official figures are used and when they were last checked.
+- **No accounts:** identity is a random per-browser device ID, stated plainly. The plan lives in the browser; chat history and email preferences are keyed to the device ID.
 
 ---
 
@@ -85,79 +59,79 @@ A status-report pass through `AUDIT.md` surfaced several items still marked `tod
 - **Frontend**: Next.js 16 (App Router), React 19
 - **Backend**: AWS Lambda (Python), DynamoDB, API Gateway (legacy; current API routes run inside Next.js on Amplify)
 - **Auth**: none. Each browser has a random device ID; there are no accounts (the half-built Cognito path was removed in Nov 2026)
-- **AI**: Anthropic Claude API via server-side proxy
-- **Hosting**: AWS Amplify, auto-deploy from `main`
+- **AI**: Anthropic Claude API via server-side proxy (Sonnet for chat, Haiku for the weekly check)
+- **Hosting**: AWS Amplify, auto-deploy from `main`, gated on the test suite
 - **Persistence**: localStorage, plus DynamoDB keyed on the device ID for chat history and email preferences
 
 ---
 
 ## Where it differs from the field
 
-| | Boldin | Empower | Fidelity Go | **Retire.Simplified** |
+| | Boldin | ProjectionLab | Empower / brokerage planners | **Retire.Simplified** |
 |---|---|---|---|---|
-| Price | $120/yr | Free, AUM | 0.35% AUM ($350/yr on $100K) | **$0** |
-| No-signup entry point | No | No | No | **`/verdict` — 90 seconds, no email** |
-| RMD avalanche year-by-year | Hidden | No | No | Yes |
-| IRMAA cliff detector | No | No | No | Yes |
-| Tax torpedo visualizer | No | No | No | Yes |
-| Roth conversion ladder | Paid tier | No | No | Yes |
-| Healthcare bridge math | Light | No | No | Yes |
-| Couples gap-year retirement | Paid tier | No | No | Yes |
-| Historical sequence backtesting | No | No | No | Yes |
-| Methodology fully documented | No | No | No | Yes (`/methodology`) |
+| Price (Nov 2026) | Free / $168/yr | Free / $129/yr | Free, funnels to advice | **$0** |
+| Year-by-year federal + state tax, Roth, IRMAA, ACA bridge | Paid tier | Paid tier | Limited | Yes |
+| Moves ranked by dollar value in one list | Separate explorers | Separate tools | No | Yes |
+| Explains why its odds differ from other tools | No | No | No | Yes |
+| Published, tested reference cases | No | No | No | Yes (`/accuracy`) |
 | Open source | No | No | No | **MIT License** |
 
-The thesis: Boldin/Empower/Fidelity Go all hide the educational layer behind a paywall or behind UX that smooths over the hard parts. We surface the hard parts up front and give them away.
+Competitor rows reflect the Nov 2026 product research; re-check prices before quoting them publicly. "No competitor ranks moves in one list" is an absence of evidence, not a verified fact.
 
 ---
 
 ## What's next
 
-Ordered by user-impact-per-week-of-work, not by ambition.
+Ordered by user impact per week of work. Features are no longer the gap — getting found, and being trusted, are.
 
-### Now (next two weeks)
-- **Tester feedback loop** — five-to-ten qualitative sessions before broader launch.
-- **Tab hover tooltips** for nav orientation — not yet built; no `title`/tooltip affordance on the nav pills today.
-- **State-tax brackets for HI, MN, MA, WI** — extend the graduated-bracket model (CA/NY/NJ/OR) to the remaining graduated states the in-planner warning currently flags.
-- **Consolidate `MyPlan.jsx`'s inline projection with `lib/computeProjection.js`** — see Known debt. Promoted to Now: it's the single most-cited recurring bug source across both audits (duplicate math drifting between the tab and the canonical engine), and the surface area only grows as more features are built on top of `computeProjection.js`.
+### Now (next 30 days)
+- **2027 official figures.** Slot in IRS 2027 brackets, deductions and 401(k)/IRA limits, and CMS 2027 Part B and IRMAA tiers, as each is published; bump the "checked" stamp. Confirm Wisconsin's 2026 schedule and Massachusetts's surtax threshold against the states' own sites.
+- **Quick verdict as the front door** for first-time visitors (today they land on Ask with a setup chooser).
+- **Privacy-friendly analytics** — cookieless, aggregate only — so the next decisions rest on usage, not guesses.
+- **Five to ten tester sessions** with people in the 55–70 target segment.
+- **First community launch:** Bogleheads, the FIRE podcasts, Hacker News (ProjectionLab's path to $1M ARR without funding).
 
-### Soon (next 1–2 months)
-- **Provisional-income (SS-taxability) cliff detector** — same UX pattern as the IRMAA cliff detector, but for the SS taxability tiers ($25K/$34K single, $32K/$44K MFJ, statutory and never indexed). `computeTax()` already returns `ssTaxablePercent`; this is mostly reusing existing UI, not new modeling.
-- **Roth conversion ladder v2** — model ACA subsidy clawback for pre-65 conversions (explicitly flagged as not-yet-modeled in the Roth Ladder tab today).
-- **Numeric input fields alongside sliders** — for users dialing in precise values when the slider step is too coarse. Still slider-only throughout.
-- **State comparison tool** — side-by-side projection: "what if you retire in TX vs. stay in CA?" Surfaces multi-decade tax-savings of state moves. Not started.
-- **Global real-dollar/inflation toggle** — GrowthProjector and Roth vs Trad (TaxAware) both have a nominal/real toggle now; My Plan's main year-by-year table, Decision Engine, and Scenarios still show nominal only. Worth promoting to a shared plan-level setting rather than repeating the per-tab toggle a third and fourth time.
+### Soon (next 1–3 months)
+- **"What if I have to stop at 60?"** one-tap stress test, wired to the ACA bridge move (46% of 2026 retirees stopped earlier than planned).
+- **Social Security cut scenario** (e.g. 22% from 2032), so the claiming advice is shown to hold up under a cut.
+- **Advisor-meeting prep pack:** the PDF report reshaped around the questions to bring to a professional.
+- **Prefill from a tax return:** upload a 1040, pre-fill tax inputs, nothing stored.
+- **Roth ladder v2:** ACA subsidy clawback for pre-65 conversions.
+- **Consistent ranking in Improve:** put every move's dollar value in today's dollars (the cliff moves sum nominal, hypothetical costs).
+- **Era-accurate inflation in the history replay** (the CPI column is recorded but not yet used).
+- **Medicare Part D IRMAA** (only Part B is charged today).
 
-### Later (next quarter+)
-- **Plaid aggregation (read-only)** — the API route exists only as a commented-out placeholder today (no live Plaid integration). Auto-populate balances from Schwab/Fidelity/Vanguard would reduce activation cost to seconds.
-- **Plus tier ($8/mo)** — saved scenarios, scenario comparison, advanced Monte Carlo (regime-aware, bootstrap), email support. Core tool stays free.
-- **RIA partnership tier ($199/firm/mo)** — co-branded methodology page, lead-share, white-labeled PDF reports.
-- **QCDs (Qualified Charitable Distributions)** — for 70½+ retirees with charitable intent: $108K/yr (2026 indexed) of RMDs sent direct to charity, satisfies RMD without raising AGI. Powerful IRMAA / SS-taxability avoidance; the RMD engine is precise enough that this is mostly a UI + waterfall-order extension.
-- **Tax-loss harvesting estimator** — annualized tax savings estimate based on taxable account size + portfolio volatility.
-- **Backdoor Roth / Mega Backdoor Roth flag** — when user is above the Roth IRA income phase-out ($168K single / $252K MFJ in 2026), surface the strategy with mechanics. High-value for this app's actual mass-affluent user base, who hit this phase-out routinely.
+### Later
+- **QCDs** for 70½+ givers; **backdoor / mega-backdoor Roth** flag above the Roth income phase-out; **tax-loss harvesting** estimate; **state move comparison** ("retire in TX or stay in CA?").
+- **Read-only MCP connector** so people can bring their plan into the assistant they already use.
+- **Revenue, only after an audience and a securities-lawyer review:** hosted extras (more AI, sync, advisor seats) — never the MIT-licensed math.
+
+### Decide
+- **Portfolio tool:** naming funds is the closest the product comes to investment advice. Keep it as "model a mix you choose", or remove it.
+- **Account linking (Plaid):** built and env-gated, off in production. Users in this segment rarely ask for linking, and it adds cost and liability; decide whether it stays.
 
 ### Known debt
-- **State tax uses a single effective rate for non-graduated states** (all except CA/NY/NJ/OR, and — once shipped — HI/MN/MA/WI). This is fine for genuinely flat-rate/no-income-tax states, but any other high-progressivity state we haven't graduated yet would still undershoot for high earners. Caveat surfaced in the State picker tooltip.
-- **Qualifying widow(er) status, step-up in cost basis at death, inherited-IRA 10-year rule for non-spouse heirs** — documented gaps from the Phase F survivor-analysis work, listed on `/methodology`.
+- Massachusetts and Wisconsin 2026 figures are secondary-source consensus, flagged in code and on `/methodology`.
+- Oregon's brackets are held fixed in later years (law indexes all but the top bracket; per-bracket indexing not modeled). California indexes by its own CPI; we use the plan's inflation rate.
+- Non-bracket states use one effective rate. State retirement exclusions are held at today's dollar amounts.
+- Odds sampling moves the headline by about ±3 points at 500 runs.
+- AI rate limits are per server instance, not shared across instances.
+- Survivor gaps: qualifying widow(er) status, step-up in cost basis at death, the inherited-IRA 10-year rule for non-spouse heirs (listed on `/methodology`).
 
 ### Explicitly not on the roadmap
-
-These are **out of scope** by design — surfacing them would push the tool out of mass-affluent into HNW territory and dilute the focus.
-
-- Estate tax planning (federal exemption is $15M, made permanent by OBBBA; relevant only above mass-affluent)
-- AMT, NUA on company stock, K-1 / RSU / deferred comp modeling
-- Concentrated single-stock risk, private-equity holdings
+Kept out by design — they push the product into high-net-worth territory or into regulated advice:
+- Estate tax planning (federal exemption $15M, made permanent by OBBBA)
+- AMT, NUA on company stock, K-1 / deferred comp modeling
+- Concentrated single-stock risk, private holdings
+- Recommending specific securities or funds, or placing trades
 - Long-term care insurance product comparisons
-- Active brokerage management or rebalancing trades
 
 ---
 
 ## Pitch
 
-> Free retirement calculators tell you what you want to hear ("you have a 96% chance of success!"). Paid ones charge $120/yr to surface what should be the educational baseline. We built the third option: free, honest about its assumptions, with the math that paid tools hide. Three questions, no signup, your numbers stay in your browser. Source on GitHub.
-
-The retirement-planning software market is roughly $20B/yr in retail TAM. There's no clear free leader. Boldin is the closest comp and charges where the educational layer should be free.
+> Know what you can spend, not just whether it lasts. Retire Simplified gives you one clear answer in minutes — your odds, your monthly spending number, and your best moves ranked by dollars — with real year-by-year tax math and every number shown. Free, open source, nothing to sell you.
 
 ---
 
-*Last updated: 2026-07-15 — reconciled against actual shipped code (several "Now"/"Soon" items from the prior update had already shipped without the roadmap being updated); incorporates feedback from two tester rounds (consumer + Fisherman Investments tax consulting team).*
+*Last updated: 2026-11-11 — rewritten for the three-screen product after the Nov 2–11 redesign, odds engine, inflation indexing, household and tax audits, and trust pages. Next-step priorities follow the Nov 2026 product research (kept outside the repo).*

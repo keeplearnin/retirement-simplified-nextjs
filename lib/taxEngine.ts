@@ -400,8 +400,8 @@ const DEFAULT_STATE_TAX_RATE = 0.05; // fallback
 // rate above, which is accurate for non-graduated / lower-income states.
 //
 // Later tax years: these states raise their brackets with inflation each
-// year by law (CA R&TC 17041(h), OR ORS 316.037, MN 290.06 subd. 2d, WI
-// 71.06(2e), MA's surtax threshold under Art. 44 §4), so a projection
+// year by law (CA R&TC 17041(h), MN 290.06 subd. 2d, WI 71.06(2e), MA's
+// surtax threshold under Art. 44 §4), so a projection
 // scales them by TaxInput.indexFactor like the federal brackets. NY, NJ and
 // HI set their brackets in statute with no indexing — they stay fixed, and
 // inflation alone does push incomes there into higher brackets.

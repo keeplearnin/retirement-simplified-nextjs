@@ -74,7 +74,7 @@ Re-audit during the couples-mode build and the launch-readiness review. Most iss
 These are documented in code and on `/methodology` rather than fixed:
 
 - ~~**Per-spouse RMD divisor**~~ **CLOSED 2026-05-03** by Phase F (commit pending). `lib/computeProjection.js` and the `MyPlan.jsx` inline mirror now track per-spouse 401(k)/Roth/HSA/Pension balances, compute RMDs from each spouse's own balance using their own age, and roll deceased spouse's balances into the survivor's bucket on first death.
-- **MyPlan.jsx inline projection mirrors `lib/computeProjection.js`** — kept mathematically identical via the audit but is duplicate work for every future change. Consolidating is a multi-hour touch-everything refactor; deferred until post-launch.
+- ~~**MyPlan.jsx inline projection mirrors `lib/computeProjection.js`**~~ **CLOSED 2026-07-15.** `MyPlan.jsx` now calls `computeProjection(plan)` directly (`const results = useMemo(() => computeProjection(plan), [plan]);`) — the duplicate inline projection is gone. This closes the single most-cited recurring bug source across both audits.
 - **State tax** — CA/NY/NJ/OR now use full graduated brackets (closed 2026-05-02). HI, MN, MA, WI still on flat rates with in-planner warning for high earners; on roadmap.
 
 ---
