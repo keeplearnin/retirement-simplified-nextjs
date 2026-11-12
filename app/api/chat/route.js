@@ -14,10 +14,10 @@ const MAX_BODY_BYTES = 100_000; // ~25K tokens worst case
 const ALLOWED_ROLES = new Set(['user', 'assistant']);
 
 // Daily caps keep the AI bill bounded (each chat costs real money). Per
-// identity, plus per IP so rotating anonymous device ids doesn't reset it.
-// In-memory like checkRateLimit, so best-effort per server instance.
-const DAILY_CHATS_ANONYMOUS = 30;
-const DAILY_CHATS_SIGNED_IN = 100;
+// device id, plus per IP so rotating device ids doesn't reset it. There are
+// no accounts, so there is no higher signed-in tier. In-memory like
+// checkRateLimit, so best-effort per server instance.
+const DAILY_CHATS_PER_DEVICE = 30;
 const DAILY_CHATS_PER_IP = 100;
 const DAY_MS = 86_400_000;
 
@@ -29,12 +29,9 @@ export async function POST(request) {
     const ip = getClientIp(request);
     const rateLimited = checkRateLimit(`chat:${ip}`, 20, 60_000);
     if (rateLimited) return rateLimited;
-    const dailyLimit = authResult.anonymous ? DAILY_CHATS_ANONYMOUS : DAILY_CHATS_SIGNED_IN;
-    if (checkRateLimit(`chat-day:${authResult.sub}`, dailyLimit, DAY_MS) || checkRateLimit(`chat-day-ip:${ip}`, DAILY_CHATS_PER_IP, DAY_MS)) {
+    if (checkRateLimit(`chat-day:${authResult.sub}`, DAILY_CHATS_PER_DEVICE, DAY_MS) || checkRateLimit(`chat-day-ip:${ip}`, DAILY_CHATS_PER_IP, DAY_MS)) {
       return NextResponse.json({
-        error: authResult.anonymous
-          ? `You've reached today's limit of ${DAILY_CHATS_ANONYMOUS} questions. Sign in for more, or come back tomorrow — the Plan and Improve screens still work.`
-          : "You've reached today's question limit. Come back tomorrow — the Plan and Improve screens still work.",
+        error: `You've reached today's limit of ${DAILY_CHATS_PER_DEVICE} questions. Come back tomorrow — the Plan and Improve screens still work.`,
         daily: true,
       }, { status: 429 });
     }
