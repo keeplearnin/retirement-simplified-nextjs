@@ -48,9 +48,10 @@ Social Security and income (claiming, withdrawal order, healthcare before 65), R
 ## Trust and credibility
 
 - **/accuracy:** 15 hand-worked IRS/SSA cases, asserted as tests and rendered live with the engine's result.
-- **CI gate:** the full suite (274 tests) runs on every push and PR, and Amplify runs it before building — a red suite blocks the deploy.
+- **CI gate:** the full suite (283 tests) runs on every push and PR, and Amplify runs it before building — a red suite blocks the deploy.
 - **Dated figures:** every page says which year's official figures are used and when they were last checked.
 - **No accounts:** identity is a random per-browser device ID, stated plainly. The plan lives in the browser; chat history and email preferences are keyed to the device ID.
+- **Analytics without the plan:** Google Analytics 4 sees pages, screens and a few action counts — never plan figures (enforced in `lib/analytics.js` and tested). Off under Global Privacy Control or the per-browser switch on `/assistant-rules`; off entirely until `NEXT_PUBLIC_GA_ID` is set.
 
 ---
 
@@ -62,6 +63,7 @@ Social Security and income (claiming, withdrawal order, healthcare before 65), R
 - **AI**: Anthropic Claude API via server-side proxy (Sonnet for chat, Haiku for the weekly check)
 - **Hosting**: AWS Amplify, auto-deploy from `main`, gated on the test suite
 - **Persistence**: localStorage, plus DynamoDB keyed on the device ID for chat history and email preferences
+- **Analytics / SEO**: GA4 via `components/Analytics.jsx` (screens on `/` report as virtual pages `/app/plan`, `/app/improve`, `/app/ask`, `/app/tool/…`); per-page canonical, Open Graph and share image via `pageMeta()` in `lib/seo.js`; WebApplication JSON-LD on home and calculators
 
 ---
 
@@ -87,7 +89,7 @@ Ordered by user impact per week of work. Features are no longer the gap — gett
 ### Now (next 30 days)
 - **2027 official figures.** Slot in IRS 2027 brackets, deductions and 401(k)/IRA limits, and CMS 2027 Part B and IRMAA tiers, as each is published; bump the "checked" stamp. Confirm Wisconsin's 2026 schedule and Massachusetts's surtax threshold against the states' own sites.
 - **Quick verdict as the front door** for first-time visitors (today they land on Ask with a setup chooser).
-- **Privacy-friendly analytics** — cookieless, aggregate only — so the next decisions rest on usage, not guesses.
+- **Analytics live:** Google Analytics 4 is built in (Nov 12) and turns on when `NEXT_PUBLIC_GA_ID` is set in Amplify. Next: link Search Console to the GA property, and mark `verdict_done` and `onboarding_done` as key events.
 - **Five to ten tester sessions** with people in the 55–70 target segment.
 - **First community launch:** Bogleheads, the FIRE podcasts, Hacker News (ProjectionLab's path to $1M ARR without funding).
 

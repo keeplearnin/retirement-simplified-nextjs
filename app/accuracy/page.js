@@ -1,12 +1,13 @@
 import { REFERENCE_CASES, caseResult } from '@/lib/referenceCases';
 import { FIGURES } from '@/lib/constants';
+import { pageMeta } from '@/lib/seo';
 
-export const metadata = {
+export const metadata = pageMeta({
   title: 'How we check the math — Retire Simplified',
   description:
     'The retirement engine checked against hand-worked IRS and SSA examples, plus why our answer can differ from other retirement calculators.',
-  alternates: { canonical: 'https://retiresimplified.com/accuracy' },
-};
+  path: '/accuracy',
+});
 
 const REPO = 'https://github.com/keeplearnin/retirement-simplified-nextjs';
 

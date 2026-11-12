@@ -10,6 +10,7 @@ import AnimatedNumber from '@/components/ui/AnimatedNumber';
 import SequencedLoader from '@/components/ui/SequencedLoader';
 import Chip from '@/components/ui/Chip';
 import Button from '@/components/ui/Button';
+import { trackEvent } from '@/lib/analytics';
 import {
   isHealthCheckDue,
   markHealthCheckRan,
@@ -384,6 +385,7 @@ export default function AIAdvisor() {
   async function sendMessage(text) {
     const trimmed = (text || '').trim();
     if (!trimmed) return;
+    trackEvent('chat_question');
     const userMsg = { role: 'user', content: trimmed };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);

@@ -10,6 +10,7 @@ import { fmt } from '@/lib/format';
 import ClaimingHeatmap from '@/components/ui/ClaimingHeatmap';
 import { usePlan } from '@/components/PlanProvider';
 import { runDecisionEngine } from '@/lib/decisionEngine';
+import { trackEvent } from '@/lib/analytics';
 
 const CATEGORY_COLORS = {
   'Social Security': 'var(--blue)',
@@ -147,6 +148,7 @@ export default function Optimize() {
       if (sSrc) updateIncome(a.spouseSourceId, { ...sSrc, startAge: a.spouseStartAge });
     }
     setAppliedIds(ids => [...ids, action.id]);
+    trackEvent('move_applied', { move: action.id });
   }
 
   if (!result) {

@@ -23,6 +23,9 @@ const nextConfig = {
       { source: '/methodology', headers: [revalidate] },
       { source: '/report', headers: [revalidate] },
       { source: '/calculators/:slug*', headers: [revalidate] },
+      { source: '/accuracy', headers: [revalidate] },
+      { source: '/how-it-works', headers: [revalidate] },
+      { source: '/assistant-rules', headers: [revalidate] },
       // Note: /_next/static assets are content-hashed and already served
       // `immutable` by Next.js — no override needed (and overriding them
       // triggers a build warning).

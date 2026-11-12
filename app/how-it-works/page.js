@@ -1,12 +1,13 @@
 import TrustPage, { REPO, h2, muted, body, link, Item } from '@/components/trust/TrustPage';
 import ArchitectureDiagram from '@/components/trust/ArchitectureDiagram';
+import { pageMeta } from '@/lib/seo';
 
-export const metadata = {
-  title: 'How Retire.Simplified works — Retire Simplified',
+export const metadata = pageMeta({
+  title: 'How Retire Simplified works — Retire Simplified',
   description:
     'One projection engine behind every screen, stress-tested across 500 markets and real history since 1928, with an AI assistant that explains the numbers but never produces them.',
-  alternates: { canonical: 'https://retiresimplified.com/how-it-works' },
-};
+  path: '/how-it-works',
+});
 
 const ol = { paddingLeft: 20, margin: 0 };
 

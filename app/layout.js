@@ -1,5 +1,7 @@
 import { Inter, Fraunces } from 'next/font/google';
 import './globals.css';
+import Analytics from '@/components/Analytics';
+import { SITE_URL, SITE_NAME } from '@/lib/seo';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -18,13 +20,13 @@ const fraunces = Fraunces({
   display: 'swap',
 });
 
+// Site-wide defaults only. Canonical URLs and openGraph live on each page
+// via pageMeta() in lib/seo.js — see the note there on why not here.
 export const metadata = {
-  title: 'Retirement.Simplified — From First Paycheck to Last Withdrawal',
+  metadataBase: new URL(SITE_URL),
+  applicationName: SITE_NAME,
+  title: `${SITE_NAME} — Free Retirement Planner`,
   description: 'Free, open-source retirement planner. See the chance your money lasts, which moves are worth the most (Social Security timing, Roth conversions, taxes), and ask questions about your own plan. Every number shows its math.',
-  openGraph: {
-    title: 'Retirement.Simplified — From First Paycheck to Last Withdrawal',
-    description: 'A free, open-source second opinion on your retirement plan — with the math shown.',
-  },
 };
 
 export default function RootLayout({ children }) {
@@ -42,7 +44,10 @@ export default function RootLayout({ children }) {
           }}
         />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }

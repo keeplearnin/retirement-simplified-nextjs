@@ -1,11 +1,13 @@
 import TrustPage, { REPO, h2, muted, body, link, Rule, Item } from '@/components/trust/TrustPage';
+import { pageMeta } from '@/lib/seo';
+import AnalyticsOptOut from '@/components/AnalyticsOptOut';
 
-export const metadata = {
+export const metadata = pageMeta({
   title: 'What the assistant will and won’t do — Retire Simplified',
   description:
     'Exactly what “Ask about your plan” can do, the five rules it never breaks, where its numbers come from, and what happens to your data.',
-  alternates: { canonical: 'https://retiresimplified.com/assistant-rules' },
-};
+  path: '/assistant-rules',
+});
 
 export default function AssistantRulesPage() {
   return (
@@ -116,6 +118,11 @@ export default function AssistantRulesPage() {
         <Item title="Sent to the AI model:">
           the plan figures needed to answer your question, for that request only. The assistant is instructed never to reference your
           data outside the conversation, and we do not use your plan to train anything.
+        </Item>
+        <Item title="Usage analytics (Google Analytics):">
+          which pages and screens are visited, and counts of a few actions (finishing setup or the Quick verdict, applying a move, asking a question). It
+          sets Google Analytics cookies in your browser. It never receives your plan’s numbers or what you type, and advertising
+          features are switched off. Analytics is off if your browser sends Global Privacy Control. <AnalyticsOptOut />
         </Item>
         <Item title="Never collected:">
           your name, account numbers or login credentials. We have no way to link a plan to a person unless you enter an email for the

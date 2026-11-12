@@ -6,6 +6,12 @@
       "runtimeExecutable": "/bin/bash",
       "runtimeArgs": ["-c", "export PATH=/usr/local/bin:/opt/homebrew/bin:$PATH && cd /Users/hari/projects/retirement-simplified && npx next dev -p 3463"],
       "port": 3463
+    },
+    {
+      "name": "retirement-simplified-prod",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "export PATH=/usr/local/bin:/opt/homebrew/bin:$PATH && cd /Users/hari/projects/retirement-simplified && npx next start -p 3464"],
+      "port": 3464
     }
   ]
 }

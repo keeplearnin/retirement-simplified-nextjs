@@ -4,6 +4,7 @@ import { useState } from 'react';
 import VerdictInputForm from '@/components/verdict/VerdictInputForm';
 import VerdictResult from '@/components/verdict/VerdictResult';
 import { computeVerdict } from '@/lib/verdict';
+import { trackEvent } from '@/lib/analytics';
 
 export default function VerdictPage() {
   const [output, setOutput] = useState(null);
@@ -12,6 +13,7 @@ export default function VerdictPage() {
   function handleSubmit(submitted) {
     setInput(submitted);
     setOutput(computeVerdict(submitted));
+    trackEvent('verdict_done');
     if (typeof window !== 'undefined') window.scrollTo(0, 0);
   }
 
