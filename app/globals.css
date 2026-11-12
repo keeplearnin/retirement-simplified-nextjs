@@ -5,10 +5,10 @@
    desaturated jade — money-green heritage, not tech-green glow.
    ────────────────────────────────────────────────────────────────── */
 :root, [data-theme="dark"] {
-  --bg: #0C100E;
-  --bg2: #121713;
-  --card: #171D18;
-  --card-hover: #1C231D;
+  --bg: #0B1222;
+  --bg2: #101A30;
+  --card: #152039;
+  --card-hover: #1A2745;
   --accent: #63C794;
   --accent-dim: rgba(99, 199, 148, 0.12);
   --accent-glow: rgba(99, 199, 148, 0.24);
@@ -25,15 +25,15 @@
   --blue-dim: rgba(130, 168, 201, 0.12);
   --purple: #A492C9;
   --purple-dim: rgba(164, 146, 201, 0.12);
-  --heading: #F4F3EC;
-  --text: #E7E5DB;
-  --text-muted: #9BA69B;
-  --text-dim: #66716A;
-  --border: #242B25;
-  --border-light: #37403A;
+  --heading: #F1F5FB;
+  --text: #E2E8F2;
+  --text-muted: #9AA8BF;
+  --text-dim: #67748D;
+  --border: #243354;
+  --border-light: #364A75;
   --serif: var(--font-fraunces), Georgia, 'Times New Roman', serif;
   --sans: var(--font-inter), system-ui, sans-serif;
-  --glass: rgba(23, 29, 24, 0.6);
+  --glass: rgba(16, 24, 44, 0.6);
   --glass-border: rgba(255, 255, 255, 0.06);
 
   /* ─── DESIGN TOKENS ───────────────────────────────────────────────
@@ -294,7 +294,7 @@ input[type=range]::-moz-range-thumb {
 /* Engines without backdrop-filter get a near-opaque header instead of
    crisp page text bleeding through the logo. */
 @supports not (backdrop-filter: blur(1px)) {
-  .app-header { background: rgba(23, 29, 24, 0.97); }
+  .app-header { background: rgba(16, 24, 44, 0.97); }
 }
 :root:not([data-theme="dark"]) .app-header {
   background: rgba(255,255,255,0.96);
