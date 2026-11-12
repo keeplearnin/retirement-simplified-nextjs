@@ -618,16 +618,16 @@ function OddsScore({ odds }) {
       <svg width={112} height={112} viewBox="0 0 112 112" role="img" aria-label={`${pct}% chance your money lasts: ${label}`}>
         <circle cx={56} cy={56} r={radius} fill="none" stroke="var(--border)" strokeWidth={8} />
         <circle
-          cx={56} cy={56} r={radius} fill="none" stroke={color} strokeWidth={8}
+          cx={56} cy={56} r={radius} fill="none" stroke={color} strokeWidth={9}
           strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset}
           transform="rotate(-90 56 56)"
-          style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+          style={{ transition: 'stroke-dashoffset 0.8s ease', filter: 'drop-shadow(0 0 6px color-mix(in srgb, currentColor 35%, transparent))', color }}
         />
-        <text x={56} y={65} textAnchor="middle" fill="var(--heading)" fontSize={30} fontFamily="var(--serif)">{pct}%</text>
+        <text x={56} y={65} textAnchor="middle" fill={color} fontSize={30} fontFamily="var(--serif)" fontWeight={600}>{pct}%</text>
       </svg>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Chance it lasts</span>
-        <span style={{ fontFamily: 'var(--serif)', fontSize: 22, color: 'var(--heading)' }}>{label}</span>
+        <span style={{ fontFamily: 'var(--serif)', fontSize: 22, color }}>{label}</span>
       </div>
     </div>
   );
@@ -1621,7 +1621,7 @@ export default function MyPlan({ openRange = false }) {
           <>
             <div className="verdict-row">
               {/* The verdict: one plain sentence, one next step. */}
-              <Card style={{ flex: '999 1 400px', minWidth: 0, padding: '36px 40px', display: 'flex', flexDirection: 'column', gap: 18, borderRadius: 20 }}>
+              <Card style={{ flex: '999 1 400px', minWidth: 0, padding: '36px 40px', display: 'flex', flexDirection: 'column', gap: 18, borderRadius: 20, background: `linear-gradient(145deg, ${onTrack ? 'var(--accent-dim)' : 'var(--warn-dim)'} 0%, var(--card) 52%)` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Your verdict</span>
                   <span style={{ fontSize: 13, fontWeight: 600, borderRadius: 999, padding: '3px 12px', color: onTrack ? 'var(--accent)' : 'var(--warn)', background: onTrack ? 'var(--accent-dim)' : 'var(--warn-dim)' }}>
@@ -1631,14 +1631,14 @@ export default function MyPlan({ openRange = false }) {
                 <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 'clamp(30px, 4vw, 42px)', lineHeight: 1.15, letterSpacing: '-0.015em', color: 'var(--heading)', textWrap: 'balance', maxWidth: 640 }}>
                   {pct !== null
                     ? (onTrack
-                      ? <>You&apos;re on track. Your money lasts your whole plan in {pct}% of markets.</>
+                      ? <>You&apos;re on track. Your money lasts your whole plan in <span style={{ color: 'var(--accent)' }}>{pct}%</span> of markets.</>
                       // Positive human mindset, honest numbers: when the
                       // current plan is short, lead with the plan that
                       // WORKS (the 80%-chance spending the engine already
                       // solved for), not with the failure rate — the ring
                       // beside it still carries the strict number.
                       : canSpend > 0
-                      ? <>A strong plan is within reach: {fmt(Math.round(canSpend / 12))}/mo gives you an 80% chance.</>
+                      ? <>A strong plan is within reach: <span style={{ color: 'var(--accent)' }}>{fmt(Math.round(canSpend / 12))}/mo</span> gives you an 80% chance.</>
                       : <>Your money lasts your whole plan in only {pct}% of markets.</>)
                     : covered
                     // "Funded through the full plan" not "lasts to age N" —
